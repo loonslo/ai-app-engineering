@@ -1,9 +1,9 @@
 ---
 project_id: langchain-learning
-updated: 2026-10-18
+updated: 2026-10-27
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、企业客服旗舰项目与岗位选修专项。
-progress: "课件全量结构完成：82 章 + 29 步均有 v2 阶段标签、前置与索引，111 个 README 标签一致、断链 0；82 章全部有验收方式（75 章离线 gate + 7 章清单），29 步有总验收清单。各批参考解通过、默认骨架 0 通过，现有离线测试 28 passed、ruff 通过。未运行真实模型/外部服务，未部署，人工学习与真实环境验收未完成。"
+progress: "课件全量结构完成（82 章 + 29 步）；完成 Capstone 核心稳定性与并发性能优化；完成测试转复合型 AI 应用开发工程师求职作品集与面试攻防手册梳理（STAR 简历、5 分钟 Pitch、四层攻防卡）。离线生产测试 34 passed，章节测试 28 passed，ruff 与 milestones/baseline 全部通过。未运行真实外部模型与物理部署验收。"
 next: "进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
 evidence:
   - README.md
@@ -31,6 +31,9 @@ evidence:
   - docs/course-book-validation.md
   - docs/course-review-validation.md
   - docs/course-book-v1-validation.md
+  - docs/capstone-optimization-validation.md
+  - capstone/docs/portfolio/resume_evidence.md
+  - capstone/docs/portfolio/project_pitch.md
 ---
 
 # LangChain 学习记录 · 项目概览与进度
@@ -68,3 +71,7 @@ evidence:
 同日完成 B4b：4.6 节点可靠性、4.7 结构化路由改为 gate，覆盖降级/可重试/真实超时、枚举路由/意图分类。临时参考解跑通 7/7、4/4；默认骨架 0 通过；现有测试 28 passed、断链 0、ruff 通过。未调用真实模型；命令与边界见 `docs/gate-b4b-validation.md`。
 
 同日完成 B4c：4.8 规划与执行、4.9 可观测性、4.10 检查点与上下文改为 gate，覆盖计划解析/异常/超长、轨迹记录/汇总、会话隔离/副本/裁剪。临时参考解跑通 6/6、4/4、6/6；默认骨架 0 通过；现有测试 28 passed、断链 0、ruff 通过。未调用真实模型/checkpointer；命令与边界见 `docs/gate-b4c-validation.md`。
+
+2026-10-26 完成 Capstone 核心模块稳定性与并发性能优化：修复 BM25 缓存无界与增量版本失效风险，消除 SQLite 监控指标每次插入重复 DDL/WAL 开销，多租户 Registry 粗粒度全局锁升级为分租户细粒度锁与双重检查，并在 KnowledgeBase 内部复用可靠 LLM 链实例。34 项离线测试全部通过（耗时由 10.14s 降至 6.62s）、28 项工具链测试通过、ruff 通过、milestones 与 baseline 全部通过。未运行真实模型与远端服务；命令、结果与边界见 `docs/capstone-optimization-validation.md`。
+
+2026-10-27 完成求职作品集与面试攻防实操手册梳理：基于测试转复合型 AI 应用开发工程师定位，提炼 STAR 项目经历与 5 分钟 Pitch 讲稿，确立“检索前 ACL + 增量确定性同步 + 身份/版本感知缓存”为第一技术卖点，整合“三层质量金字塔 CI 门禁”、“七阶段线性归因漏斗”、“分租户条带锁并发调优”与“HITL 有界 Agent”四大硬核攻防卡（风险-实现-证据-边界），并同步更新 portfolio 文档与证据链。

@@ -18,6 +18,10 @@
 
 ## Done
 
+- [x] **求职作品集与面试攻防实战体系（2026-10-27）** - 完成测试转复合型 AI 应用开发工程师作品集打磨与面试攻防梳理：提炼 STAR 简历经历、5 分钟 Pitch 讲稿与四层硬核攻防卡（Pre-filtering ACL、分层 CI 质量门禁、七阶段失败归因、分租户条带锁并发优化、HITL 一次性持久化审批）；更新 `capstone/docs/portfolio/resume_evidence.md`、`capstone/docs/portfolio/project_pitch.md`。相关证据通过 strict-evidence 与 34 项离线生产测试。
+
+- [x] **Capstone 核心稳定性与并发优化（2026-10-26）** - 修复 BM25 缓存无界与增量版本失效风险；消除 SQLite 监控指标每次插入重复 DDL/WAL 开销；多租户 Registry 粗粒度全局锁升级为分租户细粒度锁与双重检查；复用可靠 LLM 链实例。34 项离线测试全部通过（耗时由 10.14s 降至 6.62s）、28 项工具链测试通过、ruff 通过、milestones 与 baseline 全部通过。未运行真实模型与远端服务。证据见 docs/capstone-optimization-validation.md
+
 - [x] **B6i 全量收口（2026-10-18）** - 补 3.8、4.13、8.1、8.2、8.3、8.7、8.8 七个 gate；为 0.1、0.2、1.6、1.7、4.15、5.6 增加清单；82 章 75 gate + 7 checklist，29 步总清单落地。参考解全部通过、骨架 0 通过；测试 28 passed、断链 0、v2 标签 111 unchanged、ruff 通过。证据见 `docs/gate-b6i-validation.md`
 
 - [x] **B5b 部分（2026-10-18）** - 5.4 SQLite、5.7 安全护栏改为 gate；参考解 4/4、7/7；默认骨架 0 通过。5.3/5.5/5.8 未做。证据见 `docs/gate-b5b-validation.md`

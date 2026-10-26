@@ -51,6 +51,15 @@ class TenantKBRegistry:
         self._items: dict[str, KnowledgeBase] = {}
         self._sync_mtimes: dict[str, int] = {}
         self._lock = RLock()
+        self._tenant_locks: dict[str, RLock] = {}
+
+    def _get_tenant_lock(self, tenant_id: str) -> RLock:
+        with self._lock:
+            lock = self._tenant_locks.get(tenant_id)
+            if lock is None:
+                lock = RLock()
+                self._tenant_locks[tenant_id] = lock
+            return lock
 
     @staticmethod
     def _sync_mtime(tenant_id: str) -> int:
@@ -68,33 +77,48 @@ class TenantKBRegistry:
         return C.DOCS_DIR
 
     def get(self, tenant_id: str) -> KnowledgeBase:
+        sync_mtime = self._sync_mtime(tenant_id)
         with self._lock:
             existing = self._items.get(tenant_id)
-            sync_mtime = self._sync_mtime(tenant_id)
             if (
                 existing is not None
                 and self._sync_mtimes.get(tenant_id, 0) == sync_mtime
             ):
                 return existing
+
+        tenant_lock = self._get_tenant_lock(tenant_id)
+        with tenant_lock:
+            with self._lock:
+                existing = self._items.get(tenant_id)
+                sync_mtime = self._sync_mtime(tenant_id)
+                if (
+                    existing is not None
+                    and self._sync_mtimes.get(tenant_id, 0) == sync_mtime
+                ):
+                    return existing
+
             kb = KnowledgeBase(
                 tenant_id=tenant_id,
                 docs_dir=self._docs_dir(tenant_id),
                 persist_dir=C.tenant_chroma_dir(tenant_id),
             ).build()
-            self._items[tenant_id] = kb
-            self._sync_mtimes[tenant_id] = sync_mtime
+            with self._lock:
+                self._items[tenant_id] = kb
+                self._sync_mtimes[tenant_id] = sync_mtime
             answer_cache.invalidate_tenant(tenant_id)
             return kb
 
     def reload(self, tenant_id: str) -> KnowledgeBase:
-        with self._lock:
+        tenant_lock = self._get_tenant_lock(tenant_id)
+        with tenant_lock:
             kb = KnowledgeBase(
                 tenant_id=tenant_id,
                 docs_dir=self._docs_dir(tenant_id),
                 persist_dir=C.tenant_chroma_dir(tenant_id),
             ).build(rebuild=True)
-            self._items[tenant_id] = kb
-            self._sync_mtimes[tenant_id] = self._sync_mtime(tenant_id)
+            with self._lock:
+                self._items[tenant_id] = kb
+                self._sync_mtimes[tenant_id] = self._sync_mtime(tenant_id)
             answer_cache.invalidate_tenant(tenant_id)
             return kb
 

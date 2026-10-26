@@ -2,32 +2,51 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
+import threading
 from contextlib import closing
 from datetime import UTC, datetime, timedelta
 
 from . import config as C
 
+_initialized_dbs: set[str] = set()
+_init_lock = threading.Lock()
+
+
+def _ensure_schema(connection: sqlite3.Connection, db_path: str) -> None:
+    if db_path in _initialized_dbs:
+        return
+    with _init_lock:
+        if db_path in _initialized_dbs:
+            return
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute(
+            """CREATE TABLE IF NOT EXISTS request_metrics(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                tenant TEXT NOT NULL,
+                latency_ms REAL NOT NULL,
+                is_error INTEGER NOT NULL,
+                tokens INTEGER NOT NULL DEFAULT 0,
+                cost REAL NOT NULL DEFAULT 0,
+                model TEXT NOT NULL DEFAULT '',
+                cache_hit INTEGER NOT NULL DEFAULT 0,
+                question_fingerprint TEXT NOT NULL DEFAULT ''
+            )"""
+        )
+        _initialized_dbs.add(db_path)
+
 
 def _connect() -> sqlite3.Connection:
     C.ensure_runtime_directories()
-    connection = sqlite3.connect(C.METRICS_DB_PATH, timeout=5)
-    connection.execute("PRAGMA journal_mode=WAL")
-    connection.execute(
-        """CREATE TABLE IF NOT EXISTS request_metrics(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            ts TEXT NOT NULL,
-            request_id TEXT NOT NULL,
-            tenant TEXT NOT NULL,
-            latency_ms REAL NOT NULL,
-            is_error INTEGER NOT NULL,
-            tokens INTEGER NOT NULL DEFAULT 0,
-            cost REAL NOT NULL DEFAULT 0,
-            model TEXT NOT NULL DEFAULT '',
-            cache_hit INTEGER NOT NULL DEFAULT 0,
-            question_fingerprint TEXT NOT NULL DEFAULT ''
-        )"""
-    )
+    db_path = str(C.METRICS_DB_PATH)
+    if db_path in _initialized_dbs and not os.path.exists(db_path):
+        with _init_lock:
+            _initialized_dbs.discard(db_path)
+    connection = sqlite3.connect(db_path, timeout=5)
+    _ensure_schema(connection, db_path)
     return connection
 
 

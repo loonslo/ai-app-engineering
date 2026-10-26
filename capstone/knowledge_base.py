@@ -8,6 +8,7 @@ import logging
 import re
 import string
 from dataclasses import dataclass
+from collections import OrderedDict
 from pathlib import Path
 from threading import RLock
 from typing import Any
@@ -195,7 +196,8 @@ class KnowledgeBase:
         self.chunks: list[Document] = []
         self.vectorstore: Chroma | None = None
         self.version = "unbuilt"
-        self._bm25: dict[tuple[str, str, tuple[str, ...]], LexicalRetriever] = {}
+        self._bm25: OrderedDict[tuple[str, str, str, tuple[str, ...]], LexicalRetriever] = OrderedDict()
+        self._llm_cache: dict[str, Any] = {}
         self._lock = RLock()
 
     def _load_chunks(self) -> list[Document]:
@@ -243,6 +245,9 @@ class KnowledgeBase:
             sorted(chunk.metadata["chunk_id"] for chunk in self.chunks)
         )
         self.version = hashlib.sha256(version_material.encode()).hexdigest()[:16]
+        with self._lock:
+            self._bm25.clear()
+            self._llm_cache.clear()
         self.persist_dir.parent.mkdir(parents=True, exist_ok=True)
 
         has_index = self.persist_dir.is_dir() and any(self.persist_dir.iterdir())
@@ -274,10 +279,11 @@ class KnowledgeBase:
         return self
 
     def _authorized_bm25(self, user: User) -> LexicalRetriever | None:
-        key = (user.user_id, user.dept, tuple(sorted(user.roles)))
+        key = (self.version, user.user_id, user.dept, tuple(sorted(user.roles)))
         with self._lock:
             cached = self._bm25.get(key)
             if cached is not None:
+                self._bm25.move_to_end(key)
                 return cached
             authorized = [
                 chunk for chunk in self.chunks if can_see(chunk.metadata, user)
@@ -285,6 +291,8 @@ class KnowledgeBase:
             if not authorized:
                 return None
             retriever = LexicalRetriever(authorized, k=C.TOP_K * 2)
+            if len(self._bm25) >= 256:
+                self._bm25.popitem(last=False)
             self._bm25[key] = retriever
             return retriever
 
@@ -402,6 +410,14 @@ class KnowledgeBase:
             request_id=request_id,
         ).text
 
+    def _get_cached_llm(self, model: str) -> Any:
+        with self._lock:
+            llm = self._llm_cache.get(model)
+            if llm is None:
+                llm = C.get_reliable_llm(model=model)
+                self._llm_cache[model] = llm
+            return llm
+
     def answer_with_usage(
         self,
         question: str,
@@ -423,7 +439,7 @@ class KnowledgeBase:
                 else f"{question}\n用户显式回复偏好：{response_preferences}"
             ),
         )
-        response = C.get_reliable_llm(model=model).invoke(
+        response = self._get_cached_llm(model=model).invoke(
             messages,
             config={
                 "metadata": {

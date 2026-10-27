@@ -81,13 +81,15 @@ python chapters/part1-foundations/1.1-first-call/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 1.1
+python chapters/part1-foundations/1.1-first-call/first_call.py
 ```
 
-对照时只回答：
+参考实现改用原生的 `common.get_openai_client()` 与 `common.chat_model_name()` 执行调用。需要认识到：框架里的聊天模型类（例如 LangChain 的 `ChatOpenAI`）在这一层本质上只是包装了同一个底层的 HTTP 请求与 JSON 往返，剥离框架后我们能更清晰地看见网络、错误捕获与 Token 计量的真实细节。
 
-1. 参考实现直接 `llm.invoke`，没有处理空 content / 超时；如果上生产，最先补哪一层？
-2. `StrOutputParser` 帮你省掉了哪一步？它有没有丢掉 token 信息？
+对照时思考并回答：
+
+1. 参考实现直接通过原生 SDK 调用，并显式捕获了认证、超时、限流三类异常；如果要在生产落地，哪些属于可重试错误？
+2. 原生返回中的 `usage` 包含了哪些字段？为什么不能直接把响应剥离成纯字符串而忽略 `finish_reason`？
 3. 参考实现的 system prompt 和本 gate 的 `build_messages` 结构是否一致？
 
 ## 概念地图

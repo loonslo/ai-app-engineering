@@ -87,14 +87,16 @@ python chapters/part1-foundations/1.8-cli-chatbot/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 1.8
+python chapters/part1-foundations/1.8-cli-chatbot/chatbot_project.py
 ```
 
-对照时只回答：
+参考实现改用原生的 `run_cli` 控制循环，跨章复用了 1.3 结构化校验与 1.5 工具调用体系，彻底剥离了 LangChain 框架依赖。
 
-1. 参考实现用 `input()` 交互；要把它改成可测试的 `run_cli(inputs, ...)`，最小改动是什么？
-2. 参考实现的 `quit` 会保存对话文件；本 gate 为什么不写文件？
-3. 参考实现没有 `max_turns`；加上限会改变哪些行为？
+对照时思考并回答：
+
+1. 为什么将命令行输入设计为 `inputs: Iterable[str]` 能够使 CLI 程序在离线状态下实现 100% 自动化单元测试？
+2. clear 命令为什么必须重置为仅包含 SYSTEM_PROMPT 的初始状态？如果直接清空成空列表会丢失什么？
+3. 生产环境中为什么要硬性限制 max_turns？当触发 max_turns 时，返回特定 exit_code=2 对上层容器编排或监控系统有什么意义？
 
 ## 概念地图
 

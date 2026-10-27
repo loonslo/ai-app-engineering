@@ -84,14 +84,42 @@ python chapters/part1-foundations/1.5-tool-calling/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 1.5
+python chapters/part1-foundations/1.5-tool-calling/tool_calling.py
 ```
 
-对照时只回答：
+参考实现采用原生的 SDK 完整还原了 OpenAI 风格工具调用协议的全链路，涵盖了工具 Schema 声明、并发工具解析、基于 role="tool" + tool_call_id 的结果回灌，以及工具失败的防御性回传。
 
-1. 参考实现用 `@tool` + `bind_tools`，谁负责生成工具 schema？你的 gate 里是谁？
-2. 参考实现只跑两轮；如果模型连续请求工具，它有没有上限？
-3. 参考实现的 `calculate` 用 `eval`；你的 `dispatch_tool` 有没有类似风险？
+对照时思考并回答：
+
+1. 为什么在工具调用中，工具执行抛出的异常（如参数非法、超时、网络错误）不能直接崩溃抛出，而必须作为结构化错误信息通过 role="tool" 回灌给模型？
+2. 协议中的 `tool_call_id` 是如何保证模型在发起多个并行工具调用时，能准确将返回结果与各个调用上下文一一对应的？
+3. 为什么必须硬性限制 `max_steps`？当达到最大循环步数时，工程上应当返回降级提示还是直接拒绝服务？
+
+## 框架对照
+
+同一工具调用流程在 LangChain 中通常这样实现（历史参考代码已归档至 [tool_calling_langchain.py](tool_calling_langchain.py)）：
+
+```python
+from langchain_core.tools import tool
+
+@tool
+def get_weather(city: str) -> str:
+    """查询指定城市当天的实时天气。"""
+    return f"{city} 晴 22℃"
+
+llm_with_tools = llm.bind_tools([get_weather])
+ai_msg = llm_with_tools.invoke("北京天气怎么样？")
+# 框架将自动提取 ai_msg.tool_calls 并分发
+```
+
+### 框架省去了什么，又隐藏了什么？
+1. **省去的代码**：
+   - 自动通过函数签名与 Docstring 生成 JSON Schema；
+   - 自动将 `tool_calls` 转换为 `ToolMessage` 并绑定 `tool_call_id`。
+2. **隐藏的行为与潜在风险**：
+   - **错误吞没与抛出边界**：如果工具抛出非受检异常，默认可能直接抛出崩溃，而不是把错误信息组织成观察结果（Observation）回灌给模型促使其纠偏；
+   - **并发分发控制**：面对并行工具调用（Parallel Tool Calling）时，原生实现可以清晰地控制是串行还是并发执行，而框架封装容易隐藏异步并发与超时控制细节；
+   - **参数防御**：直接依赖类型提示（Type Hints）自动反射生成的 Schema，对于复杂校验逻辑（如正负数、正则格式）缺乏显式防御断言。
 
 ## 概念地图
 

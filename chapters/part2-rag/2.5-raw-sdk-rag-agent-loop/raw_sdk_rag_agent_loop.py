@@ -26,14 +26,20 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Callable
 
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
-from common import SAMPLE_DOC
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from common import DEEPSEEK_BASE_URL, SAMPLE_DOC, _deepseek_api_key, chat_model_name
 
 load_dotenv()
 
-API_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/chat/completions"
-MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+API_URL = DEEPSEEK_BASE_URL.rstrip("/") + "/chat/completions"
+MODEL = chat_model_name()
 
 
 @dataclass
@@ -78,7 +84,7 @@ def retrieve(query: str, chunks: list[Chunk], k: int = 3) -> list[Chunk]:
 
 def chat(messages: list[dict[str, str]], temperature: float = 0.0) -> str:
     """直接调 OpenAI 兼容接口。没有 key 时返回离线提示，保证文件可读可跑。"""
-    api_key = os.getenv("DEEPSEEK_API_KEY")
+    api_key = _deepseek_api_key()
     if not api_key:
         return "（离线模式）未配置 DEEPSEEK_API_KEY；这里会发送 messages 给模型并返回 content。"
 

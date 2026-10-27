@@ -7,6 +7,9 @@ ROOT = Path(__file__).resolve().parents[1]
 CHAPTERS: dict[str, str] = {
     "0.1": "chapters/part0-setup/0.1-environment",
     "0.2": "chapters/part0-setup/0.2-learning-workflow",
+    "0.3": "chapters/part0-setup/0.3-coding-agent-workflow",
+    "0.4": "chapters/part0-setup/0.4-python-engineering-base",
+    "0.5": "chapters/part0-setup/0.5-job-map-gap",
     "1.1": "chapters/part1-foundations/1.1-first-call",
     "1.2": "chapters/part1-foundations/1.2-control-output",
     "1.3": "chapters/part1-foundations/1.3-structured-output",
@@ -15,6 +18,8 @@ CHAPTERS: dict[str, str] = {
     "1.6": "chapters/part1-foundations/1.6-mcp-intro",
     "1.7": "chapters/part1-foundations/1.7-llm-internals",
     "1.8": "chapters/part1-foundations/1.8-cli-chatbot",
+    "1.9": "chapters/part1-foundations/1.9-provider-cost",
+    "1.10": "chapters/part1-foundations/1.10-embedded-llm-feature",
     "2.1": "chapters/part2-rag/2.1-load-split",
     "2.2": "chapters/part2-rag/2.2-embed-retrieve",
     "2.3": "chapters/part2-rag/2.3-minimal-rag",

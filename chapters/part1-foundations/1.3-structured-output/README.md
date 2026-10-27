@@ -83,14 +83,24 @@ python chapters/part1-foundations/1.3-structured-output/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 1.3
+python chapters/part1-foundations/1.3-structured-output/structured_output.py
 ```
 
-对照时只回答：
+参考实现改用原生的客户端，完整演示了三种结构化提取路径：
+1. **JSON Object 模式**（`response_format={"type": "json_object"}`）+ 运行时 Pydantic 校验与一次修复重试；
+2. **工具即输出**（Tool Calling as Output）：定义工具 Schema 并强制 `tool_choice`；
+3. **严格模式能力判定**：先做能力探针，而不是假设所有模型都支持严格 JSON Schema。
 
-1. 参考实现用 `with_structured_output`，它把“格式约束”交给了谁？你的解析器补了什么？
-2. 参考实现拿到的是 Pydantic 对象；你的 gate 返回 dict。两者在后续评测里各有什么取舍？
-3. 参考实现没有业务范围校验；把 score 改成 0–100 后，哪里需要改？
+> [!IMPORTANT]
+> **厂商生态与思考模型重要边界**：
+> - 根据主流框架调研（来源：Pydantic AI 官方文档与社区追踪，核验读取日期：**2026-10-27**），DeepSeek 官方的 Chat Completions API 端点目前**不接受严格的 JSON Schema 语法**（即 `response_format={"type": "json_schema"}` 会报错或被忽略）；在接入 DeepSeek 时应使用方式一或方式二进行结构化提取。
+> - 在推理模型（如 DeepSeek-R1 / V4）中，模型默认开启内部思考过程。在思考模式下，端点通常**不接受强制 `tool_choice` 参数**。在需要严格、高确定性结构化提取的业务中，必须显式关闭思考或使用非推理通用模型。
+
+对照时思考并回答：
+
+1. 为什么说 JSON Schema 校验通过只代表“数据类型正确”，不能代表“业务语义合法”？为什么在 DTO 映射层必须做业务二阶校验？
+2. 工具即输出模式在什么情况下会失效？为什么不能依赖写死的厂商名单判断严格 Schema 支持？
+3. 在重试修复提示词中，应该把前一次的错误信息以何种形式回传给模型？
 
 ## 概念地图
 

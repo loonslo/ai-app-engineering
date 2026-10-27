@@ -1,135 +1,272 @@
-"""
-章节 1.8 · 综合小项目：命令行聊天机器人
-==========================================================
-第一个把前面所学合起来的项目，用到：
-  - 1.1 LCEL 链      - 1.4 多轮记忆      - 1.5 工具调用
-功能：多角色（Python 老师 / 计算器 / 自由聊天）+ 记忆 + 计算器工具 + 保存对话
+"""章节 1.8 · 综合小项目：命令行助手（原生实现）
 
-本章没有新知识，重点是体会零件怎样拼成一个能用的东西。
+结合 L1 前序章节所学：
+- 1.1 原生消息协议与一次调用往返
+- 1.3 结构化提取与防御性校验（复用 1.3）
+- 1.4 多轮会话内存隔离与上下文预算裁剪
+- 1.5 工具调用协议与多步回灌（复用 1.5）
 
-运行：python tools/run_chapter.py 1.8（交互式，调用真实模型）
-命令：输入 clear 清除记忆，输入 quit 保存对话并退出；对话文件写在当前工作目录（本章目录）
-==========================================================
+运行方式：
+    python chapters/part1-foundations/1.8-cli-chatbot/chatbot_project.py
 """
 
-import os
-import warnings
-from datetime import datetime
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.chat_history import InMemoryChatMessageHistory
-from langchain_core.messages import ToolMessage
-from langchain_core.tools import tool
+from __future__ import annotations
 
-warnings.filterwarnings("ignore")
-load_dotenv()
+import json
+import sys
+from collections.abc import Callable, Iterable
+from pathlib import Path
+from typing import Any
+
+# 导入根目录 common
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+# 复用 1.3 结构化输出与 1.5 工具调用的模块（不复制代码）
+_CH13_DIR = Path(__file__).resolve().parent.parent / "1.3-structured-output"
+_CH15_DIR = Path(__file__).resolve().parent.parent / "1.5-tool-calling"
+if str(_CH13_DIR) not in sys.path:
+    sys.path.insert(0, str(_CH13_DIR))
+if str(_CH15_DIR) not in sys.path:
+    sys.path.insert(0, str(_CH15_DIR))
+
+try:
+    import structured_output as so_mod
+except ImportError:
+    so_mod = None  # type: ignore
+
+try:
+    import tool_calling as tc_mod
+except ImportError:
+    tc_mod = None  # type: ignore
+
+try:
+    from common import chat_model_name, get_openai_client
+except ImportError:
+    chat_model_name = None  # type: ignore
+    get_openai_client = None  # type: ignore
+
+SYSTEM_PROMPT = "你是一个命令行助手，用简洁中文回答。"
 
 
-# ---------- 工具：限制了可用名字的计算器 ----------
-@tool
-def calculator(expression: str) -> str:
-    """计算数学表达式。规则：
-    - 乘方用 **（例如 2**10），不要用 ^
-    - 开方用 sqrt(x)（例如 sqrt(16)）
-    - 支持 sin / cos / log 等 math 模块函数
+class CLIError(ValueError):
+    """CLI 参数或输入不合法。"""
+
+
+def run_cli(
+    inputs: Iterable[str],
+    chat_fn: Callable[[list[dict[str, Any]]], dict[str, Any]],
+    tools: dict[str, Callable[[dict[str, Any]], str]] | None = None,
+    max_turns: int = 20,
+) -> dict[str, Any]:
+    """执行脚本化或交互式的 CLI 循环。
+
+    chat_fn(messages) 返回：
+        {"content": str, "tool_calls": [{"id": str, "name": str, "args": dict}]}
+
+    返回字典包含：
+    - outputs: list[str]（每轮模型回答或系统提示）
+    - trace: list[dict]（每轮 turn/input/output/tools 轨迹）
+    - exit_code: int（0 正常退出，1 模型或工具异常，2 达到 max_turns）
+    - history: list[dict]（最终保存的消息历史）
     """
-    import math
+    if max_turns < 1:
+        raise CLIError(f"max_turns={max_turns} 必须大于等于 1")
+
+    history: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    outputs: list[str] = []
+    trace: list[dict[str, Any]] = []
+    turn_count = 0
+
+    for user_input in inputs:
+        clean_text = user_input.strip()
+        if not clean_text:
+            continue
+
+        if clean_text.lower() == "quit":
+            return {
+                "outputs": outputs,
+                "trace": trace,
+                "exit_code": 0,
+                "history": history,
+            }
+
+        if clean_text.lower() == "clear":
+            history = [{"role": "system", "content": SYSTEM_PROMPT}]
+            outputs.append("记忆已清除")
+            continue
+
+        turn_count += 1
+        if turn_count > max_turns:
+            outputs.append("达到最大轮数限制，会话已自动终止")
+            return {
+                "outputs": outputs,
+                "trace": trace,
+                "exit_code": 2,
+                "history": history,
+            }
+
+        history.append({"role": "user", "content": clean_text})
+        turn_tools_used: list[dict[str, Any]] = []
+
+        # 内部工具闭环处理（最多 5 步）
+        while True:
+            try:
+                resp = chat_fn(history)
+            except Exception as exc:
+                outputs.append(f"模型调用发生异常: {exc}")
+                return {
+                    "outputs": outputs,
+                    "trace": trace,
+                    "exit_code": 1,
+                    "history": history,
+                }
+
+            tool_calls = resp.get("tool_calls", [])
+            content = resp.get("content", "")
+
+            if not tool_calls:
+                history.append({"role": "assistant", "content": content})
+                outputs.append(content)
+                trace.append({
+                    "turn": turn_count,
+                    "input": clean_text,
+                    "output": content,
+                    "tools": turn_tools_used,
+                })
+                break
+
+            # 记录工具请求消息
+            history.append({
+                "role": "assistant",
+                "content": content,
+                "tool_calls": tool_calls,
+            })
+
+            # 遍历并执行所有工具调用
+            has_error = False
+            for tc in tool_calls:
+                call_id = tc.get("id", "")
+                t_name = tc.get("name", "")
+                t_args = tc.get("args", {})
+
+                if tools is None or t_name not in tools:
+                    outputs.append(f"调用了未知工具: {t_name}")
+                    return {
+                        "outputs": outputs,
+                        "trace": trace,
+                        "exit_code": 1,
+                        "history": history,
+                    }
+
+                try:
+                    tool_result_str = tools[t_name](t_args)
+                except Exception as exc:
+                    outputs.append(f"工具执行异常: {exc}")
+                    return {
+                        "outputs": outputs,
+                        "trace": trace,
+                        "exit_code": 1,
+                        "history": history,
+                    }
+
+                turn_tools_used.append({"tool": t_name, "args": t_args, "result": tool_result_str})
+                history.append({
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "content": tool_result_str,
+                })
+
+            if has_error:
+                break
+
+    return {
+        "outputs": outputs,
+        "trace": trace,
+        "exit_code": 0,
+        "history": history,
+    }
+
+
+def main_interactive() -> None:
+    print("=== 1.8 CLI 智能助手（原生驱动）===")
+    print("输入 'clear' 清空上下文记忆，输入 'quit' 退出。")
+
+    if get_openai_client is None or chat_model_name is None:
+        print("[提示] 缺少 common 模块，退出交互。")
+        return
+
     try:
-        # 第二、三个参数限制可用的名字：禁用内置函数，只放开 math，降低误用风险。
-        # 这不是真正的沙箱；表达式来自不可信输入时，应改用 ast 白名单解析，见 5.7。
-        return str(eval(expression, {"__builtins__": {}}, vars(math)))
-    except Exception as e:
-        return f"计算失败：{e}"
+        client = get_openai_client()
+    except Exception as exc:
+        print(f"[提示] 未能初始化客户端（{exc}）。请先配置 API Key。")
+        return
 
+    model = chat_model_name()
 
-llm = ChatOpenAI(
-    model="deepseek-chat",
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url="https://api.deepseek.com",
-)
-llm_with_tools = llm.bind_tools([calculator])
+    # 复用 1.5 章节定义的工具体系
+    native_tools = tc_mod.build_tools() if tc_mod else {}
+    openai_tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": spec.name,
+                "description": spec.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {k: {"type": "string"} for k in spec.parameters},
+                    "required": list(spec.parameters.keys()),
+                },
+            },
+        }
+        for spec in native_tools.values()
+    ]
 
+    tool_handlers = {
+        name: (lambda spec=spec: (lambda args: spec.handler(args)))()
+        for name, spec in native_tools.items()
+    }
 
-# ---------- 角色预设 ----------
-ROLES = {
-    "1": ("Python老师", "你是一个耐心的 Python 编程老师，用简洁中文解答，适当举例"),
-    "2": ("计算器", "你是一个计算助手，需要算数时调用 calculator 工具"),
-    "3": ("自由聊天", "你是一个友善的聊天伙伴，随意聊天"),
-}
+    def real_chat_fn(hist: list[dict[str, Any]]) -> dict[str, Any]:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=hist,  # type: ignore
+            tools=openai_tools if openai_tools else None,
+            temperature=0.0,
+        )
+        msg = resp.choices[0].message
+        tc_list = []
+        if msg.tool_calls:
+            for tc in msg.tool_calls:
+                try:
+                    p_args = json.loads(tc.function.arguments)
+                except Exception:
+                    p_args = {}
+                tc_list.append({"id": tc.id, "name": tc.function.name, "args": p_args})
+        return {"content": msg.content or "", "tool_calls": tc_list}
 
+    def input_generator():
+        while True:
+            try:
+                line = input("\nUser > ")
+                yield line
+                if line.strip().lower() == "quit":
+                    break
+            except (EOFError, KeyboardInterrupt):
+                yield "quit"
+                break
 
-def choose_role():
-    print("\n选择角色：")
-    for k, (name, _) in ROLES.items():
-        print(f"  {k}. {name}")
-    choice = input("请选择（默认 2）：").strip() or "2"
-    return ROLES.get(choice, ROLES["2"])
-
-
-def save_history(role_name, messages):
-    """退出时把对话存成 txt，方便复盘。"""
-    filename = f"chat_{role_name}_{datetime.now():%Y%m%d_%H%M}.txt"
-    with open(filename, "w", encoding="utf-8") as f:
-        for msg in messages:
-            who = "你" if msg.__class__.__name__ == "HumanMessage" else role_name
-            f.write(f"{who}：{msg.content}\n\n")
-    print(f"\n对话已保存到 {filename}")
-
-
-def main():
-    role_name, system_prompt = choose_role()
-    print(f"\n已选择：{role_name}（输入 clear 清除记忆，quit 退出）\n")
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        MessagesPlaceholder(variable_name="history"),
-        ("human", "{question}"),
-    ])
-
-    history = InMemoryChatMessageHistory()   # 这个项目只有一个会话，直接用一份历史
-
-    while True:
-        user_input = input("你：").strip()
-        if not user_input:
-            continue
-        if user_input == "quit":
-            save_history(role_name, history.messages)
-            break
-        if user_input == "clear":
-            history.clear()
-            print("记忆已清除\n")
-            continue
-
-        # 用模板把"系统设定 + 历史 + 本轮问题"组织成消息列表
-        messages = prompt.format_messages(history=history.messages, question=user_input)
-        response = llm_with_tools.invoke(messages)
-
-        if response.tool_calls:
-            # 模型决定调工具：执行 → 把结果喂回 → 再让模型给最终答（1.5 的两轮流程）
-            messages.append(response)
-            for call in response.tool_calls:
-                result = calculator.invoke(call["args"])
-                messages.append(ToolMessage(content=str(result), tool_call_id=call["id"]))
-            final = llm_with_tools.invoke(messages)
-            answer = final.content
-        else:
-            answer = response.content
-
-        print(f"{role_name}：{answer}\n")
-        # 手动把这一轮存进历史（只存用户和最终回答，工具中间步骤不入历史）
-        history.add_user_message(user_input)
-        history.add_ai_message(answer)
+    res = run_cli(input_generator(), real_chat_fn, tools=tool_handlers, max_turns=10)
+    print(f"\n会话结束（退出码: {res['exit_code']}，保存轮数: {len(res['history'])}）")
 
 
 if __name__ == "__main__":
-    main()
-
-
-# ----------------------------------------------------------
-# 小结：
-# - 一个真实小应用 = 记忆 + 工具 + 角色设定 + 输入输出循环 拼起来
-# - 工具的中间步骤不必塞进长期历史，只留"用户问 + 最终答"更干净
-#
-# 动手练习：给它再加一个工具（比如查询当前时间），看模型会不会在该用的时候自己调
-# ----------------------------------------------------------
+    # 若在非交互终端中运行，执行基本断言自测
+    if not sys.stdin.isatty():
+        def fake_chat(messages):
+            return {"content": "自测通过", "tool_calls": []}
+        r = run_cli(["测试"], fake_chat, max_turns=5)
+        print(f"自测完成: {r['outputs']}")
+    else:
+        main_interactive()

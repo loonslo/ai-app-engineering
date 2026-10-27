@@ -1,11 +1,11 @@
 # Tasks
 
-状态核对：2026-10-18。课件全量结构完成：82 章 + 29 步均有 v2 标签与验收方式（75 章 gate + 7 章清单 + 29 步总清单）。统一入口见 `chapters/README.md`；目录与文件存在不代表本人已学完或真实环境验收通过。最新收口验证见 `docs/gate-b6i-validation.md`；岗位对标与路径提案见 `docs/curriculum-v2.md`。
+状态核对：2026-10-28。课件全量结构完成：82 章 + 29 步均有 v2 标签与验收方式（75 章 gate + 7 章清单 + 29 步总清单）。v3 课程改造完成 V3-0 基础设施与 V3-1 批次（L0 + L1 共 15 章全量内容，5 个新建章 + 8 个原生重构章 + 1.10 原生/PAI 双解双 Gate 与离线评测 Harness）。统一入口见 `chapters/README.md`；目录与文件存在不代表本人已学完或真实环境验收通过。最新收口验证见 `docs/gate-v3-1-validation.md`；岗位对标与路径提案见 `docs/curriculum-v3.md`。
 
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0 基础设施已完成复核修复待复核；下一步做 V3-1（L0 + L1）。实施者按 `docs/v3/specs/` 的细则完成并自检，审核者按 `docs/v3/review-checklist.md` 验收，审核记录写入 `docs/v3/reviews/`。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0 基础设施已复核通过；V3-1（L0 + L1 全部 15 章）已完成实施与自检，待审核者验收；下一步推进 V3-2（L2 检索与知识系统）。审核记录写入 `docs/v3/reviews/`。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
@@ -18,6 +18,12 @@
 - [ ] **求职准备** - 只从 `capstone/docs/portfolio/` 和真实报告提取可证明结论
 
 ## Done
+
+- [x] **v3 阶段 0 与阶段 1 V3-1 批次落地（2026-10-28）** - 依据 `docs/v3/specs/L0.md` 与 `docs/v3/specs/L1.md` 完成 L0.1–L0.5 与 L1.1–L1.10 全量内容改造：
+  1. 5 个新建章节落地：L0.3（编码 Agent 工作流与审查，包含 practice_repo 真实演练与 check_task.py 退出码验证）、L0.4（Python 工程底座，12 项工程 Gate）、L0.5（岗位地图与差距诊断，包含 3 份求职对标模板与清单）、L1.7/1.9（Provider 抽象与成本 Gate，13 项断言，多 Provider 成本追踪与超时故障转移）、L1.10（嵌入式 LLM 功能综合，原生与 Pydantic AI 双解双 Gate，20 条工单评测集与 FastAPI 工单服务）；
+  2. 8 个原生章节重构：L1.1（原生 OpenAI SDK 替换 LangChain）、L1.2/1.7（改写为原理 Gate，13 项纯数学离线断言）、L1.3（原生控制输出）、L1.4（原生结构化输出与 Pydantic）、L1.5（原生消息记忆与 Token 预算）、L1.6（原生工具调用与单轮/多轮 Tool Loop，原文件保留为 `tool_calling_langchain.py` 作为框架对照）、L1.8（增补配置与测试引用）、L1.9/1.8（原生 CLI 交互智能体）；
+  3. Gate 与评测验证：5 个章节的 starter 骨架在未实现状态下全部退出 1，参考解全部通过（0.3 通过、0.4 12/12、1.7 13/13、1.9 13/13、1.10 原生 16/16、1.10 PAI 6/6，退出码均为 0）；1.10 的 Golden Set 评测模拟 LLM 准确率 100%、规则兜底 75%；
+  4. 质量门禁：工具与章节测试 54 passed、capstone 回归 34 passed、327 个 Markdown 文件断链 0、ruff py311 检查通过、L1 改写章节无非预期 langchain 导入泄漏（0 leaks）、`apply_v2_map --check` 保持 111 unchanged、`apply_v3_map --check` 5 个新建章节全部 unchanged。未运行真实外部模型与公网部署。证据见 `docs/gate-v3-1-validation.md`。
 
 - [x] **v3 基础设施 V3-0 批次落地与复核修复（2026-10-28）** - 针对审核记录（`docs/v3/reviews/V3-0.md`）完成复核修复：
   1. 依赖解析与环境恢复（B1）：选方案 A 锁定 `pydantic-ai-slim[openai]==2.31.1`，在干净临时环境中验证 `pip install --dry-run` 顺利解析，本机 `.venv` 同步恢复且 `pip check` 零冲突；核对 2.31.1 `DeepSeekProvider` 尚未识别 `deepseek-flash`，后续 L1.10/L4.5 按细则显式关闭思考；

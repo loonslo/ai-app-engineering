@@ -83,14 +83,20 @@ python chapters/part1-foundations/1.4-context-memory/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 1.4
+python chapters/part1-foundations/1.4-context-memory/context_memory.py
 ```
 
-对照时只回答：
+参考实现改用原生的 `messages` 列表管理多轮会话，并演示了基于滑动窗口的预算裁剪与对话摘要压缩。
 
-1. 参考实现用 `RunnableWithMessageHistory` 自动存历史；它有没有预算裁剪？
-2. 参考实现的 `session_id` 隔离靠什么？你的 `SessionMemory` 靠什么？
-3. 参考实现的历史在内存里，程序退出就丢；如果要持久化，最小改动是什么？
+> [!NOTE]
+> **章节边界与进阶指引**：
+> 本章只聚焦于**单会话内的滑动窗口预算管理与基础隔离**。关于复杂长上下文的结构化工程设计（Context Engineering）详见 [L2.1](../../part2-rag/2.1-load-split/README.md)；跨会话长期记忆、实体抽取与分层压缩机制详见 [L2.10](../../part2-rag/2.10-chroma-persist/README.md)。
+
+对照时思考并回答：
+
+1. 为什么在多轮对话中盲目将全部历史发给模型不仅成本飙升，还会因为“Lost in the Middle”效应导致模型指令遵循能力下降？
+2. 为什么在裁剪历史时，System Prompt 必须永远无条件保留在最前面？
+3. 在生产环境中，若会话达到数万 Token，阶段性摘要（Summarization）与直接丢弃旧消息相比各有什么优缺点？
 
 ## 概念地图
 

@@ -84,14 +84,16 @@ python chapters/part1-foundations/1.2-control-output/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 1.2
+python chapters/part1-foundations/1.2-control-output/control_output.py
 ```
 
-对照时只回答：
+参考实现改用原生的 `client.chat.completions.create(..., stream=True)`，并演示了首 Token 延迟（TTFT）测量与 `stream_options={"include_usage": True}` 获取。
 
-1. 参考实现只改了 `temperature`，没有校验参数；上生产要先补哪一层？
-2. `chain.stream` 的每个 chunk 是什么类型？和本 gate 的 `collect_stream` 输入是否一致？
-3. 参考实现没有处理流中断；如果网络断了，用户会看到什么？
+对照时思考并回答：
+
+1. 原生流式调用中，首 Token 延迟（TTFT）与后续 Token 输出速率分别受哪些工程瓶颈限制？
+2. 流式响应中的 `usage` 为什么往往在最后一个 chunk 才能读到？如果上游服务商不支持 `include_usage`，应当如何兜底？
+3. 如果在流传输过程中网络发生异常中断，`collect_stream` 是如何保留已收到文本并记录 `model_error` 的？
 
 ## 概念地图
 

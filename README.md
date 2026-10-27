@@ -58,7 +58,7 @@ print(snapshot_download('BAAI/bge-small-zh-v1.5'))   # 打印模型所在的本�
 | 4 | Agent 与 LangGraph | [第 4 篇](chapters/part4-agents-langgraph/README.md) | 必修 |
 | 5 | 服务化与工程可靠性 | [第 5 篇](chapters/part5-production/README.md) | 必修 |
 | 6 | 模型方案取舍 | [第 6 篇](chapters/part6-model-tradeoffs/README.md) | 必修，LoRA 实操选做 |
-| 7 | 企业客服 Copilot · 8 个里程碑 | [项目教程](flagship-project/README.md) · [整合实现 capstone](capstone/README.md) | 必修综合项目 |
+| 7 | 企业客服 Copilot · 8 个里程碑 | [项目教程](flagship-project/README.md) · [整合实现 capstone](capstone/README.md) | 必修综合项目；项目教程已于 2026-10-27 冻结为历史快照，后续以 capstone 为准 |
 | 8 | AI 质量工程专项 | [第 8 篇](chapters/part8-ai-quality-optional/README.md) | 选修 |
 | 9 | 企业数据与推理设施专项 | [第 9 篇](chapters/part9-enterprise-infra-optional/README.md) | 选修 |
 | 10 | MCP 鉴权与 A2A | [第 10 篇](chapters/part10-mcp-a2a-optional/README.md) | 选修 |

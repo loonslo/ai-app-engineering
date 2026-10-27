@@ -39,7 +39,7 @@ jobs:
 
       - name: Verify course tools and unified project baseline
         run: |
-          python -m pytest tools chapters/test_new_lessons.py -q
+          python -m pytest tools chapters/test_new_lessons.py chapters/test_v3_lessons.py -q
           python -m capstone.project_baseline --json
 
       - name: Run deterministic production-boundary tests

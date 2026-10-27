@@ -4,9 +4,10 @@
 
 ## Active
 
-- [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
+- [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0 基础设施已完成待审核；下一步做 V3-1（L0 + L1）。实施者按 `docs/v3/specs/` 的细则完成并自检，审核者按 `docs/v3/review-checklist.md` 验收，审核记录写入 `docs/v3/reviews/`。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
-- [ ] **核对旗舰项目与选修阶段验收** - 按当前章节或里程碑读取代码与测试，补运行证据；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
+- [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
 - [ ] **核对第三方内容与保留的证据文件** - `面试题/` 含第三方整理内容，公开前先核对版权；`reports/` 保留了 3 个被引用的文件（见 `reports/README.md`），删除它们会让 `python -m capstone.interview_evidence --strict-evidence` 失败，并使 `capstone/docs/portfolio/` 引用的压测数字失去来源
 
@@ -18,6 +19,11 @@
 
 ## Done
 
+- [x] **v3 基础设施 V3-0 批次落地（2026-10-27）** - 为 v3 改造准备公共底座：`common.py` 新增原生 OpenAI 客户端与异步工厂（`get_openai_client`、`get_async_openai_client`）、模型名称提取（`chat_model_name`）与本地 embedding/reranker 工厂（`get_sentence_embedder`、`embed_texts`、`get_cross_encoder`）；核对 DeepSeek 官方模型为 `deepseek-flash` 并更新默认值，OpenAI 确认为 `gpt-4o-mini`；在 `requirements-course.txt` 锁定 `pydantic-ai-slim[openai]==2.62.0` 与 `opentelemetry-sdk==1.44.0`；新增覆盖 119 个条目的 `docs/course-v3-map.json` 与幂等标签工具 `tools/apply_v3_map.py`（保留 v2 行，待建章节不报错）；新增 `tools/test_apply_v3_map.py` 与 `chapters/test_v3_lessons.py` 并接入 CI。工具测试与纯函数测试 44 passed、capstone 生产测试 34 passed、断链 0、ruff 通过、`apply_v2_map --check` 111 unchanged。未运行真实外部模型调用与物理部署；证据见 `docs/gate-v3-0-validation.md`
+
+- [x] **v3 两项决定落地（2026-10-27）** - 用户决定：flagship-project 冻结为基于 LangChain 1.x 的历史教学快照；V3-10 保留 `v2 路径` 行、在其上方新增 `v3 路径` 行。已同步：`flagship-project/README.md` 顶部加冻结说明；`AGENTS.md` 删除 flagship 与 capstone 联动验收的约定，改为以 capstone 为准；根目录 README 课程表标注冻结；`docs/v3/` 的默认决策、V3-0 与 V3-10 细则、大纲与 `docs/curriculum-v3.md` 第 7.3 节改为已决定。CI 中 m1/step1 的基线测试保留。只改文档，未改代码
+- [x] **就业视角审查并入与 v3 执行包（2026-10-27）** - 用英文资料（排除中文来源）从招聘筛选、面试形式、企业落地三方面审查 v3，结论并入 `docs/curriculum-v3.md` 第 8 节：技术覆盖够到中级 AI 应用工程师，主要缺口是真实证据、面试形式训练与岗位定位。据此新增项目主线 P（篇 11）、就业轨道 J（篇 12）与就业出口标准 E1–E4，课时由 334h 调整为 380h / 16 周。产出执行包 `docs/v3/`：大纲、编写规范、审核清单与 11 个批次的细则，供其他 AI 实施、Claude 审核。只做设计，未修改章节、未运行课程测试或真实模型；章节以 `docs/v3/outline.md` 为准
+- [x] **课程路径 v3 提案（2026-10-27）** - 用英文资料调研 2026 主流 AI 应用 / Agent 技术栈（排除中文来源），并逐条取舍一份外部架构观点（嵌入式集成 vs 专项 Agent），在 v2 骨架上提出 v3：默认实现改为原生 SDK + Pydantic，核心 SDK 选 Pydantic AI，LangGraph 只负责状态与恢复，LangChain 降为框架素养一章；按两种交付形态组织 334 小时路径，新增上下文工程、执行面、沙箱、持久执行、OTel 等章节；核对仓库 LangChain 依赖分布并给出改造批次。只做设计，未修改章节、未运行课程测试或真实模型；提案见 `docs/curriculum-v3.md`
 - [x] **求职作品集与面试攻防实战体系（2026-10-27）** - 完成测试转复合型 AI 应用开发工程师作品集打磨与面试攻防梳理：提炼 STAR 简历经历、5 分钟 Pitch 讲稿与四层硬核攻防卡（Pre-filtering ACL、分层 CI 质量门禁、七阶段失败归因、分租户条带锁并发优化、HITL 一次性持久化审批）；更新 `capstone/docs/portfolio/resume_evidence.md`、`capstone/docs/portfolio/project_pitch.md`。相关证据通过 strict-evidence 与 34 项离线生产测试。
 
 - [x] **Capstone 核心稳定性与并发优化（2026-10-26）** - 修复 BM25 缓存无界与增量版本失效风险；消除 SQLite 监控指标每次插入重复 DDL/WAL 开销；多租户 Registry 粗粒度全局锁升级为分租户细粒度锁与双重检查；复用可靠 LLM 链实例。34 项离线测试全部通过（耗时由 10.14s 降至 6.62s）、28 项工具链测试通过、ruff 通过、milestones 与 baseline 全部通过。未运行真实模型与远端服务。证据见 docs/capstone-optimization-validation.md

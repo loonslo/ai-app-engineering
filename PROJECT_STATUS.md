@@ -2,14 +2,17 @@
 project_id: langchain-learning
 updated: 2026-10-27
 status: active
-overview: 测试工程师转 AI 应用开发的章节课程、企业客服旗舰项目与岗位选修专项。
-progress: "课件全量结构完成（82 章 + 29 步）；完成 Capstone 核心稳定性与并发性能优化；完成测试转复合型 AI 应用开发工程师求职作品集与面试攻防手册梳理（STAR 简历、5 分钟 Pitch、四层攻防卡）。离线生产测试 34 passed，章节测试 28 passed，ruff 与 milestones/baseline 全部通过。未运行真实外部模型与物理部署验收。"
-next: "进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
+overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
+progress: "落地 v3 改造基础设施批次 V3-0（common.py 原生工厂、官方模型 ID 核对与默认值更新、requirements-course 依赖锁定、119 章映射 docs/course-v3-map.json、幂等标签工具 tools/apply_v3_map.py、CI 离线测试集成）；课件全量结构完成（82 章 + 29 步）；完成 Capstone 稳定性与并发优化；梳理求职作品集与面试攻防手册；完成 v3 提案与就业视角审查；flagship-project 冻结为历史快照。离线生产测试 34 passed，工具与章节测试 44 passed，ruff、断链与 milestones 全部通过。未运行真实外部模型与物理部署验收。"
+next: "按 docs/v3/README.md 推进 V3-1 批次（L0 + L1）；按各章细则实现并自检。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
 evidence:
   - README.md
   - TASKS.md
   - chapters/README.md
   - docs/curriculum-v2.md
+  - docs/curriculum-v3.md
+  - docs/v3/README.md
+  - docs/v3/outline.md
   - docs/course-v2-structure-validation.md
   - docs/gate-samples-validation.md
   - docs/gate-b1-validation.md
@@ -34,6 +37,7 @@ evidence:
   - docs/capstone-optimization-validation.md
   - capstone/docs/portfolio/resume_evidence.md
   - capstone/docs/portfolio/project_pitch.md
+  - docs/gate-v3-0-validation.md
 ---
 
 # LangChain 学习记录 · 项目概览与进度
@@ -75,3 +79,11 @@ evidence:
 2026-10-26 完成 Capstone 核心模块稳定性与并发性能优化：修复 BM25 缓存无界与增量版本失效风险，消除 SQLite 监控指标每次插入重复 DDL/WAL 开销，多租户 Registry 粗粒度全局锁升级为分租户细粒度锁与双重检查，并在 KnowledgeBase 内部复用可靠 LLM 链实例。34 项离线测试全部通过（耗时由 10.14s 降至 6.62s）、28 项工具链测试通过、ruff 通过、milestones 与 baseline 全部通过。未运行真实模型与远端服务；命令、结果与边界见 `docs/capstone-optimization-validation.md`。
 
 2026-10-27 完成求职作品集与面试攻防实操手册梳理：基于测试转复合型 AI 应用开发工程师定位，提炼 STAR 项目经历与 5 分钟 Pitch 讲稿，确立“检索前 ACL + 增量确定性同步 + 身份/版本感知缓存”为第一技术卖点，整合“三层质量金字塔 CI 门禁”、“七阶段线性归因漏斗”、“分租户条带锁并发调优”与“HITL 有界 Agent”四大硬核攻防卡（风险-实现-证据-边界），并同步更新 portfolio 文档与证据链。
+
+同日完成课程路径 v3 提案：用英文资料调研 2026 主流 AI 应用 / Agent 技术栈（排除中文来源），逐条取舍一份外部架构观点，在 v2 骨架上提出原语先行、按嵌入式功能与专项 Agent 两种形态组织的路径；核心 SDK 选 Pydantic AI，LangGraph 只负责状态与恢复，LangChain 降为框架素养一章。只做设计，未修改章节、未运行课程测试或真实模型；flagship 去留与章节标签切换待用户决定。依据、取舍与批次见 `docs/curriculum-v3.md`。
+
+同日并入就业视角审查：用英文资料从招聘筛选、面试形式、企业落地三方面审查 v3，结论是技术覆盖够到中级 AI 应用工程师，主要缺口在真实证据、面试形式训练与岗位定位。据此新增项目主线 P、就业轨道 J 与就业出口标准 E1–E4，课时调整为 380h / 16 周；并产出执行包 `docs/v3/`（大纲、编写规范、审核清单、11 个批次的细则），由其他 AI 按细则实施、Claude 审核。仍只是设计，未修改章节、未运行课程测试或真实模型；国内岗位只来自英文媒体报道，定稿前需对照目标 JD。
+
+同日用户作出两项决定：flagship-project 冻结为基于 LangChain 1.x 的历史教学快照，不再更新（快照仍可还原运行，CI 保留 m1/step1 基线测试）；V3-10 打标签时保留 `v2 路径` 行、在其上方新增 `v3 路径` 行。据此修改了 `AGENTS.md` 的联动验收约定、`flagship-project/README.md` 的冻结说明、根目录 README 的课程表，以及 `docs/v3/` 与 `docs/curriculum-v3.md` 中的相关表述。只改文档，未改代码与测试。
+
+同日完成 v3 改造基础设施批次 V3-0：`common.py` 新增原生 OpenAI 客户端与异步工厂、模型 ID 解析函数、本地嵌入与重排模型工厂；查阅 DeepSeek 官方 API 文档将主力推荐模型默认值更新为 `deepseek-flash`（旧别名 `deepseek-chat` 已下线），OpenAI 确认为 `gpt-4o-mini` 并同步 `.env.example`；在 `requirements-course.txt` 锁定 `pydantic-ai-slim[openai]==2.62.0` 与 `opentelemetry-sdk==1.44.0`；新增覆盖 119 个条目的 `docs/course-v3-map.json` 与幂等标签工具 `tools/apply_v3_map.py`（保留 v2 行，待建章节不报错）；新增 `tools/test_apply_v3_map.py` 与 `chapters/test_v3_lessons.py` 并接入 GitHub Actions CI。工具测试与纯函数测试 44 项通过、capstone 生产测试 34 项通过、Markdown 断链 0、ruff 静态检查通过、`apply_v2_map --check` 111 项无变化。未运行真实外部模型调用与物理部署；命令、结果与边界见 `docs/gate-v3-0-validation.md`。

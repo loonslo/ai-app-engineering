@@ -23,6 +23,8 @@ from urllib.parse import urlparse
 
 from dotenv import dotenv_values, load_dotenv
 
+import openai
+
 _DOTENV_PATH = Path(__file__).resolve().with_name(".env")
 _DOTENV_DEEPSEEK_API_KEY = (
     str(dotenv_values(_DOTENV_PATH).get("DEEPSEEK_API_KEY") or "").strip()
@@ -52,7 +54,7 @@ ZH_SEPARATORS = ["\n\n", "\n", "。", "，", " ", ""]
 # ---- LLM provider：兼容 DeepSeek 官方 API、本地 OpenAI-compatible 服务和 Ollama ----
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-flash")
 DEEPSEEK_SIMPLE_MODEL = os.getenv("DEEPSEEK_SIMPLE_MODEL", "").strip()
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "deepseek-r1:7b")
@@ -311,3 +313,210 @@ def select_model(question: str) -> str:
     if simple and len(question.strip()) <= 80:
         return simple
     return primary
+
+
+# ---- v3 原生模型与嵌入工厂（不依赖 LangChain） ----
+
+
+def get_openai_client(
+    *, timeout: float = 30.0, max_retries: int = 0
+) -> openai.OpenAI:
+    """按 LLM_PROVIDER 返回 OpenAI 兼容的客户端。
+
+    v3 章节应使用本函数创建客户端，而不是使用 get_llm()。
+    构造时不发送网络请求。
+    """
+    provider = LLM_PROVIDER
+    if provider == "bedrock":
+        raise RuntimeError(
+            "Bedrock 不支持直接返回 OpenAI 客户端；请改用 OpenAI 兼容网关或旧接口 get_llm()"
+        )
+    if provider not in SUPPORTED_LLM_PROVIDERS:
+        raise ValueError(f"未知 LLM_PROVIDER：{provider}")
+
+    if provider == "azure":
+        endpoint = os.getenv("AZURE_ENDPOINT", "").strip()
+        if not endpoint:
+            raise RuntimeError("缺少必需环境变量 AZURE_ENDPOINT")
+        api_key = os.getenv("AZURE_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("缺少必需环境变量 AZURE_API_KEY")
+        api_version = os.getenv("AZURE_API_VERSION", "2024-10-21").strip()
+        return openai.AzureOpenAI(
+            azure_endpoint=endpoint,
+            api_key=api_key,
+            api_version=api_version,
+            timeout=timeout,
+            max_retries=max_retries,
+        )
+
+    if provider == "deepseek":
+        base_url = DEEPSEEK_BASE_URL
+        api_key = _deepseek_api_key()
+        if not api_key:
+            if _is_local_url(base_url):
+                api_key = "local-model"
+            else:
+                raise RuntimeError("缺少必需环境变量 DEEPSEEK_API_KEY")
+    elif provider == "openai":
+        base_url = os.getenv("OPENAI_BASE_URL") or None
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("缺少必需环境变量 OPENAI_API_KEY")
+    elif provider == "openai_compatible":
+        base_url = os.getenv("OPENAI_COMPATIBLE_BASE_URL", "").strip().rstrip("/")
+        if not base_url:
+            raise RuntimeError("缺少必需环境变量 OPENAI_COMPATIBLE_BASE_URL")
+        api_key = os.getenv("OPENAI_COMPATIBLE_API_KEY", "").strip()
+        if not api_key:
+            if _is_local_url(base_url):
+                api_key = "local-model"
+            else:
+                raise RuntimeError("缺少必需环境变量 OPENAI_COMPATIBLE_API_KEY")
+    elif provider == "ollama":
+        base_url = f"{OLLAMA_BASE_URL}/v1"
+        api_key = "ollama"
+
+    return openai.OpenAI(
+        base_url=base_url,
+        api_key=api_key,
+        timeout=timeout,
+        max_retries=max_retries,
+    )
+
+
+def get_async_openai_client(
+    *, timeout: float = 30.0, max_retries: int = 0
+) -> openai.AsyncOpenAI:
+    """按 LLM_PROVIDER 返回 OpenAI 兼容的异步客户端。
+
+    v3 章节应使用本函数创建异步客户端，而不是使用 get_llm()。
+    构造时不发送网络请求。
+    """
+    provider = LLM_PROVIDER
+    if provider == "bedrock":
+        raise RuntimeError(
+            "Bedrock 不支持直接返回 OpenAI 客户端；请改用 OpenAI 兼容网关或旧接口 get_llm()"
+        )
+    if provider not in SUPPORTED_LLM_PROVIDERS:
+        raise ValueError(f"未知 LLM_PROVIDER：{provider}")
+
+    if provider == "azure":
+        endpoint = os.getenv("AZURE_ENDPOINT", "").strip()
+        if not endpoint:
+            raise RuntimeError("缺少必需环境变量 AZURE_ENDPOINT")
+        api_key = os.getenv("AZURE_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("缺少必需环境变量 AZURE_API_KEY")
+        api_version = os.getenv("AZURE_API_VERSION", "2024-10-21").strip()
+        return openai.AsyncAzureOpenAI(
+            azure_endpoint=endpoint,
+            api_key=api_key,
+            api_version=api_version,
+            timeout=timeout,
+            max_retries=max_retries,
+        )
+
+    if provider == "deepseek":
+        base_url = DEEPSEEK_BASE_URL
+        api_key = _deepseek_api_key()
+        if not api_key:
+            if _is_local_url(base_url):
+                api_key = "local-model"
+            else:
+                raise RuntimeError("缺少必需环境变量 DEEPSEEK_API_KEY")
+    elif provider == "openai":
+        base_url = os.getenv("OPENAI_BASE_URL") or None
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            raise RuntimeError("缺少必需环境变量 OPENAI_API_KEY")
+    elif provider == "openai_compatible":
+        base_url = os.getenv("OPENAI_COMPATIBLE_BASE_URL", "").strip().rstrip("/")
+        if not base_url:
+            raise RuntimeError("缺少必需环境变量 OPENAI_COMPATIBLE_BASE_URL")
+        api_key = os.getenv("OPENAI_COMPATIBLE_API_KEY", "").strip()
+        if not api_key:
+            if _is_local_url(base_url):
+                api_key = "local-model"
+            else:
+                raise RuntimeError("缺少必需环境变量 OPENAI_COMPATIBLE_API_KEY")
+    elif provider == "ollama":
+        base_url = f"{OLLAMA_BASE_URL}/v1"
+        api_key = "ollama"
+
+    return openai.AsyncOpenAI(
+        base_url=base_url,
+        api_key=api_key,
+        timeout=timeout,
+        max_retries=max_retries,
+    )
+
+
+def chat_model_name(model: str | None = None) -> str:
+    """获取当前配置的聊天模型名称。
+
+    v3 章节应使用本函数获取模型 ID，而不是硬编码模型名称或直接调用 active_model_name()。
+    """
+    selected = (model or "").strip() or active_model_name().strip()
+    if not selected:
+        env_map = {
+            "deepseek": "DEEPSEEK_MODEL",
+            "openai": "OPENAI_MODEL",
+            "openai_compatible": "OPENAI_COMPATIBLE_MODEL",
+            "ollama": "OLLAMA_MODEL",
+            "azure": "AZURE_DEPLOYMENT",
+            "bedrock": "BEDROCK_MODEL",
+        }
+        env_var = env_map.get(LLM_PROVIDER, "MODEL")
+        raise RuntimeError(f"未配置模型名称，请设置环境变量 {env_var}")
+    return selected
+
+
+@lru_cache(maxsize=1)
+def get_sentence_embedder():
+    """本地 sentence_transformers embedding 模型工厂。进程内只加载一次（lru_cache 缓存）。
+
+    v3 章节应使用本函数或 embed_texts()，而不是 get_embeddings()。
+    """
+    model_path = EMBED_MODEL_PATH
+    if not Path(model_path).exists():
+        raise RuntimeError(
+            f"本地 embedding 模型路径不存在：{model_path}。"
+            "准备方法见根目录 README“准备本地 embedding 模型”（如使用 ModelScope 下载 "
+            "BAAI/bge-small-zh-v1.5 或在 .env 中设置 EMBED_MODEL_PATH）。"
+        )
+    from sentence_transformers import SentenceTransformer
+
+    return SentenceTransformer(model_path)
+
+
+def embed_texts(texts: list[str], *, normalize: bool = True) -> list[list[float]]:
+    """使用本地 embedding 模型将文本列表向量化。
+
+    v3 章节文本向量化统一入口。空列表直接返回 []。
+    """
+    if not texts:
+        return []
+    embedder = get_sentence_embedder()
+    vectors = embedder.encode(texts, normalize_embeddings=normalize)
+    if hasattr(vectors, "tolist"):
+        return vectors.tolist()
+    return [v.tolist() if hasattr(v, "tolist") else list(v) for v in vectors]
+
+
+@lru_cache(maxsize=1)
+def get_cross_encoder():
+    """本地 sentence_transformers CrossEncoder 重排模型工厂。进程内只加载一次（lru_cache 缓存）。
+
+    v3 检索重排章节统一入口。
+    """
+    model_path = RERANKER_MODEL_PATH
+    if not Path(model_path).exists():
+        raise RuntimeError(
+            f"本地 reranker 模型路径不存在：{model_path}。"
+            "准备方法见根目录 README“准备本地 embedding 模型”（如使用 ModelScope 下载 "
+            "BAAI/bge-reranker-base 或在 .env 中设置 RERANKER_MODEL_PATH）。"
+        )
+    from sentence_transformers import CrossEncoder
+
+    return CrossEncoder(model_path)

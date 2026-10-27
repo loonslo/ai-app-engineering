@@ -15,15 +15,19 @@
 ==========================================================
 """
 
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
 from dotenv import dotenv_values, load_dotenv
 
-import openai
+if TYPE_CHECKING:
+    import openai
 
 _DOTENV_PATH = Path(__file__).resolve().with_name(".env")
 _DOTENV_DEEPSEEK_API_KEY = (
@@ -123,7 +127,7 @@ def active_model_name() -> str:
     if LLM_PROVIDER == "openai_compatible":
         return os.getenv("OPENAI_COMPATIBLE_MODEL", "").strip()
     if LLM_PROVIDER == "openai":
-        return os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        return os.getenv("OPENAI_MODEL", "gpt-6-luna")
     if LLM_PROVIDER == "azure":
         return os.getenv("AZURE_DEPLOYMENT", "")
     if LLM_PROVIDER == "bedrock":
@@ -318,14 +322,10 @@ def select_model(question: str) -> str:
 # ---- v3 原生模型与嵌入工厂（不依赖 LangChain） ----
 
 
-def get_openai_client(
+def _resolve_openai_client_kwargs(
     *, timeout: float = 30.0, max_retries: int = 0
-) -> openai.OpenAI:
-    """按 LLM_PROVIDER 返回 OpenAI 兼容的客户端。
-
-    v3 章节应使用本函数创建客户端，而不是使用 get_llm()。
-    构造时不发送网络请求。
-    """
+) -> tuple[str, dict[str, Any]]:
+    """解析当前 LLM_PROVIDER 的客户端类型与构造参数（内部共用 helper）。"""
     provider = LLM_PROVIDER
     if provider == "bedrock":
         raise RuntimeError(
@@ -342,13 +342,13 @@ def get_openai_client(
         if not api_key:
             raise RuntimeError("缺少必需环境变量 AZURE_API_KEY")
         api_version = os.getenv("AZURE_API_VERSION", "2024-10-21").strip()
-        return openai.AzureOpenAI(
-            azure_endpoint=endpoint,
-            api_key=api_key,
-            api_version=api_version,
-            timeout=timeout,
-            max_retries=max_retries,
-        )
+        return "azure", {
+            "azure_endpoint": endpoint,
+            "api_key": api_key,
+            "api_version": api_version,
+            "timeout": timeout,
+            "max_retries": max_retries,
+        }
 
     if provider == "deepseek":
         base_url = DEEPSEEK_BASE_URL
@@ -377,12 +377,30 @@ def get_openai_client(
         base_url = f"{OLLAMA_BASE_URL}/v1"
         api_key = "ollama"
 
-    return openai.OpenAI(
-        base_url=base_url,
-        api_key=api_key,
-        timeout=timeout,
-        max_retries=max_retries,
+    return "openai", {
+        "base_url": base_url,
+        "api_key": api_key,
+        "timeout": timeout,
+        "max_retries": max_retries,
+    }
+
+
+def get_openai_client(
+    *, timeout: float = 30.0, max_retries: int = 0
+) -> openai.OpenAI:
+    """按 LLM_PROVIDER 返回 OpenAI 兼容的客户端。
+
+    v3 章节应使用本函数创建客户端，而不是使用 get_llm()。
+    构造时不发送网络请求。
+    """
+    import openai
+
+    client_type, kwargs = _resolve_openai_client_kwargs(
+        timeout=timeout, max_retries=max_retries
     )
+    if client_type == "azure":
+        return openai.AzureOpenAI(**kwargs)
+    return openai.OpenAI(**kwargs)
 
 
 def get_async_openai_client(
@@ -393,63 +411,14 @@ def get_async_openai_client(
     v3 章节应使用本函数创建异步客户端，而不是使用 get_llm()。
     构造时不发送网络请求。
     """
-    provider = LLM_PROVIDER
-    if provider == "bedrock":
-        raise RuntimeError(
-            "Bedrock 不支持直接返回 OpenAI 客户端；请改用 OpenAI 兼容网关或旧接口 get_llm()"
-        )
-    if provider not in SUPPORTED_LLM_PROVIDERS:
-        raise ValueError(f"未知 LLM_PROVIDER：{provider}")
+    import openai
 
-    if provider == "azure":
-        endpoint = os.getenv("AZURE_ENDPOINT", "").strip()
-        if not endpoint:
-            raise RuntimeError("缺少必需环境变量 AZURE_ENDPOINT")
-        api_key = os.getenv("AZURE_API_KEY", "").strip()
-        if not api_key:
-            raise RuntimeError("缺少必需环境变量 AZURE_API_KEY")
-        api_version = os.getenv("AZURE_API_VERSION", "2024-10-21").strip()
-        return openai.AsyncAzureOpenAI(
-            azure_endpoint=endpoint,
-            api_key=api_key,
-            api_version=api_version,
-            timeout=timeout,
-            max_retries=max_retries,
-        )
-
-    if provider == "deepseek":
-        base_url = DEEPSEEK_BASE_URL
-        api_key = _deepseek_api_key()
-        if not api_key:
-            if _is_local_url(base_url):
-                api_key = "local-model"
-            else:
-                raise RuntimeError("缺少必需环境变量 DEEPSEEK_API_KEY")
-    elif provider == "openai":
-        base_url = os.getenv("OPENAI_BASE_URL") or None
-        api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        if not api_key:
-            raise RuntimeError("缺少必需环境变量 OPENAI_API_KEY")
-    elif provider == "openai_compatible":
-        base_url = os.getenv("OPENAI_COMPATIBLE_BASE_URL", "").strip().rstrip("/")
-        if not base_url:
-            raise RuntimeError("缺少必需环境变量 OPENAI_COMPATIBLE_BASE_URL")
-        api_key = os.getenv("OPENAI_COMPATIBLE_API_KEY", "").strip()
-        if not api_key:
-            if _is_local_url(base_url):
-                api_key = "local-model"
-            else:
-                raise RuntimeError("缺少必需环境变量 OPENAI_COMPATIBLE_API_KEY")
-    elif provider == "ollama":
-        base_url = f"{OLLAMA_BASE_URL}/v1"
-        api_key = "ollama"
-
-    return openai.AsyncOpenAI(
-        base_url=base_url,
-        api_key=api_key,
-        timeout=timeout,
-        max_retries=max_retries,
+    client_type, kwargs = _resolve_openai_client_kwargs(
+        timeout=timeout, max_retries=max_retries
     )
+    if client_type == "azure":
+        return openai.AsyncAzureOpenAI(**kwargs)
+    return openai.AsyncOpenAI(**kwargs)
 
 
 def chat_model_name(model: str | None = None) -> str:

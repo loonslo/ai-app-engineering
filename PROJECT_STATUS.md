@@ -1,10 +1,10 @@
 ---
 project_id: langchain-learning
-updated: 2026-10-27
+updated: 2026-10-28
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "落地 v3 改造基础设施批次 V3-0（common.py 原生工厂、官方模型 ID 核对与默认值更新、requirements-course 依赖锁定、119 章映射 docs/course-v3-map.json、幂等标签工具 tools/apply_v3_map.py、CI 离线测试集成）；课件全量结构完成（82 章 + 29 步）；完成 Capstone 稳定性与并发优化；梳理求职作品集与面试攻防手册；完成 v3 提案与就业视角审查；flagship-project 冻结为历史快照。离线生产测试 34 passed，工具与章节测试 44 passed，ruff、断链与 milestones 全部通过。未运行真实外部模型与物理部署验收。"
-next: "按 docs/v3/README.md 推进 V3-1 批次（L0 + L1）；按各章细则实现并自检。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
+progress: "v3 改造基础设施批次 V3-0 完成复核修复（锁定 pydantic-ai-slim==2.31.1 解决 openai<3 依赖冲突并在干净临时环境验证通过、本机 .venv 恢复且 pip check 零冲突、更新 OpenAI 默认模型为 gpt-6-luna、改引 DeepSeek 官方英文定价文档、common.py 客户端工厂去重与延迟导入、v3 路径改为插在 v2 下方并经两次 apply 验证 v2 仍为 111 unchanged）；课件全量结构完成（82 章 + 29 步）；完成 Capstone 稳定性与并发优化；梳理求职作品集与面试攻防手册；完成 v3 提案与就业视角审查；flagship-project 冻结为历史快照。离线生产测试 34 passed，工具与章节测试 45 passed，ruff、断链与 milestones 全部通过。未运行真实外部模型与物理部署验收。"
+next: "待 Claude 复核 V3-0 后，按 docs/v3/README.md 推进 V3-1 批次（L0 + L1）；按各章细则实现并自检。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
 evidence:
   - README.md
   - TASKS.md
@@ -38,6 +38,7 @@ evidence:
   - capstone/docs/portfolio/resume_evidence.md
   - capstone/docs/portfolio/project_pitch.md
   - docs/gate-v3-0-validation.md
+  - docs/v3/reviews/V3-0.md
 ---
 
 # LangChain 学习记录 · 项目概览与进度
@@ -87,3 +88,6 @@ evidence:
 同日用户作出两项决定：flagship-project 冻结为基于 LangChain 1.x 的历史教学快照，不再更新（快照仍可还原运行，CI 保留 m1/step1 基线测试）；V3-10 打标签时保留 `v2 路径` 行、在其上方新增 `v3 路径` 行。据此修改了 `AGENTS.md` 的联动验收约定、`flagship-project/README.md` 的冻结说明、根目录 README 的课程表，以及 `docs/v3/` 与 `docs/curriculum-v3.md` 中的相关表述。只改文档，未改代码与测试。
 
 同日完成 v3 改造基础设施批次 V3-0：`common.py` 新增原生 OpenAI 客户端与异步工厂、模型 ID 解析函数、本地嵌入与重排模型工厂；查阅 DeepSeek 官方 API 文档将主力推荐模型默认值更新为 `deepseek-flash`（旧别名 `deepseek-chat` 已下线），OpenAI 确认为 `gpt-4o-mini` 并同步 `.env.example`；在 `requirements-course.txt` 锁定 `pydantic-ai-slim[openai]==2.62.0` 与 `opentelemetry-sdk==1.44.0`；新增覆盖 119 个条目的 `docs/course-v3-map.json` 与幂等标签工具 `tools/apply_v3_map.py`（保留 v2 行，待建章节不报错）；新增 `tools/test_apply_v3_map.py` 与 `chapters/test_v3_lessons.py` 并接入 GitHub Actions CI。工具测试与纯函数测试 44 项通过、capstone 生产测试 34 项通过、Markdown 断链 0、ruff 静态检查通过、`apply_v2_map --check` 111 项无变化。未运行真实外部模型调用与物理部署；命令、结果与边界见 `docs/gate-v3-0-validation.md`。
+
+
+2026-10-28 完成 V3-0 批次的审核复核修复：针对 `docs/v3/reviews/V3-0.md` 审核退回的阻断项与主要问题，将 `pydantic-ai-slim` 锁定到兼容 `openai<3` 的最新稳定版本 `2.31.1`，在干净临时虚拟环境中通过 `pip install --dry-run` 验证完整可解析，恢复本机 `.venv` 环境且 `pip check` 零冲突；依据 OpenAI 官方弃用页更正事实并将 `OPENAI_MODEL` 默认值更新为 `gpt-6-luna`；改引 DeepSeek 官方英文定价文档；`common.py` 抽出客户端配置解析 helper 消除 50 行重复并将 `import openai` 改为延迟导入；`tools/apply_v3_map.py` 的 v3 行改为插在 v2 行下方，在临时副本中连续执行两次 `--apply` 后 `apply_v2_map --check` 保持 111 unchanged。工具与章节测试 45 项通过、capstone 生产测试 34 项通过、断链 0、ruff 通过。证据见 `docs/gate-v3-0-validation.md` 与 `docs/v3/reviews/V3-0.md`。

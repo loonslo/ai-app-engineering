@@ -228,7 +228,7 @@
 ### 7.3 用户决定（2026-10-27）
 
 1. **flagship-project 冻结**：作为基于 LangChain 1.x 的历史教学快照保留，不再更新；快照仍可还原运行，CI 继续跑 m1/step1 基线测试。已同步修改 `AGENTS.md` 的联动验收约定、`flagship-project/README.md` 的冻结说明，以及根目录 README 的课程表。
-2. **新增 v3 路径行**：V3-10 打标签时，旧章节保留 `v2 路径` 行，在其上方新增 `v3 路径` 行；冻结的旗舰步骤不加 v3 标签。
+2. **新增 v3 路径行**：V3-10 打标签时，旧章节保留 `v2 路径` 行，在其下方新增 `v3 路径` 行；冻结的旗舰步骤不加 v3 标签。V3-0 复核时由“上方”改为“下方”，以免与 `tools/apply_v2_map.py` 冲突。
 
 ---
 
@@ -298,7 +298,10 @@ E1 主作品、E2 辅助作品、E3 面试准备、E4 求职材料，具体门�
   - 招聘方建议多来自猎头与面试辅导机构，不是研究。
 - **只有二手来源的事项**：Google ADK 2.0 的 GA 日期；A2A 是否已并入 AAIF；OpenAI Agent Builder 的具体关停日期（2026-06-03 宣布弃用已由官方 changelog 证实）。
 - **MCP 2026-07-28 规范**：细节来自 AAIF 按候选版写的迁移文章，落地前需对照最终规范。
-- **DeepSeek 相关**：Pydantic AI 文档与 issue #5193 称 V4 默认思考、Chat Completions 不接受严格 JSON Schema、旧别名 `deepseek-chat` 已于 2026-07-24 下线。仓库 `common.py` 默认仍是 `deepseek-chat`，而 2026-09-30 的真实模型回归通过了，原因未核实（可能是 `.env` 覆盖）。均未实测；V3-0 负责核对。
+- **DeepSeek 相关**：
+  - V3-0 复核时核对了 DeepSeek 官方英文文档（Models & Pricing，读取于 2026-10-27）：当前模型 ID 为 `deepseek-flash`（DeepSeek-V4.1-Flash-1017）与 `deepseek-v4-pro`，默认开启思考；`deepseek-v4-flash` 仍被接受，但会路由到 V4.1-Flash。
+  - `common.py` 的默认值已改为 `deepseek-flash`。
+  - Chat Completions 不接受严格 JSON Schema，这一条仍只出自 Pydantic AI 文档，未实测。
 - **harness 评价**：DeepSeek Harness 与 Pi 的评价来自 VentureBeat、Wavect 等二手资料，未实际运行。
 - **雷达版本**：Thoughtworks 雷达 Vol.35 预计 2026-11-04 发布，环位可能变化。
 - **课时与匹配度**：都是估算，未经真实学习验证。

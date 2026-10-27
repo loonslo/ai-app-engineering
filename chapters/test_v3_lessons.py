@@ -155,6 +155,11 @@ def test_chat_model_name(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(common, "DEEPSEEK_MODEL", "deepseek-flash")
     assert common.chat_model_name() == "deepseek-flash"
 
+    # OpenAI 默认模型验证（已弃用 gpt-4o-mini，默认 gpt-6-luna）
+    monkeypatch.setattr(common, "LLM_PROVIDER", "openai")
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+    assert common.chat_model_name() == "gpt-6-luna"
+
     # 模型名称为空时抛出带变量名提示的 RuntimeError
     monkeypatch.setattr(common, "LLM_PROVIDER", "openai_compatible")
     monkeypatch.delenv("OPENAI_COMPATIBLE_MODEL", raising=False)

@@ -7,7 +7,7 @@
 ## 任务 1：打标签
 
 - 运行 `python tools/apply_v3_map.py --check`，确认只剩旧章节缺少 v3 行，且没有“待建”目录。
-- 执行 `python tools/apply_v3_map.py --apply`：v3 行插在 v2 行上方，v2 行保持原样。不实现替换选项。
+- 执行 `python tools/apply_v3_map.py --apply`：v3 行插在 v2 行下方，v2 行保持原样。不实现替换选项。
 - 冻结的 `flagship-project/` 各步骤不加 v3 标签；它的 README 顶部已有冻结说明。
 - 再次运行 `--check`，应无改动（幂等）；`python tools/apply_v2_map.py --check` 仍应无变化。
 

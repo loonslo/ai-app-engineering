@@ -34,7 +34,7 @@
 
 - [ ] 新目录的编号、名称与 outline.md 一致；没有任何旧目录被改名（阻断）。
 - [ ] `tools/course_catalog.py` 已登记新目录。
-- [ ] 新章节 README 的 `v3 路径` 行与 `docs/course-v3-map.json` 一致。
+- [ ] 新章节 README 的 `v3 路径` 行与 `docs/course-v3-map.json` 一致：`apply_v3_map.py --check` 中本批次新建的章节都显示 unchanged，只剩旧章节的 inserted 与未建目录的待建。
 - [ ] 导航链接按 v3 顺序；`python tools/check_course_links.py` 断链 0（阻断）。
 - [ ] 没有修改 `chapters/README.md`、根目录 `README.md`（V3-10 除外）。
 

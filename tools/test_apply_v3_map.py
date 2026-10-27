@@ -29,7 +29,7 @@ def test_upsert_replace_v3_in_place(tmp_path: Path):
     assert status_second == "unchanged"
 
 
-def test_upsert_insert_before_v2(tmp_path: Path):
+def test_upsert_insert_after_v2(tmp_path: Path):
     readme = tmp_path / "README.md"
     readme.write_text(
         "# 测试章\n\n- **能力**：测试\n- **v2 路径**：L1.1 / 核心（v2）\n- **时间盒**：2h\n",
@@ -41,8 +41,8 @@ def test_upsert_insert_before_v2(tmp_path: Path):
     assert status == "inserted"
 
     lines = readme.read_text(encoding="utf-8").splitlines()
-    assert lines[3] == new_line
-    assert lines[4] == "- **v2 路径**：L1.1 / 核心（v2）"
+    assert lines[3] == "- **v2 路径**：L1.1 / 核心（v2）"
+    assert lines[4] == new_line
     assert lines[5] == "- **时间盒**：2h"
 
 
@@ -117,5 +117,26 @@ def test_v2_line_never_touched(tmp_path: Path):
     text = readme.read_text(encoding="utf-8")
     assert original_v2 in text
     lines = text.splitlines()
-    assert lines[3] == v3_line
-    assert lines[4] == original_v2
+    assert lines[3] == original_v2
+    assert lines[4] == v3_line
+
+
+def test_multiple_directory_match_records_problem(tmp_path: Path):
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir(parents=True)
+    map_file = docs_dir / "course-v3-map.json"
+    mapping = {
+        "0.1": {"stage": "L0.1", "role": "核心", "note": "清单验收"},
+    }
+    map_file.write_text(json.dumps(mapping, ensure_ascii=False), encoding="utf-8")
+
+    # 创建两个同名 0.1 章节目录
+    p1 = tmp_path / "chapters" / "part0-setup" / "0.1-env-a"
+    p2 = tmp_path / "chapters" / "part0-setup" / "0.1-env-b"
+    p1.mkdir(parents=True)
+    p2.mkdir(parents=True)
+    (p1 / "README.md").write_text("# 0.1a\n", encoding="utf-8")
+    (p2 / "README.md").write_text("# 0.1b\n", encoding="utf-8")
+
+    code = apply_v3_map.main(["--check"], root=tmp_path)
+    assert code == 1

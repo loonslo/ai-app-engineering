@@ -9,7 +9,7 @@
 `- **v3 路径**：<stage> / <role>（<note>）`。
 插入规则：
 - 已有 v3 路径行时原地替换；
-- 否则若有 v2 路径行，插在它的上一行；
+- 否则若有 v2 路径行，插在它的下一行；
 - 两者都没有时，插在第一个头部字段行（- **能力** 或 - **目标**）之后。
 永远保留 v2 路径行；不处理 flagship-project/（已冻结）；
 映射中存在但尚未创建目录的章节输出为“待建”，不视为错误。
@@ -38,9 +38,16 @@ def render(meta: dict) -> str:
     return f"- **v3 路径**：{stage} / {role}{tail}"
 
 
-def chapter_readme(chapter_id: str, root: Path = ROOT) -> Path | None:
+def chapter_readme(
+    chapter_id: str, root: Path = ROOT
+) -> tuple[Path | None, str | None]:
     matches = list((root / "chapters").glob(f"part*/{chapter_id}-*/README.md"))
-    return matches[0] if len(matches) == 1 else None
+    if len(matches) == 1:
+        return matches[0], None
+    if len(matches) > 1:
+        rel_paths = [str(p.relative_to(root)) for p in matches]
+        return None, f"章节 {chapter_id} 匹配到多个目录：{rel_paths}"
+    return None, None
 
 
 def upsert(path: Path, line: str, apply: bool) -> str:
@@ -63,7 +70,7 @@ def upsert(path: Path, line: str, apply: bool) -> str:
             None,
         )
         if v2_idx is not None:
-            updated = lines[:v2_idx] + [line] + lines[v2_idx:]
+            updated = lines[: v2_idx + 1] + [line] + lines[v2_idx + 1 :]
         else:
             header_idx = next(
                 (
@@ -135,8 +142,11 @@ def main(argv: list[str] | None = None, root: Path = ROOT) -> int:
     problems: list[str] = []
 
     for chapter_id, meta in mapping.items():
-        readme = chapter_readme(chapter_id, root)
+        readme, err = chapter_readme(chapter_id, root)
         rendered_line = render(meta)
+        if err:
+            problems.append(err)
+            continue
         if readme is None:
             counts["待建"] += 1
             print(f"[{'待建':9}] {chapter_id:6}  {rendered_line}")

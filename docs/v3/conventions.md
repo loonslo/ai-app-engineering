@@ -188,7 +188,8 @@ python -m ruff check --target-version py311 <本批次改动的目录与文件>
 # 7. LangChain 边界：第 7 节的 grep 命令应无输出
 # 8. v2 标签未被改动
 python tools/apply_v2_map.py --check
-# 9. v3 映射一致（V3-0 之后）
+# 9. v3 映射（V3-0 之后）。V3-10 之前退出码为 1 属正常：只允许出现旧章节的 inserted 与未建目录的“待建”；
+#    本批次新建的章节必须显示 unchanged（README 中已有正确的 v3 路径行）
 python tools/apply_v3_map.py --check
 # 10. 参考实现能启动；无密钥时给出可读提示
 python tools/run_chapter.py <章节号> [脚本名]

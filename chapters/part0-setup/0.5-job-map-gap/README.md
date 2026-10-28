@@ -31,11 +31,10 @@
 
 1. **入门级初级岗位极少（Entry-level Squeeze）**：
    - [365 Data Science 2025/2026 AI 岗位报告](https://365datascience.com/career-advice/career-guides/ai-engineer-job-outlook-2025/)（读取日期：2026-10-27）显示，0–2 年经验的初级/入门 AI 岗位在挂牌职位中仅占约 **2.5%**；
-   - [Rockstar Developer University 入门岗位统计汇总](https://rockstardeveloperuniversity.com/entry-level-software-engineer-job-market-statistics/)（读取日期：2026-10-27）显示，软件工程行业整体挂牌初级职位占比在 **4.5%–12%** 区间波动。
+   - 根据 Indeed Hiring Lab 统计（经 [Rockstar Developer University 入门岗位统计汇总](https://rockstardeveloperuniversity.com/entry-level-software-engineer-job-market-statistics/)，读取日期：2026-10-27），2026 年一季度美国软件开发岗位中初级（Entry-level）仅占约 **4.5%**；另据 [Axial Search AI 岗位需求报告](https://axialsearch.com/insights/ai-engineering-job-demand)（读取日期：2026-10-27），AI 工程类挂牌职位中初级岗位仅占约 **12%**。
    两项数据共同印证：纯新手、零传统工程经验的求职者直接切入面临严苛竞争。
 2. **工程经验与基础设施要求高（High Engineering Bar）**：
-   - 根据 [Axial Search AI 岗位需求与经验要求报告](https://axialsearch.com/insights/ai-engineering-job-demand)（读取日期：2026-10-27），AI 工程师职位中中级（Mid-level）与高级（Senior-level）合计占比约 **66%**（中位年限要求为 5 年，初级岗位中位要求约 2 年）；约 **56%** 的岗位硬性要求云平台（AWS / GCP / Azure）工程化使用经验；
-   - 另据面向落地交付方向的 FDE（前置交付工程）岗位技能分析，容器化与持续交付工具同样是硬门槛：Docker 要求约占 **35%**、Kubernetes 约占 **31%**、CI/CD 流水线约占 **27%**。
+   - 根据 [Axial Search AI 岗位需求报告](https://axialsearch.com/insights/ai-engineering-job-demand)（读取日期：2026-10-27），AI 工程师职位中中级（Mid-level）与高级（Senior-level）合计占比约 **66%**；另据 [Axial Search 经验要求与职业指南（How to Become an AI Engineer in 2026）](https://axialsearch.com/insights/ai-engineering-careers)（读取日期：2026-10-27），岗位对经验的中位年限要求约为 5 年，初级岗位中位要求约 2 年；同时约 **56%** 的岗位提到了云平台（AWS / GCP / Azure）工程化使用经验。
    这说明大模型应用开发本质是“现代软件工程 + 模型算子能力”，企业绝不仅仅需要 Prompt 调优者，而是需要懂系统架构与交付底座的工程师。
 3. **评测类岗位与前置交付工程师（FDE）高速增长**：
    随着企业私有化模型和垂直业务上线，专门负责评测集构建、LLM-as-a-Judge 调优、回归防护的“AI 评测/质量工程师”，以及深入客户现场对接的“FDE / 交付工程师”需求显著攀升（来源：[TechCrunch FDE 报道](https://techcrunch.com/2026/07/30/forward-deployed-engineers-are-the-ai-industrys-latest-talent-obsession/)、[Talex AI Evaluation 洞察](https://www.talex.co/insights/what-is-a-ai-evaluation-engineer-and-why-companies-are-hiring-for-it-now)，读取日期：2026-10-27）。

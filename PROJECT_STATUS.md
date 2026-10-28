@@ -3,8 +3,8 @@ project_id: langchain-learning
 updated: 2026-10-28
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "V3-0 复核通过；V3-1 审核退回的 3 个阻断项（B1–B3）、6 个主要问题（M1–M6）、5 个次要问题（m1–m5）以及 V3-0 复核新增的 N1 已在 wip-v3-1 分支完成系统性修复并通过全量验证，等待审核人复核：1.10 README 验收命令改为默认检查闭卷骨架；Pydantic AI gate 补齐字段契约并独立闭卷运行（骨架 0/6 退出 1，参考解 6/6 退出 0）；1.1 移除私有类改为标准公开异常与分类器；统一 5 个 gate 脚本规范（--module/stdout/gate_report.json）；按模板重写 6 篇 README；清理 2.5 ruff 错误与密钥硬编码；纠正 0.5 招聘数据引用；1.10 cases 扩充至 24 条且评测达标；明确 Pydantic AI 2.31.1 安全使用限制并登记 5 条安全公告；conventions 11 节命令 1–10 逐项通过（骨架 0/参考解全通、测试 54+34 passed、断链 0、ruff 0 errors、LangChain 泄漏 0、v2 map 111 unchanged、v3 map 6 篇新建/改写章节全部 unchanged、13 个参考实现通过 run_chapter 正常离线启动、capstone baseline 100% 通过）。未运行真实外部模型与公网部署。证据见 docs/gate-v3-1-validation.md。"
-next: "通知审核人对 wip-v3-1 分支进行复核；复核通过前不合入 master，也不开始 V3-2。待复核通过后推进 V3-2（阶段 2 RAG 与上下文工程）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
+progress: "V3-0 已通过；V3-1 复核结论为修改后通过（剩 M4-r：0.5 README 市场数据出处，见 docs/v3/reviews/V3-1.md）。以下为实施者在 wip-v3-1 分支完成的修复：1.10 README 验收命令改为默认检查闭卷骨架；Pydantic AI gate 补齐字段契约并独立闭卷运行（骨架 0/6 退出 1，参考解 6/6 退出 0）；1.1 移除私有类改为标准公开异常与分类器；统一 5 个 gate 脚本规范（--module/stdout/gate_report.json）；按模板重写 6 篇 README；清理 2.5 ruff 错误与密钥硬编码；纠正 0.5 招聘数据引用；1.10 cases 扩充至 24 条且评测达标；明确 Pydantic AI 2.31.1 安全使用限制并登记 5 条安全公告；conventions 11 节命令 1–10 逐项通过（骨架 0/参考解全通、测试 54+34 passed、断链 0、ruff 0 errors、LangChain 泄漏 0、v2 map 111 unchanged、v3 map 6 篇新建/改写章节全部 unchanged、13 个参考实现通过 run_chapter 正常离线启动、capstone baseline 100% 通过）。未运行真实外部模型与公网部署。证据见 docs/gate-v3-1-validation.md。"
+next: "修复 V3-1 的 M4-r（0.5 README 市场数据出处与措辞）后，由审核者复核这一项；确认后将 wip-v3-1 合入 master，再推进 V3-2（L2 上下文工程与检索）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
 evidence:
   - README.md
   - TASKS.md
@@ -113,3 +113,10 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 - 主要问题规范化：统一 0.4、1.7、1.9、1.10 的 5 个 Gate 脚本统一支持 `--module` 参数、stdout 输出与写入 `gate/gate_report.json` 报告；按 `conventions.md` 模板重写 0.3、0.4、0.5、1.7、1.9、1.10 的 README.md，补齐故障注入表、闭卷规则与通过后对照；清理 2.5 `raw_sdk_rag_agent_loop.py` 的 ruff 错误与密钥硬编码，在 `common.py` 新增 `deepseek_api_key()`；纠正 0.5 招聘市场数据引用并注明一手官方链接与读取日期；1.10 `gate/cases.json` 扩充订单号格式错误与超长文本至 24 条用例，离线评测模拟 LLM 100%、规则兜底 75% 通过；1.10 README 明确写明 Pydantic AI 2.31.1 安全使用约束；
 - 依赖与次要项：在 `requirements-course.txt` 完整登记 `pydantic-ai-slim==2.31.1` 的 5 条安全公告（PYSEC-2026-4284..4291）及课程防御策略，并在 TASKS 登记升级任务；统一 starter 抛出 `NotImplementedError`；补充 `FeatureDeps.clock` 默认值；整理 `.tmp/gate_solutions/v3` 参考解并重命名对齐；核对外部模型发布日期；补齐 2.5 README 配置说明；
 - 全量验证：按 `conventions.md` 第 11 节命令 1–10 逐一验证，单元与章节测试 54 passed、capstone 生产测试 34 passed、329 个 Markdown 文件断链 0、ruff 0 errors、LangChain 泄漏 0、`apply_v2_map` 111 unchanged、`apply_v3_map` 6 篇新建/改写章节全部 unchanged、13 个参考实现通过 run_chapter 正常启动、capstone baseline 100% 通过。未运行真实外部模型与公网部署。命令、结果与边界见 `docs/gate-v3-1-validation.md`。
+
+同日审核者复核 V3-1 修复（提交 af1bf7e），结论为修改后通过。
+- 复跑结果：5 个 gate 统一使用 `--module` 并写出报告；骨架全部 0 通过（含 Pydantic AI 0/6），参考解全部通过，结果确定；测试 54 + 34 项、里程碑与基线检查通过；ruff 覆盖 35 个改动文件；断链 0；在隔离副本中无密钥运行 13 个参考实现，均无堆栈。
+- 三个阻断项与 M1–M3、M5、M6 均已解决，V3-0 的 N1 关闭，V3-0 至此通过。
+- 剩余 M4-r：0.5 README 中“4.5%–12%”仍标注为 Rockstar 的数据（原文只有引自 Indeed 的 4.5%），另有一处措辞与两处缺失的链接。修完由审核者复核这一项，然后合入 master。
+
+记录见 `docs/v3/reviews/V3-1.md`。

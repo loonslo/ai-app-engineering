@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Literal
 
 # 导入共享 common
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
@@ -221,7 +221,11 @@ def main() -> None:
         if get_openai_client is None or chat_model_name is None:
             print("[可读提示] 缺少 common 依赖或未安装 openai SDK，无法执行 --live。")
             return
-        client = get_openai_client()
+        try:
+            client = get_openai_client()
+        except Exception as exc:
+            print(f"[可读提示] 当前未配置模型 API 密钥（{exc}），请在 .env 中设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY。")
+            return
         if client is None:
             print("[可读提示] 当前未配置模型 API 密钥，请在 .env 中设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY。")
             return

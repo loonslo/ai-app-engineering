@@ -2,13 +2,27 @@
 
 演示长会话历史预算压缩（保留系统提示、尾部对话、固定重要消息、其余提取摘要）
 以及多租户隔离、策略管控的长期事实与偏好记忆库。
+支持 --live 开启真实大模型摘要生成，并演示 20 轮对话关键事实保留评测。
 """
 
 from __future__ import annotations
 
+import argparse
 import json
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+try:
+    from common import chat_model_name, get_openai_client
+except ImportError:
+    chat_model_name = None  # type: ignore
+    get_openai_client = None  # type: ignore
 
 
 @dataclass(frozen=True)
@@ -38,8 +52,8 @@ def compact_history(
     2. 尾部 keep_last 条消息原样保留；
     3. 中间被标记 pinned=True 的消息原样保留；
     4. 其余中间消息交给 summarize_fn 压缩为一条 role="system"、以 [摘要] 开头的消息；
-    5. 若 summarize_fn 异常，降级为截断提示；
-    6. prefix_changed 指示首条 system 消息之后的内容是否改变（便于前缀缓存命中分析）。
+    5. 若加入摘要后总 token 超出 budget，对摘要内容进行截断，严格保证不超预算；
+    6. prefix_changed 指示首条 system 消息之后的内容是否改变。
     """
     if count_tokens(messages) <= budget:
         return CompactResult(messages=list(messages), summarized_count=0, prefix_changed=False)
@@ -70,14 +84,34 @@ def compact_history(
             summary_msg = {"role": "system", "content": f"[摘要] {summary_content}"}
         except Exception:
             summary_msg = {"role": "system", "content": f"[摘要不可用，已截断 {len(to_summarize)} 条]"}
-        new_msgs = head + [summary_msg] + pinned + tail
+
+        fixed_msgs = head + pinned + tail
+        fixed_tokens = count_tokens(fixed_msgs)
+        available_for_summary = max(0, budget - fixed_tokens)
+        if available_for_summary > 0:
+            suffix = "...[截断]"
+            content = summary_msg["content"]
+            if count_tokens([summary_msg]) > available_for_summary:
+                allowed = max(0, available_for_summary - len(suffix))
+                summary_msg = {
+                    "role": "system",
+                    "content": content[:allowed] + (suffix if allowed > 0 else ""),
+                }
+            new_msgs = head + [summary_msg] + pinned + tail
+        else:
+            new_msgs = head + pinned + tail
     else:
         new_msgs = head + pinned + tail
+
+    if len(messages) > 1 and len(new_msgs) > 1:
+        prefix_changed = new_msgs[1:] != messages[1:]
+    else:
+        prefix_changed = new_msgs != messages
 
     return CompactResult(
         messages=new_msgs,
         summarized_count=len(to_summarize),
-        prefix_changed=True,
+        prefix_changed=prefix_changed,
     )
 
 
@@ -127,8 +161,46 @@ class MemoryStore:
         return dict(self._store.get(t_key, {}))
 
 
+def make_summarizer(live: bool) -> Callable[[list[dict]], str]:
+    if live:
+        try:
+            client = get_openai_client()
+        except Exception as exc:
+            print(f"[可读提示] 未能初始化客户端（未配置有效 API 密钥）：{exc}")
+            sys.exit(1)
+        model = chat_model_name()
+
+        def live_summarize(msgs: list[dict]) -> str:
+            conversation_text = "\n".join(f"{m['role']}: {m['content']}" for m in msgs)
+            resp = client.chat.completions.create(
+                model=model,
+                temperature=0.0,
+                messages=[
+                    {"role": "system", "content": "请用一句话高度概括以下对话的核心业务事实："},
+                    {"role": "user", "content": conversation_text},
+                ],
+            )
+            return resp.choices[0].message.content or "已讨论历史业务事项"
+
+        return live_summarize
+
+    return lambda msgs: "已讨论订单发货、地址修改与运费政策。"
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="2.14 记忆与上下文压缩演示")
+    parser.add_argument("--live", action="store_true", help="启用真实在线模型生成摘要")
+    args = parser.parse_args()
+
     print("=== L2.10 记忆与上下文压缩演示 ===")
+    if args.live:
+        print("[模式] 正在使用 --live 在线调用模型生成摘要。")
+    else:
+        print("[模式] 默认离线模式（使用本地确定性摘要器，可通过 --live 开启真实大模型调用）。")
+
+    summarizer = make_summarizer(live=args.live)
+
+    # 1. 基础压缩演示
     history = [
         {"role": "system", "content": "You are a customer service assistant."},
         {"role": "user", "content": "我上一单 ORD-8888 什么时候发货？"},
@@ -141,20 +213,40 @@ def main() -> None:
         {"role": "assistant", "content": "默认顺丰速运。"},
     ]
 
-    print(f"原始消息条数：{len(history)}")
+    print(f"\n[测试 1] 基础压缩：原始消息 {len(history)} 条")
     compacted = compact_history(
         history,
-        budget=100,
-        summarize_fn=lambda msgs: "用户询问订单发货与运费政策，已获解答。",
+        budget=120,
+        summarize_fn=summarizer,
         keep_last=2,
     )
     print(f"压缩后条数：{len(compacted.messages)}")
     print(f"压缩涉及历史消息数：{compacted.summarized_count}")
     print(f"前缀变化标志：{compacted.prefix_changed}")
-    print("压缩后消息：")
+    print(f"压缩后总 Token: {default_count_tokens(compacted.messages)} (预算 120)")
     for idx, msg in enumerate(compacted.messages):
         pinned_mark = " [PINNED]" if msg.get("pinned") else ""
         print(f"  [{idx}] {msg['role']}: {msg['content']}{pinned_mark}")
+
+    # 2. 细则要求：20 轮对话记忆评测（关键事实保留验证）
+    print("\n[测试 2] 20 轮长对话关键事实保留评测")
+    long_20_rounds = [{"role": "system", "content": "You are an AI customer support assistant."}]
+    # 第 1 轮明确固定关键事实：用户的家庭地址
+    long_20_rounds.append({"role": "user", "content": "请牢记：我的收货地址是上海市徐汇区淮海中路 100 号", "pinned": True})
+    long_20_rounds.append({"role": "assistant", "content": "好的，已永久记录您的收货地址为上海市徐汇区淮海中路 100 号。"})
+    # 模拟后续 19 轮常规对话
+    for i in range(2, 21):
+        long_20_rounds.append({"role": "user", "content": f"咨询业务问题第 {i} 轮：关于退换货运费与开票"})
+        long_20_rounds.append({"role": "assistant", "content": f"答复第 {i} 轮：政策支持 7 天无理由且开具电子发票"})
+
+    print(f"构建 20 轮长对话：原始消息共 {len(long_20_rounds)} 条，Token 数：{default_count_tokens(long_20_rounds)}")
+    res_20 = compact_history(long_20_rounds, budget=260, summarize_fn=summarizer, keep_last=4)
+    print(f"在预算 260 下压缩完成：保留消息条数 {len(res_20.messages)}，压缩后 Token 数：{default_count_tokens(res_20.messages)}")
+
+    # 校验关键事实是否被完整保留
+    all_content = " ".join(m["content"] for m in res_20.messages)
+    address_retained = "上海市徐汇区淮海中路" in all_content
+    print(f"20 轮对话后关键事实（收货地址）保留检验：{'PASS (保留成功)' if address_retained else 'FAIL (丢失)'}")
 
     print("\n--- 长期记忆与多租户隔离演示 ---")
     store = MemoryStore()

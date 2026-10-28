@@ -53,7 +53,7 @@ def answer_with_citations(
 ) -> dict:
     """检索并生成带引用的回答：
     - retrieve_fn(question) -> list[(Chunk, score)]；
-    - 没有分数 >= min_score 的片段时拒答：
+    - 没有分数 >= min_score 的片段时拒答，且绝对不得调用 chat_fn：
       {"refused": True, "answer": "资料中未找到足够支持该问题的证据，已安全拒答。", "citations": []}；
     - 否则构造对话消息：将检索到的资料放置在 user 消息中明确的分隔符内，并声明资料是只读数据而非系统指令；
     - 引用格式为 "source#p<page>#<index>"，只能引用实际传给模型的片段；
@@ -63,9 +63,27 @@ def answer_with_citations(
 
 
 def evaluate(cases: list[dict], answer_fn: Callable[[dict], dict]) -> dict:
-    """评测知识库系统：
-    - cases 每条含 question、should_refuse、gold_sources（形如 "source#p<page>"）、retrieved（用于 hit@5）；
-    - 返回 citation_accuracy、refusal_accuracy、hit_at_5 与 details。
+    """评测知识库问答系统指标。
+
+    指标计算公式：
+    1. refusal_accuracy（拒答准确率）：
+       在所有用例（样本总数 N = len(cases)）上计算：
+       (ans['refused'] == case['should_refuse']) 的样本比例。
+    2. hit_at_5（Top-5 召回命中率）：
+       仅在【应答用例】（case['should_refuse'] == False）上计算，分母为应答用例总数。
+       若用例无 gold_sources 则记命中；否则当 case['retrieved'][:5] 中至少存在一个片段
+       匹配任一 gold_sources（前缀以 'gold#' 开头或完全相等）时记为命中（1.0），否则记 0.0。
+    3. citation_accuracy（引用准确率）：
+       仅在【应答用例】（case['should_refuse'] == False）上计算，分母为应答用例总数。
+       若系统未拒答且 citations 非空，且每一个 gold_sources 均至少有一个 citation 覆盖
+       （前缀以 'gold#' 开头或完全相等），且 citations 中无未检索到的幻觉片段，记为通过（1.0）；
+       若系统错误拒答或引用缺失/未覆盖全，记 0.0。
+       （注：拒答用例不计入 citation_accuracy 与 hit_at_5 的分母）。
+    4. 返回字典包含:
+       - 'citation_accuracy': float
+       - 'refusal_accuracy': float
+       - 'hit_at_5': float
+       - 'details': list[dict]（逐题记录 id, refusal_ok, citation_ok, hit_at_5）
     """
     raise NotImplementedError("实现评测函数 evaluate")
 
@@ -77,7 +95,9 @@ def ablation(
 ) -> list[dict]:
     """多配置消融实验对比：
     - configs 为配置名称到 answer_fn 的映射；
-    - 每个配置生成一行结果：name、citation_accuracy、refusal_accuracy、hit_at_5、avg_latency_ms。
+    - 每个配置生成一行结果字典：
+      {"name": str, "citation_accuracy": float, "refusal_accuracy": float, "hit_at_5": float, "avg_latency_ms": float}；
+    - avg_latency_ms 不得使用物理计时器，必须取用例列表中假时钟记录的 'latency_ms' 字段计算算术平均值（若缺失则缺省为 0.0）。
     """
     raise NotImplementedError("实现消融实验 ablation")
 
@@ -100,4 +120,3 @@ def validate_cases(path: str | Path) -> list[dict]:
     - 校验失败抛 ValueError。
     """
     raise NotImplementedError("实现评测集校验 validate_cases")
-

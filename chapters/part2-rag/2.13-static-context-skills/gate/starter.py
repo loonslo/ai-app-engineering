@@ -39,7 +39,9 @@ def parse_skill_md(text: str, path: str) -> Skill:
     规范约束（引用 agentskills.io 开放标准，读取日期：2026-10-28）：
     - 文件必须以 '---' 开头的 frontmatter 起始，以随后的 '---' 结束；
     - 仅使用标准库单行解析 'key: value'，不依赖 PyYAML；
-    - name: 必填，1~64 字符，仅限小写英文字母、数字和连字符 '-'，且不能以连字符开头；
+    - name: 必填，1~64 字符，仅限小写英文字母、数字和连字符 '-'；
+      不得以连字符开头或结尾；不得包含连续连字符 '--'；
+    - name 必须与文件所在目录名一致（Path(path).resolve().parent.name == name）；
     - description: 必填，1~1024 字符的非空描述；
     - 格式不合法抛出 SkillFormatError，并在异常消息中说明具体原因；
     - frontmatter 结束行之后的剩余内容作为 Markdown 正文 (body)。

@@ -15,17 +15,20 @@ RAG 答得准不准，第一道关口不是模型，是“文档切得好不好�
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
-
-import numpy as np
 
 try:
     from common import LONG_DOC, embed_texts
 except ModuleNotFoundError:
-    import sys
-
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from common import LONG_DOC, embed_texts
+
+# 复用 2.2 向量检索索引组件
+EMBED_DIR = Path(__file__).resolve().parents[1] / "2.2-embed-retrieve"
+if str(EMBED_DIR) not in sys.path:
+    sys.path.insert(0, str(EMBED_DIR))
+from embed_retrieve import VectorIndex  # noqa: E402
 
 
 # ----------------------------------------------------------
@@ -143,16 +146,16 @@ def retrieve_top_k(
     chunks: list[str],
     k: int = 2,
 ) -> list[tuple[float, str]]:
-    """原生向量化检索 top-k。"""
+    """复用 2.2 VectorIndex 检索 top-k。"""
     if not chunks:
         return []
+    idx = VectorIndex()
+    ids = [f"c_{i}" for i in range(len(chunks))]
     vectors = embed_texts(chunks)
+    idx.add(ids, vectors)
     q_vec = embed_texts([query])[0]
-    mat = np.array(vectors, dtype=np.float32)
-    q = np.array(q_vec, dtype=np.float32)
-    scores = np.dot(mat, q)
-    top_indices = np.argsort(-scores)[:k]
-    return [(float(scores[idx]), chunks[idx]) for idx in top_indices]
+    hits = idx.search(q_vec, k=k)
+    return [(h["score"], chunks[int(h["id"].split("_")[1])]) for h in hits]
 
 
 def run_ablation() -> None:

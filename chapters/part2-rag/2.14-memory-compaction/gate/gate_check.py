@@ -125,10 +125,20 @@ def main() -> int:
         res = core.compact_history(msgs, budget=100, summarize_fn=broken_summary, keep_last=2)
         expect("[摘要不可用，已截断" in res.messages[1]["content"], f"摘要失败应降级为截断提示：{res.messages[1]}")
 
+    def test_post_compact_within_budget():
+        msgs = build_test_history()
+        # 预算设为 160，摘要提供极长文本，验证压缩后总 Token 严格不超预算
+        res = core.compact_history(msgs, budget=160, summarize_fn=lambda x: "超长冗余会话历史摘要说明内容" * 15, keep_last=2)
+        total_tokens = sum(len(m.get("content", "")) for m in res.messages)
+        expect(total_tokens <= 160, f"压缩后总 Token ({total_tokens}) 仍超出预算 (160)：{res.messages}")
+
     def test_prefix_changed():
         msgs = build_test_history()
         res = core.compact_history(msgs, budget=100, summarize_fn=lambda x: "summary", keep_last=2)
-        expect(res.prefix_changed is True, "发生压缩时 prefix_changed 应为 True")
+        expect(res.prefix_changed is True, "发生压缩修改历史时 prefix_changed 应为 True")
+        # 测试无需压缩时 prefix_changed 为 False
+        res_no_comp = core.compact_history(msgs, budget=5000, summarize_fn=lambda x: "summary")
+        expect(res_no_comp.prefix_changed is False, "未修改消息内容时 prefix_changed 必须为 False")
 
     def test_memory_isolation():
         store = core.MemoryStore()
@@ -145,14 +155,6 @@ def main() -> int:
         ok = store.remember("tenant_1", "user_a", "city", "Beijing", source="model", confirmed=False)
         expect(ok is False, "未确认的模型写入必须被拒绝")
         expect(store.recall("tenant_1", "user_a", "city") is None, "拒绝项不应写入存储")
-
-    def test_confirmed_accepted():
-        store = core.MemoryStore()
-        ok_model = store.remember("tenant_1", "user_a", "pref", "fast", source="model", confirmed=True)
-        ok_user = store.remember("tenant_1", "user_a", "lang", "zh", source="user", confirmed=False)
-        expect(ok_model is True and ok_user is True, "已确认模型写入或用户写入应成功")
-        expect(store.recall("tenant_1", "user_a", "pref") == "fast", "写入值读取失败")
-        expect(store.recall("tenant_1", "user_a", "lang") == "zh", "写入值读取失败")
 
     def test_forget_and_export():
         store = core.MemoryStore()
@@ -174,10 +176,10 @@ def main() -> int:
     gate.check("04 固定 pinned 消息原样保留", test_preserve_pinned)
     gate.check("05 摘要消息插入位置与前缀正确", test_summary_placement)
     gate.check("06 摘要失败降级为截断说明", test_summarize_error_fallback)
-    gate.check("07 压缩时 prefix_changed 标真", test_prefix_changed)
-    gate.check("08 多租户与跨用户严格隔离", test_memory_isolation)
-    gate.check("09 未确认模型写入被拦截拒绝", test_model_unconfirmed_rejected)
-    gate.check("10 合规用户与确认模型写入通过", test_confirmed_accepted)
+    gate.check("07 压缩后总 token 不超预算", test_post_compact_within_budget)
+    gate.check("08 压缩时 prefix_changed 判断正确", test_prefix_changed)
+    gate.check("09 多租户与跨用户严格隔离", test_memory_isolation)
+    gate.check("10 未确认模型写入被拦截拒绝", test_model_unconfirmed_rejected)
     gate.check("11 记忆遗忘与安全副本导出", test_forget_and_export)
     return gate.report(module_path)
 

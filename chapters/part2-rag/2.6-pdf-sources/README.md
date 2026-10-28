@@ -88,7 +88,7 @@ python tools/run_chapter.py 2.6
 对照时只回答：
 
 1. 参考实现用 `pypdf` 逐页 `extract_text`；它怎么处理空页？
-2. 参考实现的 `format_docs` 怎么把页码拼进上下文？你的 gate 差在哪？
+2. 参考实现的 `format_context` 怎么把页码拼进上下文？你的实现格式与规范差在哪？
 3. 参考实现让模型自己写【来源】；它有没有核对引用？本 gate 的 `verify_citations` 补了什么？
 
 ## 概念地图

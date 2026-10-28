@@ -117,14 +117,18 @@ docs = retrieve_fn(question)
 if not docs:
     return {"refused": True, "answer": "文档中没有提到。", "sources": []}
 context = format_context(docs, max_context_chars)
-answer = chat_fn(build_messages(context, question))
+messages = [
+    {"role": "system", "content": system_prompt},
+    {"role": "user", "content": f"上下文：\n{context}\n\n问题：{question}"},
+]
+answer = chat_fn(messages)
 ```
 
 ### 2. 调试与可观测性代价
 
 - **调用栈深度**：LCEL 链在执行单次调用时，底层穿透 `RunnableSequence`、`RunnableParallel`、`RunnableAssign`、序列化转换器等十余层内部包装类。一旦网络抖动、返回格式畸变或超时，排查日志往往包含数页非业务栈帧。
 - **异常拦截与降级**：原生代码对检索异常（`retrieval_error`）、超时（`timeout`）、空响应（`empty_response`）可以直接使用标准的 `try-except` 分级捕获并返回确定性结果；LCEL 链则需挂载回调处理器（Callbacks）或复杂的 Fallback 结构。
-- **无证据短路**：原生实现能在检索结果不足时直接短路返回，零 LLM Token 损耗且零幻觉风险；LCEL 基础管道如果不引入复杂的条件分支，通常仍会执行完整的模型推理。
+- **无证据短路**：原生实现能在检索结果不足时直接短路返回，零 LLM Token 损耗且无证据时不调用模型；LCEL 基础管道如果不引入复杂的条件分支，通常仍会执行完整的模型推理。
 
 ## 概念地图
 

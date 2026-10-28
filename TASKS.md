@@ -5,7 +5,7 @@
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0、V3-1 已通过。V3-2（L2 上下文工程与检索）已在 `wip-v3-2` 完成开发与全项命令自检，待审核；审核通过后合入 master 并启动 V3-3（L3）。审核记录见 `docs/v3/reviews/`。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0、V3-1 已通过并合入 master。V3-2（L2 上下文工程与检索）已按 `docs/v3/reviews/V3-2.md` 完成 3 个阻断项、9 个主要问题与 7 个次要问题的全部修复，全量验证通过，待审核者复核；复核通过后合入 master，再启动 V3-3（L3 质量闭环）。审核记录见 `docs/v3/reviews/`。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
@@ -20,7 +20,13 @@
 
 ## Done
 
-- [x] **v3 阶段 2 上下文工程与检索 V3-2 批次落地（2026-10-28）** - 依据 `docs/v3/specs/L2.md` 与 `docs/v3/conventions.md` 完成 L2.1–L2.12 全量内容改造（在 `wip-v3-2` 分支）：
+- [x] **v3 阶段 2 上下文工程与检索 V3-2 批次复核修复与全量验证（2026-10-28）** - 针对审核记录（`docs/v3/reviews/V3-2.md`）退回的 3 个阻断项（B1–B3）、9 个主要问题（M1–M9）与 7 个次要问题（m1–m7），在 `wip-v3-2` 分支完成全面闭环修复：
+  1. 阻断项清零：B1（严格依据 355ea98 恢复 PROJECT_STATUS.md 全部历史正文，用户决定段落补充 v3 标签插入位置修正说明，自检契约字段）、B2（重构 2.15 kb_pipeline.py，导入前序真实组件 2.7 切分与 2.8 RRF 融合，彻底杜绝读取 gold 标准答案与伪造输出，消融对比三种真实不同配置，workbook 恢复“待填写”）、B3（彻底重写 2.15 corpus/SOURCES.md，收录 24 份真实公有/宽松开源资料，官方许可证与链接逐条核实，删除虚构条目）；
+  2. 主要问题到位：M1（重构 fetch_corpus.py，支持固定 commit/tag 并强制哈希校验，不符时非 0 退出；补齐真实表格 PDF 与扫描页）、M2（cases.json 扩充至 32 题真实语料用例，gold 页码对齐，指标仅在应答题上计算，时延改取用例假时钟）、M3（2.6 检索输出改为轻量原生 Document 对象，下游测试完全兼容，删除伪造回答兜底）、M4（所有参考实现真实模型调用改由 --live 显式开启，缺密钥可读提示退出，不伪造生成结果，Cross-Encoder 降级打印警告，ask_image 隔离环境变量）、M5（参考实现严格复用前序章节函数）、M6（2.14 补充压缩后不超预算截断保证、20 轮长对话关键事实保留评测与 --live）、M7（2.13 补充 agentskills.io 命名约束与非法测试用例）、M8（忠实转述 Anthropic 原文并标注日期链接，补齐雷达 Vol.34 链接，改用实测 62.2% 比例）、M9（如实列出细则偏离，补齐 README 模板与 workbook 待填写）；
+  3. 次要项修复：收紧 2.12/2.13/2.15 断言（m1）；删除 4 个新章节 gate/CHECKLIST.md（m2）；修正 2.6/2.10/2.3 README 与文风（m3–m5、m7）；统一 2.15 导航与 4 个新章节标题格式（m6）；
+  4. 全量验证通过：conventions 11 节命令 1–10 逐一验证：12 个 gate 骨架全部 0 通过退出 1、临时参考解全部通过退出 0 且连跑结果一致（2.9 为原 9 项 + 新增 7 项）；单元与章节测试 63 passed、capstone 生产测试 34 passed；349 份 Markdown 文件断链 0；ruff py311 静态检查通过；part2 无 LangChain 导入泄漏；apply_v2_map 111 unchanged、apply_v3_map 新建章节全部 unchanged；16 个参考实现通过 run_chapter 离线正常启动退出。未运行真实外部模型与公网下载大文件。证据见 `docs/gate-v3-2-validation.md` 与 `docs/v3/reviews/V3-2.md`。
+
+- [x] **v3 阶段 2 上下文工程与检索 V3-2 批次落地（2026-10-28；审核结论：退回，见 `docs/v3/reviews/V3-2.md`）** - 依据 `docs/v3/specs/L2.md` 与 `docs/v3/conventions.md` 完成 L2.1–L2.12 全量内容改造（在 `wip-v3-2` 分支）：
   1. 4 个新建章节落地：L2.1（`2.12-context-engineering` 上下文工程总论 Gate，11 项断言）、L2.9（`2.13-static-context-skills` 静态上下文与 Skills Gate，11 项断言）、L2.10（`2.14-memory-compaction` 记忆与压缩 Gate，11 项断言）、L2.12（`2.15-real-corpus-kb-gate` 真实资料知识库 v1 阶段出口 Gate，含 32 题基准评测集、22 份公开语料清单、下载工具与多策略消融对比流水线，12 项断言）；
   2. 9 个原生章节重构：L2.2（`2.1` 原生切分与格式加载，`2.6` 原生 PDF 溯源与下游测试兼容）、L2.3（`2.2` 原生向量检索与三类失败注入）、L2.4（`2.3` 原生最小 RAG，保留 `minimal_rag_langchain.py` 框架对照）、L2.5（`2.7` 原生保边界切分与切分统计）、L2.6（`2.8` 原生混合检索 RRF，保留 `hybrid_search_langchain.py` 框架对照；`2.11` 原生 CrossEncoder 重排与 recall@k）、L2.7（`2.9` 原生 Multi-Query、HyDE 与追加 7 项断言的自主多轮 Agentic 检索循环）、L2.8（`2.10` 原生 Chroma 持久化与确定性哈希切片 ID 幂等更新）；
   3. L2.11（`2.4` RAG 评测基线）增补更新：README 关联 L1.10 Harness 概念与从 20 到 50 条评测集构建哲学，引用 Anthropic《Demystifying evals for AI agents》（读取日期：2026-10-28），保持原 gate 与参考实现；

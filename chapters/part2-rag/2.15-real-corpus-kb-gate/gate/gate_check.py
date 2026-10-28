@@ -91,7 +91,6 @@ def main() -> int:
         text = "前言说明\n| col1 | col2 |\n| val1 | val2 |\n后记总结"
         file = core.SourceFile(name="table_doc", pages=(text,))
         report = core.ingest([file], lambda t: [t])
-        # 检验表格行未被合并
         table_chunks = [c for c in report.chunks if "|" in c.text]
         expect(len(table_chunks) == 2, f"表格行应独立切为2个chunk，实际：{len(table_chunks)}")
         expect(table_chunks[0].text == "| col1 | col2 |", f"表头行不对：{table_chunks[0].text}")
@@ -107,17 +106,25 @@ def main() -> int:
         expect(c2.source == "docA" and c2.page == 1 and c2.index == 2, f"c2 字段不对：{c2}")
         expect(c3.source == "docA" and c3.page == 2 and c3.index == 1, f"c3 字段不对：{c3}")
 
-    # 05 无证据拒答
+    # 05 无证据拒答且绝对不得调用 chat_fn (m1)
     def test_low_score_refusal():
         chunk = core.Chunk(source="doc", page=1, index=1, text="无关内容")
+        chat_called = False
+
+        def bad_chat(m):
+            nonlocal chat_called
+            chat_called = True
+            return "不该调用的回答"
+
         ans = core.answer_with_citations(
             "测试问题",
             retrieve_fn=lambda q: [(chunk, 0.3)],
-            chat_fn=lambda m: "不该调用的回答",
+            chat_fn=bad_chat,
             min_score=0.7,
         )
         expect(ans.get("refused") is True, "低分匹配应拒答")
         expect(ans.get("citations") == [], "拒答时引用必须为空列表")
+        expect(chat_called is False, "拒答时绝对不得调用 chat_fn")
 
     # 06 引用格式规范
     def test_citation_format():
@@ -137,7 +144,6 @@ def main() -> int:
     # 07 拦截未传给模型的幻觉引用
     def test_hallucinated_citation_rejected():
         chunk = core.Chunk(source="docA", page=1, index=1, text="这是真实资料A")
-        # 模拟模型编造了不存在的 docB#p9#9
         ans = core.answer_with_citations(
             "测试幻觉引用",
             retrieve_fn=lambda q: [(chunk, 0.9)],
@@ -169,10 +175,10 @@ def main() -> int:
         expect("---" in content or "===" in content or "```" in content, "资料未用明确分隔符包裹")
         expect("数据" in content or "只读" in content or "参考" in content, "未声明资料为数据或只读参考")
 
-    # 09 固定替身指标精确计算
+    # 09 固定替身指标精确计算 (仅应答题计算 citation 与 hit@5)
     def test_evaluate_metrics():
         cases = [
-            # 题 1：应答，回答正确，引用匹配
+            # 题 1：应答题，回答正确，引用匹配
             {
                 "id": "c1",
                 "question": "q1",
@@ -180,7 +186,7 @@ def main() -> int:
                 "gold_sources": ["doc#p1"],
                 "retrieved": ["doc#p1#1", "doc#p2#1"],
             },
-            # 题 2：应拒答，系统拒答
+            # 题 2：拒答题，系统拒答
             {
                 "id": "c2",
                 "question": "q2",
@@ -188,7 +194,7 @@ def main() -> int:
                 "gold_sources": [],
                 "retrieved": ["doc#p9#9"],
             },
-            # 题 3：应答，但回答未召回，引用错误
+            # 题 3：应答题，但回答未召回，引用错误
             {
                 "id": "c3",
                 "question": "q3",
@@ -206,17 +212,18 @@ def main() -> int:
             return {"refused": False, "answer": "ans3", "citations": ["doc#p1#1"]}
 
         report = core.evaluate(cases, mock_answer_fn)
-        # citation: c1(pass), c2(pass, citations=[]), c3(fail, citations=['doc#p1#1'] doesn't cover 'doc#p5') -> 2/3
-        expect(abs(report["citation_accuracy"] - 2 / 3) < 1e-4, f"citation 不准：{report['citation_accuracy']}")
-        # refusal: c1(refused=False==should_refuse), c2(refused=True==should_refuse), c3(refused=False==should_refuse) -> 3/3
+        # 应答题共有 c1, c3 (2题)：
+        # citation: c1 通过, c3 失败 -> 1/2 = 0.5
+        expect(abs(report["citation_accuracy"] - 0.5) < 1e-4, f"citation 不准：{report['citation_accuracy']}")
+        # refusal 在全部 3 题上统计：c1, c2, c3 均符合 should_refuse -> 3/3 = 1.0
         expect(abs(report["refusal_accuracy"] - 1.0) < 1e-4, f"refusal 不准：{report['refusal_accuracy']}")
-        # hit@5: c1 has doc#p1#1 in top 5 -> hit; c2 gold_sources empty -> hit; c3 doc#p5 not in top 5 -> miss => 2/3
-        expect(abs(report["hit_at_5"] - 2 / 3) < 1e-4, f"hit@5 不准：{report['hit_at_5']}")
+        # hit@5 仅在应答题 (c1, c3) 上统计：c1 命中, c3 未命中 -> 1/2 = 0.5
+        expect(abs(report["hit_at_5"] - 0.5) < 1e-4, f"hit@5 不准：{report['hit_at_5']}")
 
-    # 10 消融表
+    # 10 消融表与假时钟延迟统计
     def test_ablation_output():
         cases = [
-            {"id": "c1", "question": "q1", "should_refuse": True, "gold_sources": [], "retrieved": []}
+            {"id": "c1", "question": "q1", "should_refuse": True, "gold_sources": [], "retrieved": [], "latency_ms": 15.0}
         ]
         configs = {
             "baseline": lambda c: {"refused": True, "answer": "r", "citations": []},
@@ -227,6 +234,7 @@ def main() -> int:
         for row in res:
             for k in ("name", "citation_accuracy", "refusal_accuracy", "hit_at_5", "avg_latency_ms"):
                 expect(k in row, f"消融表缺少字段 {k}：{row}")
+            expect(abs(row["avg_latency_ms"] - 15.0) < 1e-4, f"假时钟延迟未正确统计：{row['avg_latency_ms']}")
 
     # 11 门禁阈值拦截器
     def test_gate_thresholds():
@@ -262,7 +270,7 @@ def main() -> int:
     gate.check("02 空白页记失败 (reason=empty_page)", test_empty_page)
     gate.check("03 表格行按行保留且不跨行合并", test_table_preservation)
     gate.check("04 Chunk 字段完整性与页内索引起始规范", test_chunk_fields)
-    gate.check("05 无足够支持证据时安全拒答且引用为空", test_low_score_refusal)
+    gate.check("05 无足够支持证据时安全拒答且绝对不调 chat_fn", test_low_score_refusal)
     gate.check("06 引用格式严格遵循 source#p<page>#<index>", test_citation_format)
     gate.check("07 拦截引用未传给模型的幻觉片段", test_hallucinated_citation_rejected)
     gate.check("08 资料装配在 user 消息分隔符内且声明为数据", test_prompt_isolation_delimiters)

@@ -77,10 +77,17 @@ def parse_skill_md(text: str, path: str) -> Skill:
     name = fm_kv["name"]
     description = fm_kv["description"]
 
-    # 规范校验（agentskills.io 读取日期：2026-10-28）：1~64 字符，仅限小写字母、数字和连字符，不能以连字符开头
-    if not re.match(r"^[a-z0-9][a-z0-9\-]{0,63}$", name):
+    # 规范校验（agentskills.io 读取日期：2026-10-28）：1~64 字符，仅限小写字母、数字和连字符，不得以连字符起止，不得含连续连字符
+    if not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", name) or "--" in name or len(name) > 64:
         raise SkillFormatError(
-            f"name 字段不符合规范（必须为 1~64 字符小写字母、数字或连字符）：{name!r}"
+            f"name 字段不符合规范（必须为 1~64 字符小写字母、数字或连字符，且不得以连字符起止、不得含连续连字符）：{name!r}"
+        )
+
+    # name 必须与所在目录名一致
+    dir_name = Path(path).resolve().parent.name
+    if dir_name != name:
+        raise SkillFormatError(
+            f"Skill name ({name!r}) 与所在目录名 ({dir_name!r}) 不一致"
         )
 
     if not (1 <= len(description) <= 1024):

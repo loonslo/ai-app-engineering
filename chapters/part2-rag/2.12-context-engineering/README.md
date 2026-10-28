@@ -1,6 +1,6 @@
-# 2.12 (L2.1) 上下文工程总论 · Gate
+# 2.12 上下文工程总论 · Gate
 
-[全书目录](../../README.md) · [上一章 L1.10](../../part1-foundations/1.10-embedded-llm-feature/README.md) · [下一章 L2.2](../2.1-load-split/README.md)
+[全书目录](../../README.md) · [上一章 1.10 嵌入式功能与评测](../../part1-foundations/1.10-embedded-llm-feature/README.md) · [下一章 2.1 文档加载与切分](../2.1-load-split/README.md)
 
 - **能力**：按 Token 预算确定性组装上下文段落；保证静态前缀稳定以最大化 Prompt Caching 命中；识别破坏缓存的时间戳与单段体积超限；掌握上下文工程的六大失败模式与防御策略。
 - **v3 路径**：L2.1 / 核心（Gate；上下文工程）
@@ -48,7 +48,7 @@ python chapters/part2-rag/2.12-context-engineering/gate/gate_check.py
 - **静态内容必须在前**：固定人设、静态业务政策、未修改的工具说明必须作为头部前缀；
 - **动态内容严格后置**：易变的时间戳、用户提问、动态历史只能追加在末尾。
 > [!NOTE]
-> 行业数据：根据 Datadog 发布的权威报告《State of AI Engineering》（https://www.datadoghq.com/state-of-ai-engineering/ ，读取于 2026-10-28）：在企业级真实生产调用中，**System Prompt 平均占输入 Token 的 69%**，然而在所有具备缓存潜力的调用中，**仅有约 28% 真正命中了前缀缓存**。导致未能命中的罪魁祸首正是“静态前缀中夹杂动态易变变量”。
+> 行业数据：根据 Datadog 发布的报告《State of AI Engineering》（https://www.datadoghq.com/state-of-ai-engineering/ ，读取于 2026-10-28）：在企业级生产调用中，**System Prompt 平均占输入 Token 的 69%**，然而在所有具备缓存潜力的调用中，**仅有约 28% 真正命中了前缀缓存**。导致未能命中的主要原因正是“静态前缀中夹杂动态易变变量”。
 
 ### 4. 解决上下文膨胀的四种技术手段
 - **渐进披露（Progressive Disclosure）**：初始仅暴露元数据（如 Skill 名称与描述），模型确认需要时再动态加载正文；
@@ -58,35 +58,32 @@ python chapters/part2-rag/2.12-context-engineering/gate/gate_check.py
 
 ### 5. 指令膨胀（Instruction Bloat）与雷达评级
 > [!IMPORTANT]
-> 权威架构趋势：在 Thoughtworks 技术雷达 Vol.34（https://www.thoughtworks.com/radar ，读取于 2026-10-28）中：
-> - **Agent instruction bloat（智能体指令膨胀）** 被列入 **Caution（警惕）**：盲目堆砌成千上万行 Prompt 会导致指令互相冲突、模型遵循率断崖下跌；
+> 架构趋势：在 Thoughtworks 技术雷达 Vol.34（https://www.thoughtworks.com/radar ，读取于 2026-10-28）中：
+> - **Agent instruction bloat（智能体指令膨胀）** 被列入 **Caution（警惕）**：盲目堆砌成千上万行 Prompt 会导致指令互相冲突、模型遵循率大幅下跌；
 > - **Context engineering（上下文工程）** 被列入 **Adopt（采纳）**：提倡系统化治理上下文结构、预算分配与缓存生命周期。
 
 ### 6. 常见上下文工程三大失败模式
 - **上下文污染（Context Poisoning）**：恶意的用户输入注入了伪造的系统级规则；
 - **注意力分散（Distraction）**：无关检索召回片段淹没了核心指令；
-- **指令冲突（Instruction Conflict）**：通用 Prompt 与特定业务规则说法相左，模型随机摇摆。
+- **指令冲突（Instruction Conflict）**：通用 Prompt 与特定业务规则说法相左，模型产生逻辑摇摆。
 
 ---
 
-## 流程
+## 任务与关键约定
 
-上下文装配与审查的标准生命周期：
-```text
-原始 Sections 列表
-   │
-   ├──> 1. 去重检查（同名或同文本过滤，记录 warning）
-   │
-   ├──> 2. 静态审查（Lint：检查 static 中是否含时间戳、单段是否超 50% 预算）
-   │
-   ├──> 3. Required 检验（计算 required 段落 Token；超预算抛出 ContextBudgetError）
-   │
-   ├──> 4. 优先级排序与预算裁剪（非 required 按 priority 降序尝试放入，放不下的放入 dropped）
-   │
-   ├──> 5. 排序组装（先输出纳入的 static，后输出纳入的 dynamic，各段间双换行连接）
-   │
-   └──> 6. 计算 SHA-256 前缀哈希与生成 AssembledContext 领域对象
-```
+在 `gate/starter.py` 中实现下列核心组件与函数：
+
+| 函数 / 类型 | 你要交付的行为 |
+|---|---|
+| `count_tokens` | 确定性字符近似计量：`math.ceil(len(text) / 3.5)`，空串为 0 |
+| `assemble_context` | 装配上下文：去重并产生 warning；校验 required 段落不超预算；非 required 按 priority 降序放入；输出先 static 后 dynamic；计算 static 前缀 SHA256 哈希 |
+| `lint_context` | 静态审查：检查 static 中是否混入日期时间，检查单段是否超过 50% 预算 |
+
+关键约定：
+1. **去重规则**：同一 name 重复出现或同一 text 重复出现，仅保留首次出现的段落；后续重复项记入 warnings：`duplicate:<name>`。
+2. **熔断规则**：若所有 `required=True` 段落的 Token 之和已超过 budget，立即抛出 `ContextBudgetError`。
+3. **前缀哈希**：`static_prefix_hash` 为纳入的所有 static 段落拼接正文的 SHA-256 十六进制摘要；若无 static 段落则为空字符串 `""`。
+4. **拼接格式**：各段落正文之间使用双换行 `\n\n` 拼接，不添加多余前后空格。
 
 ---
 

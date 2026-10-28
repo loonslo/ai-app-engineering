@@ -59,8 +59,8 @@ python chapters/part2-rag/2.4-eval-seed/gate/gate_check.py
 
 ## 从 20 条到 50 条：评测集构建哲学
 
-根据 Anthropic 发布的工程指导《Demystifying evals for AI agents》（读取日期：2026-10-28）：
-> 在 AI 应用与 Agent 研发初期，团队常犯的错误是盲目追求数以千计的合成测试集，却缺乏对失败细节的洞察。最有效的高杠杆评测往往始于 20 到 50 条手工精细标注、来源于真实生产与实验失败的高信噪比 Golden Set。
+根据 Anthropic 发布的工程指南 [《Demystifying evals for AI agents》](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)（2026-01-09 发布，核对读取日期：2026-10-28）：
+> "20-50 simple tasks drawn from real failures is a great start"（从真实失败中提炼 20–50 个简单任务，就是一个非常好的起点）。真实生产与实验中暴露的高信噪比用例，远比盲目生成海量未经验证的合成测试更有诊断价值。
 
 构建高质量 Golden Set 的演进路径：
 1. **20 条打底（核心边界覆盖）**：覆盖高频业务场景，显式注入并固化历史踩过的 Bug（如本章的 6 类典型失败：未召回漏引、跨界编造引用、拒答带证据、格式重复等）。这 20 条能够作为持续集成的快速烟雾测试门禁。

@@ -5,18 +5,18 @@
 1. 原生流程：检索 → 预算过滤与组装上下文 → OpenAI-compatible SDK 聊天补全
 2. 引用格式规范：引用来源标记 `source#index`（如 test_doc.txt#1）
 3. 严格拒答：当检索结果为空或相似度不足时，直接拒答且不附带来源
-4. 纯原生实现，不依赖 LangChain LCEL 黑盒包装
+4. 纯原生实现，不依赖 LangChain LCEL 黑盒包装；真实调用由 --live 开启
 
-运行：python tools/run_chapter.py 2.3 minimal_rag.py
+运行：python tools/run_chapter.py 2.3 minimal_rag.py [--live]
 ==========================================================
 """
 
 from __future__ import annotations
 
+import argparse
+import sys
 from pathlib import Path
 from typing import Callable
-
-import numpy as np
 
 try:
     from common import (
@@ -26,8 +26,6 @@ try:
         get_openai_client,
     )
 except ModuleNotFoundError:
-    import sys
-
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from common import (
         SAMPLE_DOC,
@@ -35,6 +33,12 @@ except ModuleNotFoundError:
         embed_texts,
         get_openai_client,
     )
+
+# 复用 2.2 向量检索索引组件
+EMBED_DIR = Path(__file__).resolve().parents[1] / "2.2-embed-retrieve"
+if str(EMBED_DIR) not in sys.path:
+    sys.path.insert(0, str(EMBED_DIR))
+from embed_retrieve import VectorIndex  # noqa: E402
 
 
 # ----------------------------------------------------------
@@ -177,72 +181,99 @@ def answer_with_rag(
 
 
 # ----------------------------------------------------------
-# 2. 真实/离线端到端 RAG 问答演示
+# 2. 真实/离线端到端 RAG 问答演示 (复用 2.2 VectorIndex)
 # ----------------------------------------------------------
 
 
 class KnowledgeBase:
-    """简单的基于内存向量的知识库。"""
+    """基于 2.2 VectorIndex 向量索引的轻量原生知识库。"""
 
     def __init__(self, doc_path: str | Path):
         self.doc_path = Path(doc_path)
         self.chunks: list[dict] = []
-        self.vectors: list[list[float]] = []
+        self.index = VectorIndex()
         self._build_index()
 
     def _build_index(self) -> None:
         text = self.doc_path.read_text(encoding="utf-8")
         step = 100
         idx = 1
+        ids: list[str] = []
+        texts: list[str] = []
         for start in range(0, len(text), step):
             piece = text[start : start + 120]
             if piece.strip():
+                cid = f"{self.doc_path.name}#{idx}"
                 self.chunks.append({
                     "text": piece,
-                    "source": f"{self.doc_path.name}#{idx}",
+                    "source": cid,
                     "index": idx,
                 })
+                ids.append(cid)
+                texts.append(piece)
                 idx += 1
-        if self.chunks:
-            self.vectors = embed_texts([c["text"] for c in self.chunks])
+        if texts:
+            vecs = embed_texts(texts)
+            self.index.add(ids, vecs)
 
     def retrieve(self, query: str, k: int = 3, min_score: float = 0.35) -> list[dict]:
-        if not self.chunks or not self.vectors:
+        if not self.chunks:
             return []
         q_vec = embed_texts([query])[0]
-        mat = np.array(self.vectors, dtype=np.float32)
-        q = np.array(q_vec, dtype=np.float32)
-        scores = np.dot(mat, q)
-        top_indices = np.argsort(-scores)[:k]
-
+        results = self.index.search(q_vec, k=k)
+        chunk_map = {c["source"]: c for c in self.chunks}
         hits = []
-        for idx in top_indices:
-            s = float(scores[idx])
-            if s >= min_score:
-                hits.append(self.chunks[idx])
+        for r in results:
+            if r["score"] >= min_score:
+                hits.append(chunk_map[r["id"]])
         return hits
 
 
-def default_chat_fn(messages: list[dict]) -> str:
-    """通过 OpenAI-compatible SDK 调用聊天模型；无 API 密钥时做可读离线降级。"""
-    try:
-        client = get_openai_client()
+def make_chat_fn(live: bool) -> Callable[[list[dict]], str]:
+    """根据是否开启 --live 返回在线模型调用或清晰离线提取函数。"""
+    if live:
+        try:
+            client = get_openai_client()
+        except Exception as exc:
+            print(f"[可读提示] 未能初始化客户端（未配置有效 API 密钥）：{exc}")
+            sys.exit(1)
         model = chat_model_name()
-        resp = client.chat.completions.create(
-            model=model,
-            temperature=0.0,
-            messages=messages,
-        )
-        return resp.choices[0].message.content or ""
-    except Exception as exc:
-        # 离线环境友好兜底
-        return f"[离线模拟生成] 已核对上下文证据。（环境未配置模型密钥：{exc}）"
+
+        def live_chat(messages: list[dict]) -> str:
+            resp = client.chat.completions.create(
+                model=model,
+                temperature=0.0,
+                messages=messages,
+            )
+            return resp.choices[0].message.content or ""
+
+        return live_chat
+
+    def offline_chat(messages: list[dict]) -> str:
+        # 离线演示模式：从装配消息中清晰指出未调用模型
+        user_content = messages[-1].get("content", "")
+        if "没有提供足够证据" in user_content:
+            return "文档中没有提到。"
+        return "[离线演示] 依据上下文匹配成功，已装配 Prompt；使用 --live 参数可调用真实模型生成。"
+
+    return offline_chat
 
 
-if __name__ == "__main__":
+def main() -> None:
+    parser = argparse.ArgumentParser(description="2.3 最小 RAG 原生问答演示")
+    parser.add_argument("--live", action="store_true", help="启用真实在线模型调用")
+    args = parser.parse_args()
+
     print("=== 2.3 最小 RAG 原生问答演示 ===")
+    if args.live:
+        print("[模式] 正在使用 --live 在线调用模型。")
+    else:
+        print("[模式] 默认离线模式（未发起在线模型调用，可通过 --live 开启）。")
+
     kb = KnowledgeBase(SAMPLE_DOC)
     print(f"知识库构建完成，共包含 {len(kb.chunks)} 个片段。")
+
+    chat_fn = make_chat_fn(live=args.live)
 
     test_questions = [
         "RAG 是什么？",
@@ -253,7 +284,11 @@ if __name__ == "__main__":
     for q in test_questions:
         print("\n" + "=" * 50)
         print("问题：", q)
-        res = answer_with_rag(q, kb.retrieve, default_chat_fn)
+        res = answer_with_rag(q, kb.retrieve, chat_fn)
         print("回答：", res["answer"])
         print("引用来源：", res["sources"])
         print("是否拒答：", res["refused"])
+
+
+if __name__ == "__main__":
+    main()

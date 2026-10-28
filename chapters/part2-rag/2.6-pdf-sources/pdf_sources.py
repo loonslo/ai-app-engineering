@@ -4,8 +4,8 @@
 本章把 RAG 升级为支持页码元数据与来源溯源的形式：
 1. 支持 .txt 和 .pdf，按页加载提取文本并保留页码元数据
 2. 原生实现 format_context 与 verify_citations，核对模型回答里的出处
-3. 封装 build_retriever 与 build_rag_chain，供后续评测章节复用
-4. 纯原生实现，不依赖 LangChain
+3. 封装 build_retriever 与 build_rag_chain，产出带 page_content 与 metadata 的 Document 对象
+4. 纯原生实现，下游评测章节完全兼容
 
 运行：python tools/run_chapter.py 2.6
 ==========================================================
@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,41 @@ except ModuleNotFoundError:
         embed_texts,
         get_openai_client,
     )
+
+
+# ----------------------------------------------------------
+# 0. 轻量通用 Document 结构 (完全兼容下游 3.2, 3.3, 3.5, 5.1, 5.8)
+# ----------------------------------------------------------
+
+
+@dataclass
+class Document:
+    """轻量 Document 数据结构，提供 page_content 与 metadata 属性。"""
+
+    page_content: str
+    metadata: dict[str, Any]
+
+    @property
+    def text(self) -> str:
+        return self.page_content
+
+    @property
+    def source(self) -> str:
+        return self.metadata.get("source", "")
+
+    @property
+    def page(self) -> int | None:
+        return self.metadata.get("page")
+
+    def __getitem__(self, key: str) -> Any:
+        if key in ("text", "page_content"):
+            return self.page_content
+        return self.metadata[key]
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if key in ("text", "page_content"):
+            return self.page_content
+        return self.metadata.get(key, default)
 
 
 # ----------------------------------------------------------
@@ -62,12 +98,8 @@ def load_pages(pages: list[tuple[int, str]], source: str) -> list[dict]:
     return result
 
 
-def _validate_docs(docs: list[dict]) -> None:
-    if not isinstance(docs, list):
-        raise ValueError("docs 必须是列表")
-    for doc in docs:
-        if not isinstance(doc, dict):
-            raise ValueError("doc 必须是字典")
+def _extract_doc_fields(doc: Any) -> tuple[str, str, int | None]:
+    if isinstance(doc, dict):
         if "text" not in doc or not isinstance(doc["text"], str):
             raise ValueError("doc 必须包含字符串类型的 text")
         if "source" not in doc or not isinstance(doc["source"], str):
@@ -75,36 +107,50 @@ def _validate_docs(docs: list[dict]) -> None:
         page = doc.get("page")
         if page is not None and (not isinstance(page, int) or page < 1):
             raise ValueError("page 必须是 >= 1 的整数或 None")
+        return doc["source"], doc["text"], page
+    if hasattr(doc, "page_content") and hasattr(doc, "metadata"):
+        metadata = getattr(doc, "metadata", {})
+        src = metadata.get("source", "")
+        page = metadata.get("page")
+        text = getattr(doc, "page_content", "")
+        if not isinstance(src, str):
+            raise ValueError("source 必须是字符串")
+        if not isinstance(text, str):
+            raise ValueError("text 必须是字符串")
+        if page is not None and (not isinstance(page, int) or page < 1):
+            raise ValueError("page 必须是 >= 1 的整数或 None")
+        return src, text, page
+    raise ValueError(f"不受支持的 doc 类型：{type(doc)}")
 
 
-def format_context(docs: list[dict]) -> str:
-    """把片段拼成带页码标签的上下文。"""
-    _validate_docs(docs)
+def format_context(docs: list[Any]) -> str:
+    """把片段拼成带页码标签的上下文。兼容 dict 与 Document。"""
+    if not isinstance(docs, list):
+        raise ValueError("docs 必须是列表")
     if not docs:
         return ""
 
     parts = []
     for d in docs:
-        src = d["source"]
-        page = d.get("page")
+        src, text, page = _extract_doc_fields(d)
         if page is not None:
             tag = f"[来源：{src} 第{page}页]"
         else:
             tag = f"[来源：{src}]"
-        parts.append(f"{tag}\n{d['text']}")
+        parts.append(f"{tag}\n{text}")
     return "\n\n".join(parts)
 
 
-def verify_citations(answer: str, docs: list[dict]) -> dict:
-    """核对答案里的【来源：...】标记是否都在 docs 中。"""
+def verify_citations(answer: str, docs: list[Any]) -> dict:
+    """核对答案里的【来源：...】标记是否都在 docs 中。兼容 dict 与 Document。"""
     if not isinstance(answer, str):
         raise ValueError("answer 必须是字符串")
-    _validate_docs(docs)
+    if not isinstance(docs, list):
+        raise ValueError("docs 必须是列表")
 
     valid_tags = set()
     for d in docs:
-        src = d["source"]
-        page = d.get("page")
+        src, _, page = _extract_doc_fields(d)
         if page is not None:
             valid_tags.add(f"{src}#p{page}")
         else:
@@ -161,15 +207,15 @@ def load_document(file_path: str | Path) -> list[dict]:
 
 
 class NativeRetriever:
-    """基于原生向量与余弦相似度的纯 Python 检索器。"""
+    """基于原生向量与余弦相似度的纯 Python 检索器。返回 list[Document]。"""
 
-    def __init__(self, chunks: list[dict], k: int = 4):
+    def __init__(self, chunks: list[Document], k: int = 4):
         self.chunks = chunks
         self.k = k
-        self.texts = [c["text"] for c in chunks]
+        self.texts = [c.page_content for c in chunks]
         self.vectors = embed_texts(self.texts) if self.texts else []
 
-    def invoke(self, query: str) -> list[dict]:
+    def invoke(self, query: str) -> list[Document]:
         if not self.chunks or not self.vectors:
             return []
         q_vec = embed_texts([query])[0]
@@ -182,18 +228,18 @@ class NativeRetriever:
         top = [self.chunks[idx] for _, idx in scores[: self.k]]
         return top
 
-    def __call__(self, query: str) -> list[dict]:
+    def __call__(self, query: str) -> list[Document]:
         return self.invoke(query)
 
 
 def build_retriever(file_path: str | Path, k: int = 4) -> NativeRetriever:
-    """加载 → 切分 → 向量化 → 返回检索器。"""
+    """加载 → 切分 → 向量化 → 返回原生 Document 检索器。"""
     docs = load_document(file_path)
     if not docs:
         raise ValueError("没解析出任何文本（PDF 可能是扫描件，没有文字层）")
 
-    # 简单原生分块
-    chunks: list[dict] = []
+    # 简单原生分块，封装为 Document
+    chunks: list[Document] = []
     chunk_idx = 1
     chunk_size = 300
     overlap = 50
@@ -203,12 +249,16 @@ def build_retriever(file_path: str | Path, k: int = 4) -> NativeRetriever:
         for start in range(0, len(text), step):
             piece = text[start : start + chunk_size]
             if piece.strip():
-                chunks.append({
-                    "text": piece,
-                    "source": doc["source"],
-                    "page": doc.get("page"),
-                    "index": chunk_idx,
-                })
+                chunks.append(
+                    Document(
+                        page_content=piece,
+                        metadata={
+                            "source": doc["source"],
+                            "page": doc.get("page"),
+                            "index": chunk_idx,
+                        },
+                    )
+                )
                 chunk_idx += 1
             if start + chunk_size >= len(text):
                 break
@@ -234,23 +284,20 @@ class NativeRagChain:
         )
         user_prompt = f"上下文：\n{context}\n\n问题：{question}"
 
-        try:
-            client = get_openai_client()
-            model = chat_model_name()
-            resp = client.chat.completions.create(
-                model=model,
-                temperature=self.temperature,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-            )
-            return resp.choices[0].message.content or "文档中没有提到"
-        except Exception:
-            # 离线环境或未配置模型时给出可读兜底，不崩溃
-            return f"[离线模拟回答：依据检索到 {len(docs)} 个片段] 【来源：{docs[0]['source']}" + (
-                f" 第{docs[0]['page']}页" if docs and docs[0].get("page") else ""
-            ) + "】"
+        client = get_openai_client()
+        if client is None:
+            raise RuntimeError("未配置模型 API 密钥，请在 .env 中设置 DEEPSEEK_API_KEY 或使用 --live。")
+
+        model = chat_model_name()
+        resp = client.chat.completions.create(
+            model=model,
+            temperature=self.temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        return resp.choices[0].message.content or "文档中没有提到"
 
 
 def build_rag_chain(retriever: Any, temperature: float = 0.0) -> NativeRagChain:
@@ -269,7 +316,13 @@ if __name__ == "__main__":
     v = verify_citations(test_ans, loaded)
     print(f"\n引用核对结果：ok={v['ok']}, cited={v['cited']}, unknown={v['unknown']}")
 
-    # 尝试加载示例文档
+    # 加载示例文档并测试 Retriever
     if Path(SAMPLE_DOC).is_file():
         retriever = build_retriever(SAMPLE_DOC, k=2)
-        print(f"\n检索测试完成：建库索引了 {len(retriever.chunks)} 个片段。")
+        print(f"\n检索器构建完成：已索引 {len(retriever.chunks)} 个 Document 片段。")
+        sample_hits = retriever.invoke("退款")
+        print(f"示例文档检索测试（'退款'）：召回 {len(sample_hits)} 条片段")
+        for i, hit in enumerate(sample_hits, 1):
+            src = hit.metadata.get("source")
+            pg = hit.metadata.get("page")
+            print(f"  [{i}] source={src} page={pg}: {hit.page_content[:30]}...")

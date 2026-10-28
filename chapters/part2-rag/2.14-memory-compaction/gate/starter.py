@@ -37,12 +37,13 @@ def compact_history(
     要求：
     - 不超预算时原样返回，summarized_count=0，prefix_changed=False；
     - 超预算时：
-      1. 保留第一条 system 消息与最后 keep_last 条消息；
+      1. 保留第一条 system 消息（若首条为 system）与最后 keep_last 条消息；
       2. 标记了 "pinned": True 的消息永远原样保留，并维持原有相对顺序；
-      3. 其余中间未固定消息交给 summarize_fn(list) -> str 压缩为一条 role="system"、
-         以 "[摘要]" 开头的消息，紧随第一条 system 消息之后；
+      3. 其余中间未固定消息若存在，交给 summarize_fn(list) -> str 压缩为一条 role="system"、
+         以 "[摘要]" 开头的消息，紧随第一条 system 消息之后；若无中间可压缩消息，则不插入摘要消息；
       4. 若 summarize_fn 抛出异常，降级为直接截断，摘要内容记 "[摘要不可用，已截断 N 条]"；
-      5. prefix_changed 指示第一条 system 消息之后的内容是否发生了变更。
+      5. 压缩后必须确保不超预算：若生成摘要后总 token 仍超 budget，则对摘要消息内容进行截断（保留前缀并在末尾追加 '...[截断]'），使压缩后的总 token 数严格不超过 budget；若除去摘要外的必须保留消息（system + pinned + tail）本身已占满或超出 budget，则不再插入摘要消息，直接返回固定保留消息；
+      6. prefix_changed 指示首条 system 消息之后的内容（messages[1:]）是否发生了变更。
     """
     raise NotImplementedError("实现会话压缩 compact_history")
 

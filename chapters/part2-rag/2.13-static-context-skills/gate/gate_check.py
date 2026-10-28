@@ -72,13 +72,14 @@ def main() -> int:
     gate = Gate()
 
     def test_parse_valid():
-        p = FIXTURES_DIR / "pdf-reader" / "SKILL.md"
-        text = p.read_text(encoding="utf-8")
-        skill = core.parse_skill_md(text, str(p))
-        expect(skill.meta.name == "pdf-reader", f"name 不对：{skill.meta.name}")
-        expect("PDF" in skill.meta.description, f"description 不对：{skill.meta.description}")
-        expect("PDF Reader Skill" in skill.body, f"body 缺少正文：{skill.body}")
-        expect("---" not in skill.body, "body 不应包含 frontmatter 分界线")
+        for skill_dir in ["pdf-reader", "data-cleaner", "security-audit"]:
+            p = FIXTURES_DIR / skill_dir / "SKILL.md"
+            text = p.read_text(encoding="utf-8")
+            skill = core.parse_skill_md(text, str(p))
+            expect(skill.meta.name == skill_dir, f"name 不对：{skill.meta.name}")
+            expect(len(skill.meta.description) > 0, f"description 为空：{skill_dir}")
+            expect(len(skill.body) > 0, f"body 缺少正文：{skill_dir}")
+            expect("---" not in skill.body, "body 不应包含 frontmatter 分界线")
 
     def test_parse_missing_frontmatter():
         p = FIXTURES_DIR / "missing-frontmatter" / "SKILL.md"
@@ -92,19 +93,45 @@ def main() -> int:
     def test_parse_missing_name():
         bad_text = "---\ndescription: Only description without name\n---\nBody here."
         try:
-            core.parse_skill_md(bad_text, "dummy/path")
+            core.parse_skill_md(bad_text, str(FIXTURES_DIR / "dummy" / "SKILL.md"))
         except core.SkillFormatError:
             return
         raise AssertionError("缺少 name 应抛 SkillFormatError")
 
     def test_parse_invalid_name():
+        # 1. 大写与特殊字符
         p = FIXTURES_DIR / "invalid-name" / "SKILL.md"
         text = p.read_text(encoding="utf-8")
         try:
             core.parse_skill_md(text, str(p))
+            raise AssertionError("非法 name (大写/特殊字符) 应抛 SkillFormatError")
         except core.SkillFormatError:
-            return
-        raise AssertionError("非法 name 应抛 SkillFormatError")
+            pass
+
+        # 2. 以连字符结尾 (如 pdf-)
+        bad_trailing = "---\nname: pdf-\ndescription: trailing hyphen test\n---\nBody"
+        try:
+            core.parse_skill_md(bad_trailing, str(FIXTURES_DIR / "pdf-" / "SKILL.md"))
+            raise AssertionError("以连字符结尾的 name 应抛 SkillFormatError")
+        except core.SkillFormatError:
+            pass
+
+        # 3. 包含连续连字符 (如 pdf--reader)
+        bad_consecutive = "---\nname: pdf--reader\ndescription: consecutive hyphen test\n---\nBody"
+        try:
+            core.parse_skill_md(bad_consecutive, str(FIXTURES_DIR / "pdf--reader" / "SKILL.md"))
+            raise AssertionError("含连续连字符的 name 应抛 SkillFormatError")
+        except core.SkillFormatError:
+            pass
+
+        # 4. name 与所在目录名不一致
+        mismatch_path = FIXTURES_DIR / "data-cleaner" / "SKILL.md"
+        valid_yaml_wrong_dir = "---\nname: pdf-reader\ndescription: valid name but wrong dir\n---\nBody"
+        try:
+            core.parse_skill_md(valid_yaml_wrong_dir, str(mismatch_path))
+            raise AssertionError("name 与目录名不符应抛 SkillFormatError")
+        except core.SkillFormatError:
+            pass
 
     def test_build_index_basic():
         skills = [

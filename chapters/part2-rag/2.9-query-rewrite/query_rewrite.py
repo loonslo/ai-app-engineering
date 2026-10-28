@@ -189,11 +189,17 @@ def agentic_retrieve(
 # 2. 原生 Multi-Query、HyDE 与演示
 # ----------------------------------------------------------
 
+_IS_LIVE = False
+
 
 def call_llm(prompt: str) -> str:
-    """调用大模型；缺少 API key 时进行可读离线降级。"""
-    try:
-        client = get_openai_client()
+    """调用大模型；仅在 --live 模式下发起真实网络调用，离线时返回明确标注的确定性示例。"""
+    if _IS_LIVE:
+        try:
+            client = get_openai_client()
+        except Exception as exc:
+            print(f"[错误] 未能初始化客户端（未配置有效 API 密钥）：{exc}")
+            sys.exit(1)
         model = chat_model_name()
         resp = client.chat.completions.create(
             model=model,
@@ -201,13 +207,13 @@ def call_llm(prompt: str) -> str:
             messages=[{"role": "user", "content": prompt}],
         )
         return resp.choices[0].message.content or ""
-    except Exception as exc:
-        # 离线模拟返回
-        if "改写" in prompt or "不同角度" in prompt:
-            return "如何持久化存储向量数据\n向量数据库在生产环境的落地选型\nFAISS 与 Chroma 区别"
-        if "假设性" in prompt:
-            return "向量通常通过向量数据库（如 Chroma、Milvus）或轻量索引库（如 FAISS）进行持久化存储与磁盘落盘。"
-        return f"[离线模拟返回] {exc}"
+
+    # 离线确定性示例
+    if "改写" in prompt or "不同角度" in prompt:
+        return "[离线确定性改写] 向量数据在磁盘上的持久化存储方法\n向量数据库在生产环境的选型落地\nFAISS 与 Chroma 存储差异"
+    if "假设性" in prompt:
+        return "[离线确定性 HyDE 假设文本] 向量数据通常通过专用的向量数据库（如 Chroma、Milvus）或轻量嵌入索引库（如 FAISS）进行磁盘持久化存储与索引落盘。"
+    return f"[离线确定性文本] 针对问题：{prompt[:30]}"
 
 
 def generate_hyde_query(question: str) -> str:
@@ -258,8 +264,21 @@ class SimpleIndex:
         return hits
 
 
-if __name__ == "__main__":
+def main() -> None:
+    global _IS_LIVE
+    import argparse
+
+    parser = argparse.ArgumentParser(description="2.9 查询改写演示")
+    parser.add_argument("--live", action="store_true", help="启用真实在线大模型调用")
+    args = parser.parse_args()
+    _IS_LIVE = args.live
+
     print("=== 2.9 查询改写（Multi-Query、HyDE 与 Agentic Retrieval）演示 ===")
+    if _IS_LIVE:
+        print("[模式] 正在使用 --live 在线调用真实大模型。")
+    else:
+        print("[模式] 默认离线模式（未发起在线模型调用，标有 [离线确定性...] 标记；可通过 --live 开启）。")
+
     index = SimpleIndex(SAMPLE_DOC)
     query = "向量怎么存"
     print(f"原始问题：'{query}'\n")
@@ -289,6 +308,7 @@ if __name__ == "__main__":
 
     # 3. Agentic Retrieval
     print("\n--- 3. Agentic Retrieval 检索循环 ---")
+
     def agent_rewrite_step(orig_q: str, hits_so_far: list[Hit]) -> str | None:
         if len(hits_so_far) >= 2:
             return None
@@ -304,3 +324,7 @@ if __name__ == "__main__":
     print(f"Agentic 循环结束：轮数={agent_result.rounds}, 停止原因={agent_result.stopped_reason}")
     print(f"执行的查询序列：{agent_result.queries}")
     print(f"最终捕获片段数：{len(agent_result.hits)}")
+
+
+if __name__ == "__main__":
+    main()

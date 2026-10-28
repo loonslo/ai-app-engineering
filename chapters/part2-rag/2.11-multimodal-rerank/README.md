@@ -19,7 +19,7 @@ python chapters/part2-rag/2.11-multimodal-rerank/gate/gate_check.py
 > **“混合检索 + 重排”是 2026 年文档问答的默认配置**：先用 BM25 + 向量混合检索（L2.6 / 2.8）广泛召回候选集（如 Top 15-20），再用 Cross-Encoder（如 bge-reranker-base）精排选出最相关的 Top 3-5 片段注入上下文。关于何时让 Agent 决定继续搜索还是停止的 Agentic Retrieval 见 L2.7。
 
 > [!NOTE]
-> **多模态与视觉语言模型（VLM）选做说明**：视觉语言模型（VLM）直接解析复杂版面、扫描件与图表文档在 Thoughtworks 技术雷达 Vol.34 中被列为 **Assess（评估）**（读取日期：2026-10-28），属于前沿探索方向。本章多模态部分保持选做，主线以成熟的 Cross-Encoder 精排为核心。
+> **多模态与视觉语言模型（VLM）选做说明**：视觉语言模型（VLM）直接解析复杂版面、扫描件与图表文档在 Thoughtworks 技术雷达 Vol.34（https://www.thoughtworks.com/radar ，读取日期：2026-10-28）中被列为 **Assess（评估）**，属于前沿探索方向。本章多模态部分保持选做，主线以成熟的 Cross-Encoder 精排为核心。
 
 ## 为什么做这个 gate
 
@@ -102,7 +102,7 @@ python tools/run_chapter.py 2.11
 - **稳定排序**：同分保持原顺序，结果可复现。
 - **top-k**：精排不是越多越好；要看 token 预算和噪声。
 - **recall@k**：量化前 k 个覆盖多少相关结果；重排不能补回粗召回漏掉的。
-- **多模态与 VLM**：雷达 Vol.34 Assess 阶段技术，属于复杂文档解析选做方向。
+- **多模态与 VLM**：Thoughtworks 技术雷达 Vol.34（https://www.thoughtworks.com/radar ，读取日期：2026-10-28）Assess 阶段技术，属于复杂文档解析选做方向。
 
 ## 边界
 

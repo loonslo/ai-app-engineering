@@ -98,33 +98,41 @@ def recall_at_k(retrieved_ids: list[str], relevant_ids: list[str], k: int) -> fl
 # ----------------------------------------------------------
 
 
+_RERANK_DEGRADED = False
+
+
 def native_cross_encoder_score(query: str, text: str) -> float:
-    """使用本地 bge-reranker 评分；若未下载本地模型则降级为离线相似度估计。"""
+    """使用本地 bge-reranker 评分；若未下载本地模型则降级为字面词重合打分。"""
+    global _RERANK_DEGRADED
     try:
         model = get_cross_encoder()
         score = model.predict([(query, text)])[0]
         return float(score)
     except Exception:
         # 本地重排模型未下载时做可读离线降级
+        _RERANK_DEGRADED = True
         q_chars = set(query)
         overlap = sum(1 for c in text if c in q_chars)
         return float(overlap / max(1, len(query)))
 
 
 def ask_image(image_path: str, question: str) -> str:
-    """使用视觉模型分析图像（选做方向）。"""
+    """使用视觉模型分析图像（选做方向）。仅从 VLM_* 环境变量读取，不跨厂商回退。"""
     p = Path(image_path)
     if not p.is_file():
         return f"[跳过多模态] 图片文件不存在：{image_path}"
 
-    b64 = base64.b64encode(p.read_bytes()).decode()
-    vlm_model = os.getenv("VLM_MODEL", "qwen-vl-max")
-    api_key = os.getenv("VLM_API_KEY", os.getenv("DEEPSEEK_API_KEY", "local-demo"))
-    base_url = os.getenv("VLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    vlm_model = os.getenv("VLM_MODEL")
+    api_key = os.getenv("VLM_API_KEY")
+    base_url = os.getenv("VLM_BASE_URL")
+
+    if not vlm_model or not api_key:
+        return "[可读提示] 未配置 VLM 环境变量 (VLM_MODEL, VLM_API_KEY)，跳过多模态模型调用。"
 
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key, base_url=base_url)
+    b64 = base64.b64encode(p.read_bytes()).decode()
     resp = client.chat.completions.create(
         model=vlm_model,
         messages=[
@@ -172,6 +180,10 @@ if __name__ == "__main__":
 
     # 3. Cross-Encoder 精排 top-3
     reranked = rerank(query, rough_candidates, native_cross_encoder_score, top_k=3)
-    print("\n【阶段二：Cross-Encoder 精排 Top 3】")
+    if _RERANK_DEGRADED:
+        print("\n【阶段二：字面词重合打分 Top 3】")
+        print("  [降级提示] Cross-Encoder 模型未加载，降级为字面词重合打分进行离线演示。")
+    else:
+        print("\n【阶段二：Cross-Encoder 精排 Top 3】")
     for r, item in enumerate(reranked, 1):
         print(f"  Top {r} [{item['id']}] 得分: {item['score']:.4f} -> {item['text'][:45]}...")

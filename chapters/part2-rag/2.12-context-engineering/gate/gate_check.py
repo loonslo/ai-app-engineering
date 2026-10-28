@@ -123,7 +123,7 @@ def main() -> int:
         s3 = Section(name="sec1", text="不同文本内容", kind="dynamic", priority=5)
         res = core.assemble_context([s1, s2, s3], budget=50)
         expect(len(res.included) == 1 and res.included[0] == "sec1", f"同名或重复文本应去重：{res.included}")
-        expect("duplicate:sec2" in res.warnings or "duplicate:sec1" in res.warnings, f"重复应产生 warning：{res.warnings}")
+        expect("duplicate:sec2" in res.warnings and "duplicate:sec1" in res.warnings, f"重复应同时产生同内容与同名 warning：{res.warnings}")
 
     def test_cache_hash_invariant_on_dynamic_change():
         s_static = Section(name="sys", text="静态系统提示词前缀", kind="static", priority=10)

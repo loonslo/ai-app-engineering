@@ -1,5 +1,5 @@
-"""
-章节 2.1 · 加载文档并切成片段
+"""章节 2.1 · 加载文档并切成片段（原生实现）
+
 ==========================================================
 RAG（检索增强生成）：模型不知道你的私有文档，所以先从文档里检索相关内容，
 再让模型基于这些内容回答。完整流程分两段：
@@ -7,61 +7,185 @@ RAG（检索增强生成）：模型不知道你的私有文档，所以先从�
   问答：检索 → 拼接上下文 → 生成
 本章只做建库的前两步；2.2 做向量化，2.3 串成完整问答。
 
-知识点：
-1. 把文件读成 LangChain 的 Document（正文 + 元数据）
-2. 为什么要切块：文档太长，切成小段才方便检索
-3. chunk_size 与 chunk_overlap 如何影响片段
+本版本为纯原生 Python 实现，不依赖 LangChain。
+使用原生文件读取与递归字符切分器（基于 common.ZH_SEPARATORS）。
 
 运行：python tools/run_chapter.py 2.1 load_split.py（离线，不调用模型）
 输出：示例文档的加载预览，以及每个片段的序号、字数和内容
 ==========================================================
 """
 
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from __future__ import annotations
 
-from common import LONG_DOC
+from pathlib import Path
 
-# ---------- 1. 加载文档 ----------
-# 示例是 chapters/shared-data/long_article.txt（一篇约 8.7KB 的长文章，路径由 common.py 提供）。
-# txt 直接用 open() 读取，再自己包成 Document，不需要额外的加载器依赖；
-# PDF、CSV 等格式才需要对应的 loader，见 load_split_formats.py。
-with open(LONG_DOC, encoding="utf-8") as f:
-    text = f.read()
-
-# Document 是 LangChain 里文档的标准结构：page_content 是正文，metadata 存来源等信息
-docs = [Document(page_content=text, metadata={"source": LONG_DOC.name})]
-print(f"加载了 {len(docs)} 个文档，正文预览：{docs[0].page_content[:50]}...\n")
+try:
+    from common import LONG_DOC, ZH_SEPARATORS
+except ModuleNotFoundError:
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from common import LONG_DOC, ZH_SEPARATORS
 
 
-# ---------- 2. 切割成块 ----------
-# 为什么切？一份长文档直接丢给模型，又贵又容易抓不准重点。
-# 切成小块后，检索时只挑出最相关的几块喂给模型，又准又省 token。
-#
-# RecursiveCharacterTextSplitter 的 "Recursive"：按 separators 顺序优先级递归切——
-#   先按段落 \n\n，不行再按行 \n，再按句号、逗号，最后才逐字符。
-#   顺序很关键，"" 必须放最后，否则还没轮到标点就被逐字符硬切了。
-#   这组中文分隔符在后续章节统一为 common.ZH_SEPARATORS。
-splitter = RecursiveCharacterTextSplitter(
-    chunk_size=120,        # 每块大约多少字
-    chunk_overlap=20,      # 相邻块重叠多少字，防止把一句话从中间切断、丢上下文
-    separators=["\n\n", "\n", "。", "，", " ", ""],
-)
-
-chunks = splitter.split_documents(docs)   # 切分时 metadata 会复制到每个片段
-print(f"切成了 {len(chunks)} 块：\n")
-for i, chunk in enumerate(chunks, 1):
-    print(f"--- 块 {i}（{len(chunk.page_content)} 字）---")
-    print(chunk.page_content)
-    print()
+def load_text(path: str | Path) -> dict:
+    """读取 UTF-8 文本，返回字典结构 {"text": str, "source": 文件名}。"""
+    p = Path(path)
+    if not p.is_file():
+        raise ValueError(f"文件不存在或不是文件：{path}")
+    try:
+        text = p.read_text(encoding="utf-8")
+    except Exception as exc:
+        raise ValueError(f"读取失败：{exc}") from exc
+    return {"text": text, "source": p.name}
 
 
-# ----------------------------------------------------------
-# 小结：
-# - RAG = 先检索你的文档、再让模型基于检索内容回答
-# - 文档要先切块，检索才能精准、省钱
-# - chunk_size 太大 → 块里夹杂无关内容；太小 → 一句话被切碎、丢语境
-# - chunk_overlap 让相邻块有重叠，缓解"切断语义"的问题
-#
-# 动手练习：把 chunk_size 改成 50 和 300 各跑一次，对比块数和每块的完整度
-# ----------------------------------------------------------
+def split_text_recursive(
+    text: str,
+    chunk_size: int = 120,
+    overlap: int = 20,
+    separators: list[str] | None = None,
+) -> list[str]:
+    """原生递归字符切分器：按分隔符优先级递减切分，避免硬性截断句子。"""
+    if separators is None:
+        separators = list(ZH_SEPARATORS)
+
+    if not text.strip():
+        return []
+    if len(text) <= chunk_size:
+        return [text]
+
+    chosen_sep = ""
+    next_separators: list[str] = []
+    for i, sep in enumerate(separators):
+        if sep == "":
+            chosen_sep = ""
+            next_separators = []
+            break
+        if sep in text:
+            chosen_sep = sep
+            next_separators = separators[i + 1 :]
+            break
+
+    # 当没有任何分隔符命中或到达终末空串时，执行字符级滑动窗口
+    if chosen_sep == "":
+        step = max(1, chunk_size - overlap)
+        chunks: list[str] = []
+        for start in range(0, len(text), step):
+            piece = text[start : start + chunk_size]
+            if piece.strip():
+                chunks.append(piece)
+            if start + chunk_size >= len(text):
+                break
+        return chunks
+
+    splits = text.split(chosen_sep)
+    docs: list[str] = []
+    current_doc: list[str] = []
+    current_len = 0
+
+    for split in splits:
+        if not split:
+            continue
+        split_len = len(split) + (len(chosen_sep) if current_doc else 0)
+        if split_len > chunk_size:
+            if current_doc:
+                merged = chosen_sep.join(current_doc)
+                if merged.strip():
+                    docs.append(merged)
+                current_doc = []
+                current_len = 0
+            sub_chunks = split_text_recursive(
+                split, chunk_size, overlap, next_separators
+            )
+            docs.extend(sub_chunks)
+        elif current_len + split_len <= chunk_size:
+            current_doc.append(split)
+            current_len += split_len
+        else:
+            if current_doc:
+                merged = chosen_sep.join(current_doc)
+                if merged.strip():
+                    docs.append(merged)
+            overlap_docs: list[str] = []
+            overlap_len = 0
+            for prev in reversed(current_doc):
+                needed = len(prev) + (len(chosen_sep) if overlap_docs else 0)
+                if overlap_len + needed <= overlap:
+                    overlap_docs.insert(0, prev)
+                    overlap_len += needed
+                else:
+                    break
+            current_doc = overlap_docs + [split]
+            current_len = sum(len(d) for d in current_doc) + len(chosen_sep) * max(
+                0, len(current_doc) - 1
+            )
+
+    if current_doc:
+        merged = chosen_sep.join(current_doc)
+        if merged.strip():
+            docs.append(merged)
+
+    return docs
+
+
+def split_text(
+    doc: dict,
+    chunk_size: int = 120,
+    overlap: int = 20,
+    use_recursive: bool = False,
+) -> list[dict]:
+    """把文档切成片段。
+
+    返回 [{"text": str, "source": str, "index": int}, ...]。
+    默认保持确定性字符滑动窗口切分以满足基础 gate 验收；
+    设置 use_recursive=True 时启用自然语言边界递归切分。
+    """
+    if not isinstance(doc, dict) or "text" not in doc or "source" not in doc:
+        raise ValueError("doc 必须是包含 text 和 source 的字典")
+    if not isinstance(doc["text"], str) or not isinstance(doc["source"], str):
+        raise ValueError("doc['text'] 与 doc['source'] 必须是字符串")
+    if chunk_size <= 0:
+        raise ValueError("chunk_size 必须大于 0")
+    if overlap < 0 or overlap >= chunk_size:
+        raise ValueError("overlap 必须 >= 0 且 < chunk_size")
+
+    text = doc["text"]
+    if not text.strip():
+        return []
+
+    if use_recursive:
+        raw_chunks = split_text_recursive(text, chunk_size, overlap)
+        return [
+            {"text": piece, "source": doc["source"], "index": i}
+            for i, piece in enumerate(raw_chunks, 1)
+        ]
+
+    step = chunk_size - overlap
+    chunks: list[dict] = []
+    idx = 1
+    for start in range(0, len(text), step):
+        content = text[start : start + chunk_size]
+        if not content:
+            continue
+        chunks.append({
+            "text": content,
+            "source": doc["source"],
+            "index": idx,
+        })
+        idx += 1
+        if start + chunk_size >= len(text):
+            break
+
+    return chunks
+
+
+if __name__ == "__main__":
+    doc = load_text(LONG_DOC)
+    print(f"加载了文档 {doc['source']}，正文预览：{doc['text'][:50]}...\n")
+
+    chunks = split_text(doc, chunk_size=120, overlap=20, use_recursive=True)
+    print(f"递归切成了 {len(chunks)} 块：\n")
+    for chunk in chunks[:5]:
+        print(f"--- 块 {chunk['index']}（{len(chunk['text'])} 字）---")
+        print(chunk["text"])
+        print()

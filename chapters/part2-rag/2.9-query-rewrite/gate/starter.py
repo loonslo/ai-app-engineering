@@ -1,13 +1,14 @@
-"""L2.6 查询改写 · 闭卷骨架
+"""L2.6 查询改写与 Agentic Retrieval · 闭卷骨架
 
 规则：只读本文件和本章 README 的 gate 任务书；通过 gate 之前不要打开
-query_rewrite.py。实现下面三个函数，然后运行：
+query_rewrite.py。实现下面四个函数/接口，然后运行：
 
     python chapters/part2-rag/2.9-query-rewrite/gate/gate_check.py
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable
 
 
@@ -52,3 +53,35 @@ def rewrite_query(
     - 正常 -> 原问题 + 解析结果，去重后截断到 max_queries。
     """
     raise NotImplementedError("实现查询改写")
+
+
+@dataclass(frozen=True)
+class Hit:
+    source: str
+    index: int
+    score: float
+    text: str
+
+
+@dataclass(frozen=True)
+class AgenticResult:
+    hits: tuple[Hit, ...]           # 按 source#index 去重，按 score 降序
+    rounds: int
+    queries: tuple[str, ...]
+    stopped_reason: str             # "enough" | "no_rewrite" | "max_rounds"
+
+
+def agentic_retrieve(
+    question: str,
+    search_fn: Callable[[str], list[Hit]],
+    rewrite_fn: Callable[[str, list[Hit]], str | None],
+    *,
+    max_rounds: int = 3,
+    min_hits: int = 2,
+) -> AgenticResult:
+    """每轮用当前查询调用 search_fn(query) -> list[Hit]，结果累计去重；
+    累计命中数 >= min_hits 时停止，原因 "enough"；
+    rewrite_fn(question, hits_so_far) 返回 None 时停止，原因 "no_rewrite"；
+    轮数达到 max_rounds 时停止，原因 "max_rounds"；max_rounds < 1 或 min_hits < 1 抛 ValueError。
+    """
+    raise NotImplementedError("实现 agentic_retrieve")

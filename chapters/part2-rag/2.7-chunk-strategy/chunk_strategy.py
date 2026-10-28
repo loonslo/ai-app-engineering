@@ -1,83 +1,186 @@
-"""
-章节 2.7 · 切分策略对比
+"""章节 2.7 · 切分策略对比消融（原生实现）
+
 ==========================================================
-RAG 答得准不准，第一道关口不是模型，是"文档切得好不好"。切得太碎，
-一个完整意思被劈成两半，检索只拿到半句；切得太大，一个块里塞了无关内容，
-噪声把关键信息淹了。这节不引入新组件，只调切割参数，用同一个问题观察
-检索结果怎么变——把"凭感觉设 chunk_size"变成"看效果调"。
+RAG 答得准不准，第一道关口不是模型，是“文档切得好不好”。
+本章用原生 Python 对比不同切分策略对检索效果的影响，输出消融对比表：
+1. 纯原生实现，不依赖 LangChain
+2. 实现了保边界切分 split_preserving_boundaries 与切分统计 chunk_stats
+3. 对比小块无重叠、小块有重叠、大块有重叠、结构边界切分四种策略
+4. 输出块数、平均长度、最大长度和召回片段的相似度对比
 
-知识点：
-1. chunk_size：每块多大。小=精准但易断意，大=完整但带噪声
-2. chunk_overlap：相邻块重叠多少字，防止"答案正好被切在边界"
-3. separators：按什么优先级切（段落 > 换行 > 句号…），中文要自己配（见 common.ZH_SEPARATORS）
-4. 同一问题在不同切法下，检索召回的块差异
-
-前置：2.2；本地 embedding 模型；faiss-cpu
-运行：python tools/run_chapter.py 2.7（离线，不调用聊天模型）
-输出：三组参数各自的块数、平均字数和召回的前 2 个片段
+运行：python tools/run_chapter.py 2.7
 ==========================================================
 """
 
-import os
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from common import LONG_DOC, get_embeddings, ZH_SEPARATORS
+from __future__ import annotations
 
-# ---------- 三组对照参数：每组改一个变量，单变量对比才看得清影响 ----------
-STRATEGIES = [
-    {"name": "小块 + 无重叠", "chunk_size": 50, "chunk_overlap": 0},
-    {"name": "小块 + 有重叠", "chunk_size": 50, "chunk_overlap": 20},
-    {"name": "大块 + 有重叠", "chunk_size": 500, "chunk_overlap": 30},
-]
+import re
+from pathlib import Path
 
-# 答案是"可控"，理由（普通 Agent 容易变成黑盒循环）在紧随其后的下一句；
-# 切得太碎，两句会分进不同的块，只召回半个答案。
-QUERY = "LangGraph 最大的价值是什么"
+import numpy as np
+
+try:
+    from common import LONG_DOC, embed_texts
+except ModuleNotFoundError:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from common import LONG_DOC, embed_texts
 
 
-def load_docs(path=LONG_DOC):
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    return [Document(page_content=text, metadata={"source": os.path.basename(path)})]
+# ----------------------------------------------------------
+# 1. Gate 闭卷规范函数
+# ----------------------------------------------------------
 
 
-def run_strategy(cfg: dict, docs, embeddings):
-    """按一组参数切割、建库、检索，打印块数和召回结果。"""
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=cfg["chunk_size"],
-        chunk_overlap=cfg["chunk_overlap"],
-        separators=ZH_SEPARATORS,
-    )
-    chunks = splitter.split_documents(docs)
-    vs = FAISS.from_documents(chunks, embeddings)
-    hits = vs.as_retriever(search_kwargs={"k": 2}).invoke(QUERY)
+def split_preserving_boundaries(text: str, max_chars: int) -> list[str]:
+    """优先按段落、再按句子标点、最后硬切，保证每段不超过 max_chars。"""
+    if not isinstance(text, str) or not text.strip():
+        return []
+    if max_chars <= 0:
+        raise ValueError("max_chars 必须大于 0")
+    if len(text) <= max_chars:
+        return [text]
 
-    print(f"\n【{cfg['name']}】size={cfg['chunk_size']} overlap={cfg['chunk_overlap']}")
-    print(f"  切出 {len(chunks)} 块，平均每块 {sum(len(c.page_content) for c in chunks)//len(chunks)} 字")
-    for i, d in enumerate(hits, 1):
-        print(f"  召回{i}: {d.page_content.strip()[:60]}")
+    # 1. 优先按段落切分
+    if "\n\n" in text:
+        paragraphs = text.split("\n\n")
+        chunks: list[str] = []
+        cur = ""
+        for p in paragraphs:
+            if not p:
+                continue
+            if len(p) > max_chars:
+                if cur:
+                    chunks.append(cur)
+                    cur = ""
+                chunks.extend(split_preserving_boundaries(p, max_chars))
+            elif len(cur) + (2 if cur else 0) + len(p) <= max_chars:
+                cur = cur + "\n\n" + p if cur else p
+            else:
+                if cur:
+                    chunks.append(cur)
+                cur = p
+        if cur:
+            chunks.append(cur)
+        return [c for c in chunks if c.strip()]
+
+    # 2. 段落超长按句子标点切分
+    sentences = [s for s in re.split(r"(?<=[。！？!?\n])", text) if s]
+    if len(sentences) > 1:
+        chunks = []
+        cur = ""
+        for s in sentences:
+            if not s:
+                continue
+            if len(s) > max_chars:
+                if cur:
+                    chunks.append(cur)
+                    cur = ""
+                # 硬切
+                for i in range(0, len(s), max_chars):
+                    chunks.append(s[i : i + max_chars])
+            elif len(cur) + len(s) <= max_chars:
+                cur += s
+            else:
+                if cur:
+                    chunks.append(cur)
+                cur = s
+        if cur:
+            chunks.append(cur)
+        return [c for c in chunks if c.strip()]
+
+    # 3. 单句超长硬切
+    return [
+        text[i : i + max_chars]
+        for i in range(0, len(text), max_chars)
+        if text[i : i + max_chars].strip()
+    ]
+
+
+def chunk_stats(chunks: list[str]) -> dict:
+    """统计切分块指标。"""
+    count = len(chunks)
+    empty_count = sum(1 for c in chunks if len(c) == 0)
+    if count == 0:
+        return {"count": 0, "avg_len": 0, "max_len": 0, "empty_count": 0}
+    max_len = max(len(c) for c in chunks)
+    avg_len = sum(len(c) for c in chunks) / count
+    return {
+        "count": count,
+        "avg_len": avg_len,
+        "max_len": max_len,
+        "empty_count": empty_count,
+    }
+
+
+# ----------------------------------------------------------
+# 2. 滑动窗口切分与消融实验
+# ----------------------------------------------------------
+
+
+def sliding_window_split(
+    text: str,
+    chunk_size: int,
+    overlap: int,
+) -> list[str]:
+    """基础字符滑动窗口切分。"""
+    if not text.strip():
+        return []
+    step = max(1, chunk_size - overlap)
+    chunks = []
+    for start in range(0, len(text), step):
+        c = text[start : start + chunk_size]
+        if c.strip():
+            chunks.append(c)
+        if start + chunk_size >= len(text):
+            break
+    return chunks
+
+
+def retrieve_top_k(
+    query: str,
+    chunks: list[str],
+    k: int = 2,
+) -> list[tuple[float, str]]:
+    """原生向量化检索 top-k。"""
+    if not chunks:
+        return []
+    vectors = embed_texts(chunks)
+    q_vec = embed_texts([query])[0]
+    mat = np.array(vectors, dtype=np.float32)
+    q = np.array(q_vec, dtype=np.float32)
+    scores = np.dot(mat, q)
+    top_indices = np.argsort(-scores)[:k]
+    return [(float(scores[idx]), chunks[idx]) for idx in top_indices]
+
+
+def run_ablation() -> None:
+    text = Path(LONG_DOC).read_text(encoding="utf-8")
+    query = "LangGraph 最大的价值是什么"
+
+    strategies = [
+        ("小块 + 无重叠", lambda t: sliding_window_split(t, 60, 0)),
+        ("小块 + 有重叠", lambda t: sliding_window_split(t, 60, 20)),
+        ("大块 + 有重叠", lambda t: sliding_window_split(t, 300, 50)),
+        ("保结构自然切分", lambda t: split_preserving_boundaries(t, 120)),
+    ]
+
+    print("=== 切分策略对比消融实验 ===")
+    print(f"评测查询：'{query}'\n")
+    print(f"{'策略名称':<14} | {'块数':<4} | {'平均长':<6} | {'最大长':<6} | {'Top1 得分':<9} | Top1 片段预览")
+    print("-" * 80)
+
+    for name, split_fn in strategies:
+        chunks = split_fn(text)
+        stats = chunk_stats(chunks)
+        hits = retrieve_top_k(query, chunks, k=2)
+        top1_score, top1_text = hits[0] if hits else (0.0, "")
+        preview = top1_text.replace("\n", " ")[:30]
+        print(
+            f"{name:<14} | {stats['count']:<4} | {stats['avg_len']:<6.1f} | {stats['max_len']:<6} | {top1_score:<9.4f} | {preview}..."
+        )
 
 
 if __name__ == "__main__":
-    # embedding 只建一次，重复用（建库才是变量，embedding 模型是常量）
-    docs = load_docs()
-    embeddings = get_embeddings()
-    print(f"问题：{QUERY}")
-    for cfg in STRATEGIES:
-        run_strategy(cfg, docs, embeddings)
-
-# ----------------------------------------------------------
-# 怎么读结果：
-# - 小块无重叠：块多、精准，但"结论"和"理由"可能被切到两块，
-#   只召回结论那半句 → 答案不全。
-# - 小块有重叠：边界处的句子在相邻块各留一份，跨边界的意思更容易被一块兜住。
-# - 大块有重叠：单块信息全，但也更容易混进无关句子（噪声），且更费 token。
-#
-# 经验起点（再按评测调）：中文 chunk_size 300-500、overlap 取 size 的 10-20%。
-# 没有万能值——这正是第 3 篇评测的意义：用数字证明"哪种切法答得更准"。
-#
-# 动手练习：
-# 1) 把 QUERY 换成答案只在单句里的问题（如"MCP 的全称是什么"），看切法影响是否变小。
-# 2) 加一组"超大块 size=500 overlap=0"，观察召回里混进多少无关内容。
-# ----------------------------------------------------------
+    run_ablation()

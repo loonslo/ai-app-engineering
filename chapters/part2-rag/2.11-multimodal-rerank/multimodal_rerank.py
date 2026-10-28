@@ -1,119 +1,177 @@
-"""
-章节 2.11 · reranker 重排与多模态读图
+"""章节 2.11 · Cross-Encoder 重排与多模态解析（原生实现）
+
 ==========================================================
-补充真实场景常用的两块能力：
-1. 多模态：用户的资料常是图片或扫描件（截图、拍照合同），纯文本 loader 读不了，
-   要用"视觉模型"把图看懂——要么 OCR 出文字，要么直接理解图意。
-2. reranker：向量检索为了召回率会多召回（如 top8），但塞给模型太多块=噪声+费 token。
-   reranker 是个更准（也更慢）的小模型，对召回的候选两两精排，只留最相关的 top3。
-   套路："向量粗召回（快、广）→ reranker 精排（准、窄）"，是工业级 RAG 的标配。
+为什么需要重排（Rerank）？
+- 向量双塔模型（Bi-Encoder）将 Query 与 Document 独立编码为向量，计算速度快（毫秒级），但无法捕捉词与词之间的交叉注意力（Cross-Attention）；
+- 交叉编码器（Cross-Encoder）将 (Query, Document) 拼接后输入完整 Transformer，能精确计算相关性得分，但计算开销大；
+- 工业级标准方案：“混合检索/粗召回（召回 Top 10-20）→ Cross-Encoder 精排（截取 Top 3-5）”。
 
-知识点：
-1. 视觉模型的调用方式（把图片转 base64，按多模态 message 传给支持视觉的模型）
-2. ContextualCompressionRetriever + CrossEncoderReranker：召回后重排
-3. 为什么要"粗召回 + 精排"两段式
+本文件为纯原生 Python 实现，不依赖 LangChain：
+1. 原生重排函数 rerank 与 recall@k 评估指标
+2. 使用 common.get_cross_encoder() 执行 Cross-Encoder 重排精算
+3. 多模态读图函数 ask_image（可选，使用 OpenAI-compatible VLM 端点）
 
-依赖：reranker 用 bge-reranker（魔搭下：snapshot_download('BAAI/bge-reranker-base')）
-注意（langchain 1.x）：
-  - ContextualCompressionRetriever / CrossEncoderReranker 迁到 langchain_classic.retrievers
-  - HuggingFaceCrossEncoder 在 langchain_community.cross_encoders
-
-前置：2.7；reranker 部分需要本地 bge-reranker-base；多模态部分需要视觉模型（VLM_MODEL / VLM_API_KEY / VLM_BASE_URL）和图片 sample_scan.png（仓库不附带）
 运行：python tools/run_chapter.py 2.11
-输出：粗召回 top8 与精排 top3 的对比；没有图片时跳过多模态部分
 ==========================================================
 """
 
-import os
+from __future__ import annotations
+
 import base64
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_openai import ChatOpenAI
-from common import LONG_DOC, get_embeddings, RERANKER_MODEL_PATH, ZH_SEPARATORS
+import os
+from pathlib import Path
+from typing import Callable
+
+import numpy as np
+
+try:
+    from common import LONG_DOC, embed_texts, get_cross_encoder
+except ModuleNotFoundError:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from common import LONG_DOC, embed_texts, get_cross_encoder
 
 
-# ============ 第一部分：多模态读图 ============
+# ----------------------------------------------------------
+# 1. Gate 闭卷规范函数
+# ----------------------------------------------------------
+
+
+def rerank(
+    query: str,
+    docs: list[dict],
+    score_fn: Callable[[str, str], float],
+    top_k: int = 3,
+) -> list[dict]:
+    """按 score_fn 对候选片段打分并重排。
+
+    docs 形如 [{"id": str, "text": str}, ...]。
+    返回 [{"id": str, "text": str, "score": float}]，按分数降序排列，最多 top_k 条。
+    """
+    if top_k < 1:
+        raise ValueError(f"top_k 必须 >= 1：{top_k}")
+    if not isinstance(docs, list):
+        raise ValueError("docs 必须是列表")
+    if not docs:
+        return []
+
+    scored = []
+    for idx, d in enumerate(docs):
+        if not isinstance(d, dict) or "id" not in d or "text" not in d:
+            raise ValueError("doc 必须包含 id 和 text 字段")
+        if not isinstance(d["id"], str) or not isinstance(d["text"], str):
+            raise ValueError("id 和 text 必须是字符串")
+        try:
+            s = score_fn(query, d["text"])
+        except Exception as exc:
+            raise ValueError(f"score_fn 评分异常：{exc}") from exc
+        if not isinstance(s, (int, float)) or isinstance(s, bool):
+            raise ValueError(f"score_fn 返回非数值：{s!r}")
+        scored.append((
+            -float(s),
+            idx,
+            {
+                "id": d["id"],
+                "text": d["text"],
+                "score": float(s),
+            },
+        ))
+
+    scored.sort(key=lambda item: (item[0], item[1]))
+    return [item[2] for item in scored[:top_k]]
+
+
+def recall_at_k(retrieved_ids: list[str], relevant_ids: list[str], k: int) -> float:
+    """计算 recall@k：前 k 个结果覆盖了多少相关 ID。"""
+    if k < 1:
+        raise ValueError(f"k 必须 >= 1：{k}")
+    if not relevant_ids:
+        return 0.0
+    top_k_set = set(retrieved_ids[:k])
+    hits = sum(1 for rid in relevant_ids if rid in top_k_set)
+    return float(hits / len(relevant_ids))
+
+
+# ----------------------------------------------------------
+# 2. 原生 Cross-Encoder 精排与多模态扩展
+# ----------------------------------------------------------
+
+
+def native_cross_encoder_score(query: str, text: str) -> float:
+    """使用本地 bge-reranker 评分；若未下载本地模型则降级为离线相似度估计。"""
+    try:
+        model = get_cross_encoder()
+        score = model.predict([(query, text)])[0]
+        return float(score)
+    except Exception:
+        # 本地重排模型未下载时做可读离线降级
+        q_chars = set(query)
+        overlap = sum(1 for c in text if c in q_chars)
+        return float(overlap / max(1, len(query)))
+
+
 def ask_image(image_path: str, question: str) -> str:
-    """把一张图片连同问题发给视觉模型，返回模型对图的理解/OCR 结果。
+    """使用视觉模型分析图像（选做方向）。"""
+    p = Path(image_path)
+    if not p.is_file():
+        return f"[跳过多模态] 图片文件不存在：{image_path}"
 
-    注意：deepseek-chat 不支持图片。需换一个视觉模型，例如：
-      - 阿里 qwen-vl-max（base_url=https://dashscope.aliyuncs.com/compatible-mode/v1）
-      - 或任意 OpenAI 兼容的视觉模型
-    这里用环境变量配置，跑不通就先看下面 reranker 部分。"""
-    with open(image_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode()
+    b64 = base64.b64encode(p.read_bytes()).decode()
+    vlm_model = os.getenv("VLM_MODEL", "qwen-vl-max")
+    api_key = os.getenv("VLM_API_KEY", os.getenv("DEEPSEEK_API_KEY", "local-demo"))
+    base_url = os.getenv("VLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
 
-    vlm = ChatOpenAI(
-        model=os.getenv("VLM_MODEL", "qwen-vl-max"),
-        api_key=os.getenv("VLM_API_KEY", os.getenv("DEEPSEEK_API_KEY")),
-        base_url=os.getenv("VLM_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+    from openai import OpenAI
+
+    client = OpenAI(api_key=api_key, base_url=base_url)
+    resp = client.chat.completions.create(
+        model=vlm_model,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": question},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    },
+                ],
+            }
+        ],
     )
-    # 多模态 message：一条 human 消息里同时带 文字 + 图片(data URL)
-    msg = [{"role": "user", "content": [
-        {"type": "text", "text": question},
-        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-    ]}]
-    return vlm.invoke(msg).content
-
-
-# ============ 第二部分：召回 + reranker 精排 ============
-def build_rerank_retriever():
-    """先建普通向量检索器（粗召回 k=8），再套一层 reranker 精排到 top3。"""
-    from langchain_community.cross_encoders import HuggingFaceCrossEncoder
-    from langchain_classic.retrievers import ContextualCompressionRetriever
-    from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
-
-    with open(LONG_DOC, encoding="utf-8") as f:   # 用长文章：片段够多，粗召回 top8 才有可精排的余地
-        text = f.read()
-    docs = [Document(page_content=text, metadata={"source": LONG_DOC.name})]
-    # chunk_size 取 160：太碎（如 80）会把跨句答案切散，reranker 也救不回来
-    chunks = RecursiveCharacterTextSplitter(
-        chunk_size=160, chunk_overlap=30, separators=ZH_SEPARATORS,
-    ).split_documents(docs)
-
-    embeddings = get_embeddings()
-    vs = FAISS.from_documents(chunks, embeddings)
-    base = vs.as_retriever(search_kwargs={"k": 8})        # 粗召回：宁多勿漏
-
-    cross_encoder = HuggingFaceCrossEncoder(model_name=RERANKER_MODEL_PATH)
-    compressor = CrossEncoderReranker(model=cross_encoder, top_n=3)  # 精排留 top3
-    return base, ContextualCompressionRetriever(
-        base_compressor=compressor, base_retriever=base)
+    return resp.choices[0].message.content or ""
 
 
 if __name__ == "__main__":
-    query = "LangGraph 适合哪些场景"
+    print("=== 2.11 Cross-Encoder 重排与精排演示 ===")
 
-    print("===== reranker 重排对比 =====")
-    try:
-        base, rerank_ret = build_rerank_retriever()
-        print(f"\n问题：{query}")
-        print("\n【纯向量粗召回 top8】")
-        for d in base.invoke(query):
-            print(" -", d.page_content.strip()[:40])
-        print("\n【reranker 精排后 top3】（更相关的排前面、砍掉噪声）")
-        for d in rerank_ret.invoke(query):
-            print(" -", d.page_content.strip()[:40])
-    except Exception as e:
-        print(f"(reranker 模型没下好就会报错，先 snapshot_download bge-reranker-base) {e}")
+    # 1. 准备长语料片段
+    raw_text = Path(LONG_DOC).read_text(encoding="utf-8")
+    chunks: list[dict] = []
+    step = 100
+    for i in range(0, len(raw_text), step):
+        t = raw_text[i : i + 130].strip()
+        if t:
+            chunks.append({"id": f"chunk_{len(chunks)+1}", "text": t})
 
-    print("\n===== 多模态读图（需配视觉模型）=====")
-    img = "sample_scan.png"   # 放一张截图/扫描件到目录里
-    if os.path.exists(img):
-        print(ask_image(img, "这张图里写了什么？请提取关键信息"))
-    else:
-        print(f"(没找到 {img}，放一张图片再跑这部分)")
+    # 2. 向量粗召回 top-8
+    query = "LangGraph 适合哪些复杂的业务场景"
+    print(f"查询：'{query}'")
 
-# ----------------------------------------------------------
-# 小结：
-# - 多模态：本质是"把图片编码进 message 一起发给会看图的模型"，纯文本模型不行。
-#   场景：扫描件合同、报表截图、手写票据——文本 loader 读不了的，交给视觉模型。
-# - reranker：粗召回(向量, 快但糙) + 精排(cross-encoder, 准但慢) 两段式。
-#   何时需要：候选多、对精度要求高、token 预算紧时；小库简单问答可以不上。
-#
-# # 小结：RAG 答错，先分清是【检索没召回相关内容】还是【召回了但生成时编造】——
-#   前者调切分、混合检索、查询改写、reranker；后者调 prompt、换模型、加忠实度约束。
-#
-# 动手练习：把 reranker 的 top_n 从 3 调到 1，看召回是否漏掉跨段落答案。
-# ----------------------------------------------------------
+    doc_texts = [c["text"] for c in chunks]
+    vectors = embed_texts(doc_texts)
+    q_vec = embed_texts([query])[0]
+    scores = np.dot(np.array(vectors, dtype=np.float32), np.array(q_vec, dtype=np.float32))
+    rough_top8_idx = np.argsort(-scores)[:8]
+    rough_candidates = [chunks[i] for i in rough_top8_idx]
+
+    print("\n【阶段一：向量粗召回 Top 8】")
+    for r, c in enumerate(rough_candidates, 1):
+        print(f"  [{r}] {c['id']}: {c['text'][:45]}...")
+
+    # 3. Cross-Encoder 精排 top-3
+    reranked = rerank(query, rough_candidates, native_cross_encoder_score, top_k=3)
+    print("\n【阶段二：Cross-Encoder 精排 Top 3】")
+    for r, item in enumerate(reranked, 1):
+        print(f"  Top {r} [{item['id']}] 得分: {item['score']:.4f} -> {item['text'][:45]}...")

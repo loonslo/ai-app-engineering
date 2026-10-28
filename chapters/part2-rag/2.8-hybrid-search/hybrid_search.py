@@ -1,98 +1,188 @@
-"""
-章节 2.8 · 混合检索：向量 + BM25 关键词
+"""章节 2.8 · 混合检索与 RRF 融合（原生实现）
+
 ==========================================================
-向量检索擅长"语义相近"，但对专有名词、编号、型号这种"必须精确匹配"的词
-常常召回不准（比如问"FAISS"，它可能给你一堆"向量库"的近义内容却漏了正主）。
-BM25 是经典的关键词检索，正好和向量互补。这节把两者合起来（hybrid）。
+为什么需要混合检索？
+- 向量检索擅长语义泛化（问"手机怎么退货"能匹配"退款售后流程"）；
+- 但面对专有名词、特定型号、精准编号（如"FAISS"、"v2.31"、"ORD-9981"）时，向量空间距离可能模糊；
+- BM25 擅长字面精确命中，但对同义词无能为力。
+混合检索（Hybrid Search）同时运行两路检索，并通过倒数排名融合（RRF, Reciprocal Rank Fusion）
+将两路结果合并，在 2026 年是文档问答系统的标准默认配置。
 
-知识点：
-1. BM25Retriever：基于关键词频率的检索（不靠 embedding）
-2. EnsembleRetriever：按权重合并多个检索器的结果
-3. 为什么专有名词向量召回差、混合怎么救
-
-依赖：pip install rank_bm25
-注意（langchain 1.x）：EnsembleRetriever 已从 langchain.retrievers 迁到 langchain_classic.retrievers。
-注意（2026-06）：langchain-community 仓库已归档停维护（官方 issue #674）。BM25Retriever
-  暂无独立包，仍从 community 导入可用。迁移方向：
-  主流集成 → 各自独立包（langchain-chroma / langchain-openai…），legacy → langchain-classic。
-
-★中文大坑：BM25Retriever 默认按【空格】分词，中文整句会被当成一个 token，
-  检索直接失效（本文件因为混了向量检索，坏了也看不出来——这更危险）。
-  生产必须传 preprocess_func（jieba 分词或字符 bigram），见下方代码。
-
-前置：2.7；rank_bm25；langchain-classic；本地 embedding 模型
-运行：python tools/run_chapter.py 2.8（离线，不调用聊天模型）
-输出：同一个问题下，纯向量检索与混合检索各自召回的片段
+运行：python tools/run_chapter.py 2.8 hybrid_search.py
 ==========================================================
 """
 
-import os
-from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.vectorstores import FAISS
-from langchain_community.retrievers import BM25Retriever
-from langchain_classic.retrievers import EnsembleRetriever
-from common import LONG_DOC, get_embeddings, ZH_SEPARATORS
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+import numpy as np
+from rank_bm25 import BM25Okapi
+
+try:
+    from common import LONG_DOC, embed_texts
+except ModuleNotFoundError:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from common import LONG_DOC, embed_texts
 
 
-def build_retrievers(path=LONG_DOC):
-    """建三种检索器：纯向量、纯 BM25、混合。返回 (向量, 混合) 供对比。"""
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    docs = [Document(page_content=text, metadata={"source": os.path.basename(path)})]
-    chunks = RecursiveCharacterTextSplitter(
-        chunk_size=120, chunk_overlap=20, separators=ZH_SEPARATORS,
-    ).split_documents(docs)
+# ----------------------------------------------------------
+# 1. Gate 闭卷规范函数
+# ----------------------------------------------------------
 
-    embeddings = get_embeddings()
-    vectorstore = FAISS.from_documents(chunks, embeddings)
 
-    # 1) 向量检索：靠语义相似度
-    vector_ret = vectorstore.as_retriever(search_kwargs={"k": 4})
+def rrf_fuse(
+    rankings: list[list[str]],
+    k: int = 60,
+    weights: list[float] | None = None,
+) -> list[dict]:
+    """Reciprocal Rank Fusion（RRF 倒数排名融合）。
 
-    # 2) BM25 检索：靠关键词匹配，直接从 chunks 构建，不需要 embedding
-    #    ★必须给中文传 preprocess_func：默认按空格分词，中文整句=1 个 token，检索失效。
-    #    这里用字符 bigram（零依赖）；要更准可换 jieba.lcut。
-    def _tok_zh(text: str) -> list[str]:
-        text = "".join(text.split())
-        return [text[i:i + 2] for i in range(len(text) - 1)] or [text]
+    输入多路排序（每路是 id 列表，rank 从 1 开始）。
+    返回 [{"id": str, "score": float}]，按 score 降序排列。
+    """
+    if not rankings:
+        return []
+    if all(len(r) == 0 for r in rankings):
+        return []
+    if k < 1:
+        raise ValueError(f"k 必须 >= 1：{k}")
 
-    bm25_ret = BM25Retriever.from_documents(chunks, preprocess_func=_tok_zh)
-    bm25_ret.k = 4
+    if weights is None:
+        weights = [1.0] * len(rankings)
+    else:
+        if len(weights) != len(rankings):
+            raise ValueError(
+                f"weights 长度与 rankings 不一致：{len(weights)} vs {len(rankings)}"
+            )
+        if any(w < 0 for w in weights):
+            raise ValueError("weights 权重不能为负数")
 
-    # 3) 混合检索：EnsembleRetriever 把两者结果按权重融合
-    #    weights=[0.5, 0.5] 表示两者各占一半，可按场景调（专有名词多就给 BM25 高一点）
-    hybrid_ret = EnsembleRetriever(retrievers=[vector_ret, bm25_ret], weights=[0.5, 0.5])
-    return vector_ret, hybrid_ret
+    scores: dict[str, float] = {}
+    first_seen: dict[str, int] = {}
+    counter = 0
+
+    for r_idx, ranking in enumerate(rankings):
+        seen_in_r = set()
+        w = weights[r_idx]
+        for rank, item_id in enumerate(ranking, 1):
+            if item_id in seen_in_r:
+                continue
+            seen_in_r.add(item_id)
+            if item_id not in first_seen:
+                first_seen[item_id] = counter
+                counter += 1
+            scores[item_id] = scores.get(item_id, 0.0) + w * (1.0 / (k + rank))
+
+    rows = [{"id": item_id, "score": score} for item_id, score in scores.items()]
+    rows.sort(key=lambda r: (-r["score"], first_seen[r["id"]]))
+    return rows
+
+
+def hybrid_search(
+    vector_ids: list[str],
+    bm25_ids: list[str],
+    k: int = 4,
+    weights: tuple[float, float] = (0.5, 0.5),
+) -> list[dict]:
+    """把向量和 BM25 两路结果融合并取 top-k。"""
+    if k < 1:
+        raise ValueError(f"k 必须 >= 1：{k}")
+    if not vector_ids and not bm25_ids:
+        return []
+    fused = rrf_fuse([vector_ids, bm25_ids], k=60, weights=list(weights))
+    return fused[:k]
+
+
+# ----------------------------------------------------------
+# 2. 原生 BM25 + 向量检索端到端实现
+# ----------------------------------------------------------
+
+
+def tokenize_chinese(text: str) -> list[str]:
+    """中文单字与英文/数字单词切分，无需第三方分词依赖。"""
+    return re.findall(r"[\u4e00-\u9fa5]|[a-zA-Z0-9_\.\-]+", text.lower())
+
+
+class NativeHybridPipeline:
+    """结合 rank_bm25 与原生语义向量的混合检索器。"""
+
+    def __init__(self, chunks: list[dict]):
+        self.chunks = {c["id"]: c for c in chunks}
+        self.chunk_ids = [c["id"] for c in chunks]
+        self.texts = [c["text"] for c in chunks]
+
+        # 1. 构建 BM25 索引
+        tokenized_corpus = [tokenize_chinese(t) for t in self.texts]
+        self.bm25 = BM25Okapi(tokenized_corpus)
+
+        # 2. 构建向量索引
+        self.vectors = embed_texts(self.texts) if self.texts else []
+
+    def search_bm25(self, query: str, top_n: int = 5) -> list[str]:
+        tokens = tokenize_chinese(query)
+        scores = self.bm25.get_scores(tokens)
+        top_idx = np.argsort(-scores)[:top_n]
+        return [self.chunk_ids[i] for i in top_idx if scores[i] > 0]
+
+    def search_vector(self, query: str, top_n: int = 5) -> list[str]:
+        if not self.vectors:
+            return []
+        qv = embed_texts([query])[0]
+        mat = np.array(self.vectors, dtype=np.float32)
+        q = np.array(qv, dtype=np.float32)
+        scores = np.dot(mat, q)
+        top_idx = np.argsort(-scores)[:top_n]
+        return [self.chunk_ids[i] for i in top_idx]
+
+    def retrieve(
+        self,
+        query: str,
+        k: int = 3,
+        weights: tuple[float, float] = (0.5, 0.5),
+    ) -> list[dict]:
+        bm25_ids = self.search_bm25(query, top_n=10)
+        vector_ids = self.search_vector(query, top_n=10)
+        fused = hybrid_search(vector_ids, bm25_ids, k=k, weights=weights)
+
+        results = []
+        for item in fused:
+            cid = item["id"]
+            results.append({
+                "id": cid,
+                "score": item["score"],
+                "text": self.chunks[cid]["text"],
+            })
+        return results
 
 
 if __name__ == "__main__":
-    vector_ret, hybrid_ret = build_retrievers()
+    print("=== 2.8 混合检索（BM25 + 向量检索 + RRF 融合）演示 ===")
 
-    # 对比：只含一个专有名词的查询，纯向量 vs 混合。
-    # 文章里只有一句提到 Sharpe（金融指标），它在语义上和其他句子都不像，向量检索容易漏掉；
-    # BM25 按词精确匹配，能直接命中。★ 标出召回结果里含有查询词的片段。
-    query = "Sharpe"
-    print(f"查询：{query}\n")
+    # 准备包含专有名词与一般描述的语料
+    raw_text = Path(LONG_DOC).read_text(encoding="utf-8")
+    chunks_data = []
+    step = 120
+    for i in range(0, len(raw_text), step):
+        t = raw_text[i : i + 150].strip()
+        if t:
+            chunks_data.append({"id": f"chunk_{len(chunks_data)+1}", "text": t})
 
-    def show(title, retriever):
-        docs = retriever.invoke(query)
-        print(title)
-        for d in docs:
-            mark = "★" if query in d.page_content else " "
-            print(f" {mark}", d.page_content[:40].replace("\n", " "))
-        print(f"  → 含 {query!r} 的片段：{sum(query in d.page_content for d in docs)} 个\n")
+    pipeline = NativeHybridPipeline(chunks_data)
+    print(f"语料切分完毕，共构建 {len(chunks_data)} 个片段的索引。\n")
 
-    show("【纯向量检索】", vector_ret)
-    show("【混合检索（向量 + BM25）】", hybrid_ret)
+    query = "MCP 协议与标准化工具解耦"
+    print(f"评测查询：'{query}'")
 
+    bm25_top = pipeline.search_bm25(query, top_n=3)
+    vec_top = pipeline.search_vector(query, top_n=3)
+    hybrid_top = pipeline.retrieve(query, k=3)
 
-# ----------------------------------------------------------
-# 小结：
-# - 向量检索懂语义但对精确词（专有名词/编号）不敏感；BM25 正好补上
-# - EnsembleRetriever 按权重融合多路检索；权重要按你的文档/问题类型调
-# - 判断要不要混合：如果你的领域有大量型号、缩写、编号，混合通常明显更好
-#
-# 动手练习：把 query 换成文章里另一个只出现一次的词（如 Obsidian、Milvus），
-#          比较纯向量和混合的结果；再把 weights 调成 [0.8, 0.2]，看结果如何变化
-# ----------------------------------------------------------
+    print(f"\n[BM25 单路召回]：{bm25_top}")
+    print(f"[向量 单路召回]：{vec_top}")
+    print("\n[RRF 混合融合 Top 3]：")
+    for rank, h in enumerate(hybrid_top, 1):
+        print(f"  Top {rank} [{h['id']}] 得分: {h['score']:.5f} -> {h['text'][:60]}...")

@@ -1,4 +1,4 @@
-"""L2.6 查询改写 · 离线 gate 验收。"""
+"""L2.6 查询改写与 Agentic Retrieval · 离线 gate 验收。"""
 
 from __future__ import annotations
 
@@ -126,6 +126,93 @@ def main() -> int:
                 continue
             raise AssertionError("非法参数应抛 ValueError")
 
+    # 追加检查 10~16：Agentic Retrieval
+    def test_agentic_round1_enough():
+        def fake_search(q):
+            return [
+                core.Hit(source="doc1", index=1, score=0.9, text="hit1"),
+                core.Hit(source="doc2", index=2, score=0.8, text="hit2"),
+            ]
+        res = core.agentic_retrieve("问题", fake_search, lambda q, hits: "q2", min_hits=2, max_rounds=3)
+        expect(res.rounds == 1, f"第1轮命中足够应只有1轮：{res.rounds}")
+        expect(res.stopped_reason == "enough", f"停止原因应为 enough：{res.stopped_reason}")
+        expect(res.queries == ("问题",), f"queries 不对：{res.queries}")
+        expect(len(res.hits) == 2, f"命中数不对：{len(res.hits)}")
+
+    def test_agentic_rewrite_once_enough():
+        calls = []
+        def fake_search(q):
+            calls.append(q)
+            if q == "问题":
+                return [core.Hit(source="doc1", index=1, score=0.5, text="hit1")]
+            return [core.Hit(source="doc2", index=2, score=0.85, text="hit2")]
+        def fake_rewrite(q, hits):
+            return "改写问题"
+        res = core.agentic_retrieve("问题", fake_search, fake_rewrite, min_hits=2, max_rounds=3)
+        expect(res.rounds == 2, f"应进行2轮：{res.rounds}")
+        expect(res.stopped_reason == "enough", f"停止原因应为 enough：{res.stopped_reason}")
+        expect(res.queries == ("问题", "改写问题"), f"queries 不对：{res.queries}")
+        expect(len(res.hits) == 2, f"命中数不对：{len(res.hits)}")
+
+    def test_agentic_rewrite_returns_none():
+        def fake_search(q):
+            return [core.Hit(source="doc1", index=1, score=0.5, text="hit1")]
+        def fake_rewrite(q, hits):
+            return None
+        res = core.agentic_retrieve("问题", fake_search, fake_rewrite, min_hits=3, max_rounds=3)
+        expect(res.rounds == 1, f"改写返回None应在第1轮停止：{res.rounds}")
+        expect(res.stopped_reason == "no_rewrite", f"停止原因应为 no_rewrite：{res.stopped_reason}")
+        expect(res.queries == ("问题",), f"queries 不对：{res.queries}")
+
+    def test_agentic_max_rounds():
+        counter = {"rounds": 0}
+        def fake_search(q):
+            counter["rounds"] += 1
+            return []
+        def fake_rewrite(q, hits):
+            return f"改写_{len(hits)}"
+        res = core.agentic_retrieve("问题", fake_search, fake_rewrite, min_hits=2, max_rounds=3)
+        expect(res.rounds == 3, f"达到最大轮数应为3：{res.rounds}")
+        expect(res.stopped_reason == "max_rounds", f"停止原因应为 max_rounds：{res.stopped_reason}")
+        expect(len(res.queries) == 3, f"queries 数量应为3：{len(res.queries)}")
+
+    def test_agentic_dedupe_across_rounds():
+        def fake_search(q):
+            if q == "q1":
+                return [core.Hit(source="doc1", index=1, score=0.7, text="t1")]
+            return [
+                core.Hit(source="doc1", index=1, score=0.9, text="t1"),
+                core.Hit(source="doc2", index=2, score=0.6, text="t2"),
+            ]
+        res = core.agentic_retrieve("q1", fake_search, lambda q, hits: "q2", min_hits=3, max_rounds=2)
+        expect(len(res.hits) == 2, f"跨轮重复 source#index 应去重：{len(res.hits)}")
+        expect([h.source for h in res.hits] == ["doc1", "doc2"], f"命中列表不对：{res.hits}")
+
+    def test_agentic_sort_by_score():
+        def fake_search(q):
+            return [
+                core.Hit(source="doc1", index=1, score=0.3, text="low"),
+                core.Hit(source="doc2", index=2, score=0.9, text="high"),
+                core.Hit(source="doc3", index=3, score=0.6, text="mid"),
+            ]
+        res = core.agentic_retrieve("q", fake_search, lambda q, h: None, min_hits=2)
+        scores = [h.score for h in res.hits]
+        expect(scores == sorted(scores, reverse=True), f"hits 应按 score 降序：{scores}")
+
+    def test_agentic_param_validation():
+        for bad_max in (0, -1):
+            try:
+                core.agentic_retrieve("q", lambda q: [], lambda q, h: None, max_rounds=bad_max)
+            except ValueError:
+                continue
+            raise AssertionError(f"max_rounds={bad_max} 应抛 ValueError")
+        for bad_min in (0, -1):
+            try:
+                core.agentic_retrieve("q", lambda q: [], lambda q, h: None, min_hits=bad_min)
+            except ValueError:
+                continue
+            raise AssertionError(f"min_hits={bad_min} 应抛 ValueError")
+
     gate.check("01 改写 prompt", test_prompt)
     gate.check("02 解析编号/去重", test_parse)
     gate.check("03 max_queries 解析限制", test_parse_limit)
@@ -135,6 +222,14 @@ def main() -> int:
     gate.check("07 无新查询回退", test_rewrite_no_new_query)
     gate.check("08 模型异常回退", test_rewrite_model_error)
     gate.check("09 参数校验", test_rewrite_validation)
+    # 新增项
+    gate.check("10 Agentic 第1轮命中足够停止", test_agentic_round1_enough)
+    gate.check("11 Agentic 改写后命中足够停止", test_agentic_rewrite_once_enough)
+    gate.check("12 Agentic 改写返回None停止", test_agentic_rewrite_returns_none)
+    gate.check("13 Agentic 达到最大轮数停止", test_agentic_max_rounds)
+    gate.check("14 Agentic 跨轮去重", test_agentic_dedupe_across_rounds)
+    gate.check("15 Agentic 最终按分数降序", test_agentic_sort_by_score)
+    gate.check("16 Agentic 参数校验", test_agentic_param_validation)
     return gate.report(module_path)
 
 

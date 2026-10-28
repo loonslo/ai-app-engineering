@@ -5,7 +5,7 @@
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0 已通过（N1 已关闭）。V3-1 已通过（M4-r 已于 2026-10-28 复核关闭），`wip-v3-1` 可以快进合入 master。合入后开始 V3-2（L2）。审核记录见 `docs/v3/reviews/`。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0、V3-1 已通过。V3-2（L2 上下文工程与检索）已在 `wip-v3-2` 完成开发与全项命令自检，待审核；审核通过后合入 master 并启动 V3-3（L3）。审核记录见 `docs/v3/reviews/`。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
@@ -19,6 +19,13 @@
 - [ ] **Pydantic AI 升级（待 LangChain 解除 openai 3 限制后）** - 当 LangChain 依赖集允许 openai>=3 时，将 `pydantic-ai-slim` 升级至 >=2.53.0，并消除 2.31.1 的 5 条安全公告限制（PYSEC-2026-4284..4291），复核 OTel 追踪与工具支持。
 
 ## Done
+
+- [x] **v3 阶段 2 上下文工程与检索 V3-2 批次落地（2026-10-28）** - 依据 `docs/v3/specs/L2.md` 与 `docs/v3/conventions.md` 完成 L2.1–L2.12 全量内容改造（在 `wip-v3-2` 分支）：
+  1. 4 个新建章节落地：L2.1（`2.12-context-engineering` 上下文工程总论 Gate，11 项断言）、L2.9（`2.13-static-context-skills` 静态上下文与 Skills Gate，11 项断言）、L2.10（`2.14-memory-compaction` 记忆与压缩 Gate，11 项断言）、L2.12（`2.15-real-corpus-kb-gate` 真实资料知识库 v1 阶段出口 Gate，含 32 题基准评测集、22 份公开语料清单、下载工具与多策略消融对比流水线，12 项断言）；
+  2. 9 个原生章节重构：L2.2（`2.1` 原生切分与格式加载，`2.6` 原生 PDF 溯源与下游测试兼容）、L2.3（`2.2` 原生向量检索与三类失败注入）、L2.4（`2.3` 原生最小 RAG，保留 `minimal_rag_langchain.py` 框架对照）、L2.5（`2.7` 原生保边界切分与切分统计）、L2.6（`2.8` 原生混合检索 RRF，保留 `hybrid_search_langchain.py` 框架对照；`2.11` 原生 CrossEncoder 重排与 recall@k）、L2.7（`2.9` 原生 Multi-Query、HyDE 与追加 7 项断言的自主多轮 Agentic 检索循环）、L2.8（`2.10` 原生 Chroma 持久化与确定性哈希切片 ID 幂等更新）；
+  3. L2.11（`2.4` RAG 评测基线）增补更新：README 关联 L1.10 Harness 概念与从 20 到 50 条评测集构建哲学，引用 Anthropic《Demystifying evals for AI agents》（读取日期：2026-10-28），保持原 gate 与参考实现；
+  4. 质量门禁与全量验证：13 个 Gate 骨架严格 0 通过（退出码 1），临时参考解 100% 通过（退出码 0）；单元测试扩充至 29 项，总测试套件 63 passed（退出码 0）；350 个 Markdown 文件断链 0；ruff py311 静态检查 0 errors；原生文件零 LangChain 泄漏；`apply_v2_map` 保持 111 unchanged；`apply_v3_map` 新建 4 篇章节全部显示 unchanged；全部 14 个参考实现通过 `tools/run_chapter.py` 正常离线启动。未运行真实付费模型与外部下载大文件。证据见 `docs/gate-v3-2-validation.md`。
+
 
 - [x] **V3-1 复核 M4-r，批次通过（2026-10-28）** - 复核提交 0a444fe：0.5 README 中 4.5%（Indeed，经 Rockstar 汇总）与 12%（Axial）出处分开标注，“硬性要求”改为“提到”，5 年 / 2 年补上 Axial 职业指南页链接（已核对原文），无出处的 FDE 比例已删去。断链 0、v2 标签无变化、状态文件自检通过。V3-1 全部问题关闭，结论为通过，记录见 `docs/v3/reviews/V3-1.md`
 - [x] **V3-1 复核（2026-10-28）** - 复跑提交 af1bf7e，结论为修改后通过。

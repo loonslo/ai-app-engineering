@@ -1,0 +1,7 @@
+# 真实语料库大文件不纳入版本控制
+*.pdf
+*.docx
+*.zip
+*.tar.gz
+downloads/
+raw/

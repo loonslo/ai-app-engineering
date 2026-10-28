@@ -15,6 +15,12 @@ python chapters/part2-rag/2.11-multimodal-rerank/gate/gate_check.py
 
 全部 PASS 才算通过；脚本会写 `gate/gate_report.json`。不允许改 `gate_check.py` 绕过检查。
 
+> [!IMPORTANT]
+> **“混合检索 + 重排”是 2026 年文档问答的默认配置**：先用 BM25 + 向量混合检索（L2.6 / 2.8）广泛召回候选集（如 Top 15-20），再用 Cross-Encoder（如 bge-reranker-base）精排选出最相关的 Top 3-5 片段注入上下文。关于何时让 Agent 决定继续搜索还是停止的 Agentic Retrieval 见 L2.7。
+
+> [!NOTE]
+> **多模态与视觉语言模型（VLM）选做说明**：视觉语言模型（VLM）直接解析复杂版面、扫描件与图表文档在 Thoughtworks 技术雷达 Vol.34 中被列为 **Assess（评估）**（读取日期：2026-10-28），属于前沿探索方向。本章多模态部分保持选做，主线以成熟的 Cross-Encoder 精排为核心。
+
 ## 为什么做这个 gate
 
 重排的常见错误：
@@ -86,20 +92,20 @@ python tools/run_chapter.py 2.11
 
 对照时只回答：
 
-1. 参考实现用 cross-encoder 打分；它和本 gate 的 `score_fn` 是什么关系？
-2. 参考实现的 `top_n=3` 对应本 gate 的哪个参数？
-3. 多模态读图部分为什么不在本 gate 内？它需要什么外部条件？
+1. 原生参考实现用 `common.get_cross_encoder()` 打分；它和双塔向量检索在计算复杂度上有何区别？
+2. 参考实现的 `top_k=3` 对应本 gate 的哪个参数？
+3. 为什么说“粗召回宁多勿漏，精排宁精勿滥”？
 
 ## 概念地图
 
-- **粗召回 + 精排**：先多召回，再用更准但更慢的模型排序。
+- **粗召回 + 精排**：先多召回（Bi-Encoder / BM25），再用更准但更慢的 Cross-Encoder 模型精排。
 - **稳定排序**：同分保持原顺序，结果可复现。
 - **top-k**：精排不是越多越好；要看 token 预算和噪声。
 - **recall@k**：量化前 k 个覆盖多少相关结果；重排不能补回粗召回漏掉的。
-- **多模态**：图片转 base64 交给视觉模型；纯文本模型不支持。
+- **多模态与 VLM**：雷达 Vol.34 Assess 阶段技术，属于复杂文档解析选做方向。
 
 ## 边界
 
-- gate 只做重排/指标，不实现 cross-encoder、多模态读图。
+- gate 只做重排与评估指标计算，不依赖本地 reranker 模型。
 - 通过 gate 只证明排序/截断/指标结构正确。
-- 真实 reranker、视觉模型、OCR 质量未验证；多模态部分选做。
+- 真实 Cross-Encoder 模型与多模态读图演示见参考实现。

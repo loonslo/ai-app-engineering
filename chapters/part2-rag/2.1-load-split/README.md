@@ -85,7 +85,7 @@ python tools/run_chapter.py 2.1 load_split_formats.py
 
 对照时只回答：
 
-1. 参考实现用 `RecursiveCharacterTextSplitter`，它比本 gate 的字符切分多做了什么？
+1. 参考实现用原生递归字符切分 `split_text_recursive`，它比本 gate 的字符切分多做了什么？
 2. 参考实现的 metadata 如何从文档复制到片段？你的实现在哪一步丢了 metadata？
 3. 参考实现对 PDF/CSV 用不同 loader；本 gate 只做 txt，边界在哪里？
 

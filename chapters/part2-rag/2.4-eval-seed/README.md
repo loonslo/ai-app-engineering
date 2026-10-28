@@ -1,10 +1,10 @@
-# L2.9 RAG 评测基线 · Gate（原 2.4）
+# L2.11 RAG 评测基线 · Gate（原 2.4）
 
 [全书目录](../../README.md) · [上一章 2.3](../2.3-minimal-rag/README.md) · [下一章 2.5](../2.5-raw-sdk-rag-agent-loop/README.md)
 
 - **能力**：把“答得对不对”拆成召回、引用、拒答、关键词四项；用固定样本证明评测器能抓住已知失败。
 - **v2 路径**：L2.9 / 核心（Gate；RAG 评测基线）
-- **前置**：2.3（最小 RAG）；建议先读完 3.1 的失败分析。
+- **前置**：[1.10 评测体系与嵌入式功能](../../part1-foundations/1.10-embedded-llm-feature/README.md)（掌握 Task/Trial/Grader/Transcript 架构）、[2.3 最小 RAG](../2.3-minimal-rag/README.md)。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页、`gate/starter.py`、`gate/cases.json`；**通过 gate 之前不要打开** `eval_seed.py`。
 - **验收命令**：
@@ -18,6 +18,12 @@ python chapters/part2-rag/2.4-eval-seed/gate/gate_check.py
 ## 为什么做这个 gate
 
 关键词命中不代表答案正确，答案正确不代表引用可信，引用可信也不代表该拒答时拒答了。评测器的价值不是“给一个总分”，而是**在失败发生时指出是哪一层失败**。
+
+本章评测器直接继承并特化了 [1.10 评测体系与嵌入式功能](../../part1-foundations/1.10-embedded-llm-feature/README.md) 的标准 Harness 概念：
+- **Task（任务定义）**：对应评测集 `cases.json` 中的单条基准题，明确定义用户提问、`expected_chunks`、`should_refuse` 以及期望的关键词约束。
+- **Trial（单次执行）**：受试 RAG 系统接收 Task 输入后的一次端到端运行轨迹，产出包含检索片段 ID 列表、回答文本、引用来源及拒绝标志的结果字典。
+- **Grader（判分器）**：确定性的规则与判分函数 `evaluate_case`，对单次 Trial 进行多维度量化切片，严密区分召回、引用、拒答与关键词四层达标情况。
+- **Transcript（运行明细与汇总）**：运行器 `run` 生成的逐行判定结果与总体统计指标（`pass_rate`、`retrieval_hit_rate`、`citation_accuracy`、`refusal_accuracy`）。
 
 这个 gate 用 12 条固定样本和 12 份已产出的 RAG 结果，故意埋了 6 个失败：
 
@@ -50,6 +56,16 @@ python chapters/part2-rag/2.4-eval-seed/gate/gate_check.py
 - `keyword_ok`：`keywords` 是否全部出现在答案里。
 - `passed`：以上全部成立（`retrieval_hit=None` 不参与）。
 - 汇总时分母为 0 返回 `0.0`；`retrieval_hit_rate` 没有可计算样本时返回 `None`。
+
+## 从 20 条到 50 条：评测集构建哲学
+
+根据 Anthropic 发布的工程指导《Demystifying evals for AI agents》（读取日期：2026-10-28）：
+> 在 AI 应用与 Agent 研发初期，团队常犯的错误是盲目追求数以千计的合成测试集，却缺乏对失败细节的洞察。最有效的高杠杆评测往往始于 20 到 50 条手工精细标注、来源于真实生产与实验失败的高信噪比 Golden Set。
+
+构建高质量 Golden Set 的演进路径：
+1. **20 条打底（核心边界覆盖）**：覆盖高频业务场景，显式注入并固化历史踩过的 Bug（如本章的 6 类典型失败：未召回漏引、跨界编造引用、拒答带证据、格式重复等）。这 20 条能够作为持续集成的快速烟雾测试门禁。
+2. **扩充至 50 条（压力与对抗样本）**：引入需要跨文档对比的多跳推理（Multi-hop）、相似但过期的版本冲突、语料外无解提问（检验拒答鲁棒性）、以及在文档中蓄意伪造的 Prompt 注入文本。
+3. **分层归因而非单一总分**：在评测中严禁仅记录一个笼统的 Accuracy，必须按照 Harness 范式将指标拆解为检索命中率（Retrieval Hit）、引用忠实度（Citation Accuracy）、拒答准确率（Refusal Accuracy）与语义关键词命中。
 
 ## 故障注入（必须亲手触发）
 

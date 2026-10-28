@@ -1,194 +1,276 @@
-"""
-章节 2.1 · 多种文件格式的加载与切分
+"""章节 2.1 · 多种文件格式的加载与切分（原生实现）
+
 ==========================================================
 load_split.py 只读 txt。本文件把常见格式统一成一个入口 load_and_split(path)：
 
-1. 加载：按文件扩展名选加载器，统一产出 List[Document]
-2. 切分：先按内容结构切（标题、语法、记录），再用中文递归切分器把过长的块压到 chunk_size 以内
+1. 加载：按文件扩展名选择原生加载器（txt、md、pdf、docx、csv、json）
+2. 切分：原生递归字符切分器（基于 common.ZH_SEPARATORS），保留 source、page、index 元数据
 
-按结构切分 = 在标题、函数、记录这类自然边界下刀，而不是按字符位置硬切：
-  - .md          按标题层级切（MarkdownHeaderTextSplitter），标题写入 metadata
-  - .py/.js/...  按语法切（RecursiveCharacterTextSplitter.from_language），不切断函数
-  - .pdf         每页一个 Document（PyPDFLoader）
-  - .docx        按段落/标题元素切（UnstructuredWordDocumentLoader，未安装则退回 docx2txt 读全文）
-  - .csv/.json   一条记录 = 一个 Document
-  - .txt 及其他  直接读全文；没有结构可利用，全靠后面的递归切分
-
-依赖（requirements-course.txt 未列入的可选项按需安装）：
-  已有：pypdf、langchain-community、langchain-text-splitters
-  可选：.docx → pip install docx2txt（或 unstructured）；.html → pip install bs4
+依赖：
+  已有：pypdf（标准课程依赖，按页解析 PDF）
+  可选：.docx → docx2txt（缺失时给出友好提示）
 
 运行：python tools/run_chapter.py 2.1 load_split_formats.py
-在别的脚本中使用：
-  from load_split_formats import load_and_split
-  chunks = load_and_split("手册.pdf")
-  chunks = load_and_split("文档.md", chunk_size=300)
 ==========================================================
 """
 
 from __future__ import annotations
 
-import os
+import csv
+import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List
 
-from langchain_core.documents import Document
-from langchain_text_splitters import (
-    RecursiveCharacterTextSplitter,
-    MarkdownHeaderTextSplitter,
-    Language,
-)
-
-# 复用根目录 common.py 的公共配置（中文分隔符、示例文档路径）
 try:
-    from common import ZH_SEPARATORS, LONG_DOC
-except Exception:  # 脱离本仓库单独运行本文件时的兜底
-    ZH_SEPARATORS = ["\n\n", "\n", "。", "，", " ", ""]
-    LONG_DOC = Path(__file__).resolve().parents[2] / "shared-data" / "long_article.txt"
+    from common import LONG_DOC, ZH_SEPARATORS
+except ModuleNotFoundError:
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from common import LONG_DOC, ZH_SEPARATORS
 
 
-# ----------------------------------------------------------
-# 1) 兜底：读整个文本文件，包成一个 Document（与 load_split.py 的写法相同）
-# ----------------------------------------------------------
-def _load_text_fallback(path: str) -> List[Document]:
-    with open(path, encoding="utf-8") as f:
-        return [Document(page_content=f.read(), metadata={"source": path})]
+@dataclass(frozen=True)
+class DocumentChunk:
+    text: str
+    source: str
+    page: int | None = None
+    index: int = 1
+
+    @property
+    def page_content(self) -> str:
+        return self.text
+
+    @property
+    def metadata(self) -> dict:
+        m: dict = {"source": self.source, "index": self.index}
+        if self.page is not None:
+            m["page"] = self.page
+        return m
+
+    def __getitem__(self, item: str):
+        if item == "text":
+            return self.text
+        if item == "source":
+            return self.source
+        if item == "page":
+            return self.page
+        if item == "index":
+            return self.index
+        raise KeyError(item)
+
+    def get(self, item: str, default=None):
+        try:
+            return self[item]
+        except KeyError:
+            return default
 
 
-# ----------------------------------------------------------
-# 2) 按扩展名选择加载器
-#    每个分支的目标相同：产出 List[Document]，并尽量在结构边界上切好
-# ----------------------------------------------------------
-def _load_by_ext(path: str) -> List[Document]:
-    ext = Path(path).suffix.lower()
+def split_text_recursive(
+    text: str,
+    chunk_size: int = 120,
+    overlap: int = 20,
+    separators: list[str] | None = None,
+) -> list[str]:
+    """原生递归字符切分器。"""
+    if separators is None:
+        separators = list(ZH_SEPARATORS)
 
-    # ---- .pdf：每页一个 Document（页是粗粒度的天然边界）----
+    if not text.strip():
+        return []
+    if len(text) <= chunk_size:
+        return [text]
+
+    chosen_sep = ""
+    next_separators: list[str] = []
+    for i, sep in enumerate(separators):
+        if sep == "":
+            chosen_sep = ""
+            next_separators = []
+            break
+        if sep in text:
+            chosen_sep = sep
+            next_separators = separators[i + 1 :]
+            break
+
+    if chosen_sep == "":
+        step = max(1, chunk_size - overlap)
+        chunks: list[str] = []
+        for start in range(0, len(text), step):
+            piece = text[start : start + chunk_size]
+            if piece.strip():
+                chunks.append(piece)
+            if start + chunk_size >= len(text):
+                break
+        return chunks
+
+    splits = text.split(chosen_sep)
+    docs: list[str] = []
+    current_doc: list[str] = []
+    current_len = 0
+
+    for split in splits:
+        if not split:
+            continue
+        split_len = len(split) + (len(chosen_sep) if current_doc else 0)
+        if split_len > chunk_size:
+            if current_doc:
+                merged = chosen_sep.join(current_doc)
+                if merged.strip():
+                    docs.append(merged)
+                current_doc = []
+                current_len = 0
+            sub_chunks = split_text_recursive(
+                split, chunk_size, overlap, next_separators
+            )
+            docs.extend(sub_chunks)
+        elif current_len + split_len <= chunk_size:
+            current_doc.append(split)
+            current_len += split_len
+        else:
+            if current_doc:
+                merged = chosen_sep.join(current_doc)
+                if merged.strip():
+                    docs.append(merged)
+            overlap_docs: list[str] = []
+            overlap_len = 0
+            for prev in reversed(current_doc):
+                needed = len(prev) + (len(chosen_sep) if overlap_docs else 0)
+                if overlap_len + needed <= overlap:
+                    overlap_docs.insert(0, prev)
+                    overlap_len += needed
+                else:
+                    break
+            current_doc = overlap_docs + [split]
+            current_len = sum(len(d) for d in current_doc) + len(chosen_sep) * max(
+                0, len(current_doc) - 1
+            )
+
+    if current_doc:
+        merged = chosen_sep.join(current_doc)
+        if merged.strip():
+            docs.append(merged)
+
+    return docs
+
+
+def load_raw_sections(path: str | Path) -> list[dict]:
+    """按文件扩展名读取原始内容，返回列表 [{"text": str, "source": str, "page": int | None}]。"""
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"文件不存在：{path}")
+
+    ext = p.suffix.lower()
+    source_name = p.name
+
+    # .pdf：按页读取
     if ext == ".pdf":
-        from langchain_community.document_loaders import PyPDFLoader
-        return PyPDFLoader(path).load()
+        try:
+            from pypdf import PdfReader
+        except ImportError as err:
+            raise RuntimeError("读取 PDF 需要 pypdf 库：pip install pypdf") from err
+        reader = PdfReader(str(p))
+        sections = []
+        for i, page in enumerate(reader.pages, 1):
+            text = page.extract_text() or ""
+            if text.strip():
+                sections.append({"text": text, "source": source_name, "page": i})
+        return sections
 
-    # ---- .docx：优先按段落/标题元素切；没装 unstructured 就退回读全文 ----
+    # .docx：使用 docx2txt
     if ext == ".docx":
         try:
-            from langchain_community.document_loaders import (
-                UnstructuredWordDocumentLoader,
-            )
-            return UnstructuredWordDocumentLoader(path, mode="elements").load()
-        except Exception:
-            try:
-                import docx2txt
-                text = docx2txt.process(path) or ""
-                return [Document(page_content=text, metadata={"source": path})]
-            except Exception:
-                raise RuntimeError("读 .docx 需要 pip install unstructured 或 docx2txt")
+            import docx2txt
 
-    # ---- .csv：每行 = 一条记录 = 一个 Document ----
+            text = docx2txt.process(str(p)) or ""
+            return [{"text": text, "source": source_name, "page": None}]
+        except ImportError as err:
+            raise RuntimeError(
+                "读取 .docx 文件需要安装 docx2txt：pip install docx2txt"
+            ) from err
+
+    # .csv：每行一条记录
     if ext == ".csv":
-        from langchain_community.document_loaders import CSVLoader
-        return CSVLoader(path, encoding="utf-8").load()
+        sections = []
+        with open(p, encoding="utf-8", errors="replace") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                line_text = ", ".join(f"{k}: {v}" for k, v in row.items())
+                if line_text.strip():
+                    sections.append({
+                        "text": line_text,
+                        "source": source_name,
+                        "page": None,
+                    })
+        return sections
 
-    # ---- .json / .jsonl：数组的每个元素 = 一个 Document ----
+    # .json / .jsonl
     if ext in (".json", ".jsonl"):
-        import json
-        with open(path, encoding="utf-8") as f:
-            if ext == ".jsonl":   # jsonl：每行一个 JSON 对象
+        with open(p, encoding="utf-8", errors="replace") as f:
+            if ext == ".jsonl":
                 data = [json.loads(line) for line in f if line.strip()]
             else:
                 data = json.load(f)
         if isinstance(data, list):
             return [
-                Document(page_content=json.dumps(item, ensure_ascii=False),
-                         metadata={"source": path, "index": i})
-                for i, item in enumerate(data)
+                {
+                    "text": json.dumps(item, ensure_ascii=False),
+                    "source": source_name,
+                    "page": None,
+                }
+                for item in data
             ]
-        return [Document(page_content=json.dumps(data, ensure_ascii=False),
-                         metadata={"source": path})]
+        return [
+            {
+                "text": json.dumps(data, ensure_ascii=False),
+                "source": source_name,
+                "page": None,
+            }
+        ]
 
-    # ---- .md：按 # / ## / ### 标题层级切，标题写进 metadata ----
-    if ext == ".md":
-        raw = _load_text_fallback(path)[0].page_content
-        md_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=[
-            ("#", "h1"), ("##", "h2"), ("###", "h3"),
-        ])
-        docs = md_splitter.split_text(raw)
-        for d in docs:                      # 标题切分器不带来源，补上
-            d.metadata["source"] = path
-        return docs
+    # .md / .txt 及其他纯文本
+    text = p.read_text(encoding="utf-8", errors="replace")
+    return [{"text": text, "source": source_name, "page": None}]
 
-    # ---- .html / .htm：优先按元素切，退回 BeautifulSoup 提取正文 ----
-    if ext in (".html", ".htm"):
-        try:
-            from langchain_community.document_loaders import (
-                UnstructuredHTMLLoader,
-            )
-            return UnstructuredHTMLLoader(path, mode="elements").load()
-        except Exception:
-            from langchain_community.document_loaders import BS4HTMLLoader
-            return BS4HTMLLoader(path).load()   # 需要 pip install bs4
 
-    # ---- 代码：按扩展名映射到 Language，按语法结构切 ----
-    code_map = {
-        ".py": Language.PYTHON, ".js": Language.JS, ".ts": Language.TS,
-        ".java": Language.JAVA, ".go": Language.GO, ".cpp": Language.CPP,
-        ".c": Language.C, ".cs": Language.CSHARP, ".rb": Language.RUBY,
-        ".rs": Language.RUST, ".php": Language.PHP,
-    }  # langchain-text-splitters 没有 SQL 语法切分，.sql 走下面的纯文本兜底
-    if ext in code_map:
-        raw = _load_text_fallback(path)[0].page_content
-        splitter = RecursiveCharacterTextSplitter.from_language(
-            language=code_map[ext], chunk_size=800, chunk_overlap=80,
+def load_and_split(
+    path: str | Path,
+    chunk_size: int = 500,
+    chunk_overlap: int = 50,
+) -> list[DocumentChunk]:
+    """统一入口：按格式加载并切分，保留 source, page, index 元数据。"""
+    sections = load_raw_sections(path)
+    print(f"[加载] {path} → {len(sections)} 个原始分段/页面")
+
+    result_chunks: list[DocumentChunk] = []
+    chunk_idx = 1
+    for sec in sections:
+        pieces = split_text_recursive(
+            sec["text"],
+            chunk_size=chunk_size,
+            overlap=chunk_overlap,
         )
-        # create_documents 把文本块包成 Document，并带上来源
-        return splitter.create_documents([raw], metadatas=[{"source": path}])
+        for piece in pieces:
+            result_chunks.append(
+                DocumentChunk(
+                    text=piece,
+                    source=sec["source"],
+                    page=sec["page"],
+                    index=chunk_idx,
+                )
+            )
+            chunk_idx += 1
 
-    # ---- 其他文本（.txt / .yaml / .log 等）：读全文 ----
-    return _load_text_fallback(path)
-
-
-# ----------------------------------------------------------
-# 3) 二次切分：把前面按结构切出来的大块，压到 chunk_size 以内
-#    metadata（来源、页码、标题）会随块保留
-# ----------------------------------------------------------
-def _refine_split(docs: List[Document], chunk_size: int, chunk_overlap: int
-                  ) -> List[Document]:
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        separators=ZH_SEPARATORS,
-    )
-    return splitter.split_documents(docs)
+    print(f"[切分] → {len(result_chunks)} 个 chunk（chunk_size={chunk_size}）")
+    return result_chunks
 
 
-# ----------------------------------------------------------
-# 4) 统一入口：加载 + 切分
-# ----------------------------------------------------------
-def load_and_split(path: str, chunk_size: int = 500,
-                   chunk_overlap: int = 50) -> List[Document]:
-    """按文件类型加载并切分，返回可直接向量化的 chunks。"""
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"文件不存在：{path}")
-
-    docs = _load_by_ext(path)
-    print(f"[加载] {path} → {len(docs)} 个文档/大块")
-
-    chunks = _refine_split(docs, chunk_size, chunk_overlap)
-    print(f"[切分] → {len(chunks)} 个 chunk（chunk_size={chunk_size}）")
-    return chunks
-
-
-# ----------------------------------------------------------
-# 5) 演示：先切长文章（txt，无结构），再切本章 README（md，按标题结构）
-# ----------------------------------------------------------
 if __name__ == "__main__":
     chunks = load_and_split(str(LONG_DOC), chunk_size=120, chunk_overlap=20)
-    for i, c in enumerate(chunks[:3], 1):
-        print(f"\n--- 块 {i}（{len(c.page_content)} 字）---")
-        print(c.page_content[:80])
+    for c in chunks[:3]:
+        print(f"\n--- 块 {c.index}（{len(c.text)} 字，source={c.source}）---")
+        print(c.text[:80])
 
-    # Markdown：每个块的 metadata 里带有它所属的标题
-    md_chunks = load_and_split(str(Path(__file__).with_name("README.md")), chunk_size=300)
-    print("\n第一个 Markdown 块的 metadata：", md_chunks[0].metadata)
-
-    # 其他格式同理，换成自己的文件即可：
-    # load_and_split("某文件.pdf")
-    # load_and_split("某表格.csv")
+    readme_path = Path(__file__).with_name("README.md")
+    md_chunks = load_and_split(str(readme_path), chunk_size=300)
+    print("\n第一个 Markdown 块元数据：", md_chunks[0].metadata)

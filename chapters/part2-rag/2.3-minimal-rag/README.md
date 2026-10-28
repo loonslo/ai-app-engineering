@@ -81,14 +81,50 @@ python chapters/part2-rag/2.3-minimal-rag/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 2.3
+python tools/run_chapter.py 2.3 minimal_rag.py
+python tools/run_chapter.py 2.3 minimal_rag_langchain.py
 ```
 
 对照时只回答：
 
-1. 参考实现用 LCEL 字典并行组装 context/question；你的 gate 在哪一步做同样的事？
-2. 参考实现的 prompt 要求“没有就说不知道”，但回答不带来源；这和本 gate 的 `sources` 差在哪？
-3. 参考实现没有预算裁剪；把 `max_context_chars` 加进去，需要改哪几处？
+1. 原生实现显式串联检索、预算裁剪与模型调用；LCEL 版本是如何通过管道符 `|` 实现类似逻辑的？
+2. 原生实现严格核对引用 `source#index` 与拒答；LCEL 对照版依赖提示词让模型自报来源，存在什么缺陷？
+3. 原生实现在无检索证据时完全跳过模型调用，节约了哪些开销？
+
+## 框架对照
+
+本章提供了两种实现方式供对比学习：
+- 原生实现：`minimal_rag.py`（推荐生产基线，原生 Python + OpenAI SDK）
+- LCEL 对照：`minimal_rag_langchain.py`（LangChain 经典声明式链路）
+
+### 1. 代码形态对比
+
+在 LCEL 对照版中，调用链通过操作符重载拼接：
+
+```python
+rag_chain = (
+    {"context": retriever | format_docs, "question": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+```
+
+而在原生实现中，执行流程为显式控制流：
+
+```python
+docs = retrieve_fn(question)
+if not docs:
+    return {"refused": True, "answer": "文档中没有提到。", "sources": []}
+context = format_context(docs, max_context_chars)
+answer = chat_fn(build_messages(context, question))
+```
+
+### 2. 调试与可观测性代价
+
+- **调用栈深度**：LCEL 链在执行单次调用时，底层穿透 `RunnableSequence`、`RunnableParallel`、`RunnableAssign`、序列化转换器等十余层内部包装类。一旦网络抖动、返回格式畸变或超时，排查日志往往包含数页非业务栈帧。
+- **异常拦截与降级**：原生代码对检索异常（`retrieval_error`）、超时（`timeout`）、空响应（`empty_response`）可以直接使用标准的 `try-except` 分级捕获并返回确定性结果；LCEL 链则需挂载回调处理器（Callbacks）或复杂的 Fallback 结构。
+- **无证据短路**：原生实现能在检索结果不足时直接短路返回，零 LLM Token 损耗且零幻觉风险；LCEL 基础管道如果不引入复杂的条件分支，通常仍会执行完整的模型推理。
 
 ## 概念地图
 
@@ -102,4 +138,4 @@ python tools/run_chapter.py 2.3
 
 - gate 用假检索/假模型，不验证真实 RAG 质量。
 - 通过 gate 只证明上下文/引用/拒答结构正确。
-- MMR、FAISS、真实 prompt 效果见参考实现；评测见 2.9。
+- 进阶混合检索与重排见 2.8 与 2.11；完整真实评测见 2.15。

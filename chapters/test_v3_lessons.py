@@ -645,3 +645,170 @@ def test_l1_10_embedded_feature_pure_functions():
     fallback_refund = mod.rules_fallback("我想退货退款，请帮我处理")
     assert fallback_refund.source == "rules"
     assert fallback_refund.needs_human is True
+
+
+
+# ======================================================================
+# V3-2 上下文工程与检索（L2 系列纯函数离线单元测试）
+# ======================================================================
+
+
+def _load_v3_2_mod(rel_path: str, mod_name: str):
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    p = Path(__file__).resolve().parent / rel_path
+    spec = importlib.util.spec_from_file_location(mod_name, p)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_v3_2_context_engineering():
+    mod = _load_v3_2_mod("part2-rag/2.12-context-engineering/context_engineering.py", "v3_2_l21")
+    Section = mod.Section
+    assemble = mod.assemble_context
+    ContextBudgetError = mod.ContextBudgetError
+
+    sec_sys = Section("sys", "System instruction", "static", 100, required=True)
+    sec_dyn1 = Section("dyn1", "user info", "dynamic", 50)
+    sec_dyn2 = Section("dyn2", "low priority", "dynamic", 10)
+
+    # 1. 预算充足正常组装
+    res = assemble([sec_dyn1, sec_sys, sec_dyn2], budget=50)
+    # static 在前，dynamic 在后
+    assert res.included == ("sys", "dyn1", "dyn2")
+    assert res.text.startswith("System instruction")
+    assert res.static_prefix_hash != ""
+
+    # 2. 超预算截断低优先级
+    res2 = assemble([sec_dyn1, sec_sys, sec_dyn2], budget=5)
+    assert "sys" in res2.included
+    assert "dyn2" in res2.dropped
+
+    # 3. required 超预算抛 ContextBudgetError（中文每字1token）
+    with pytest.raises(ContextBudgetError):
+        assemble([Section("huge", "测试超长文本" * 20, "static", 100, required=True)], budget=2)
+
+
+def test_v3_2_native_load_split():
+    mod = _load_v3_2_mod("part2-rag/2.1-load-split/load_split.py", "v3_2_l22_split")
+    doc = {"text": "第一段说明。\n\n第二段内容。第三句解释。", "source": "test.txt"}
+    chunks = mod.split_text(doc, chunk_size=15, overlap=3)
+    assert len(chunks) >= 2
+    for c in chunks:
+        assert isinstance(c, dict)
+        assert c["index"] >= 1
+        assert c["source"] == "test.txt"
+
+
+def test_v3_2_chunk_strategy_boundaries():
+    mod = _load_v3_2_mod("part2-rag/2.7-chunk-strategy/chunk_strategy.py", "v3_2_l25_strat")
+    text = "段落一内容。\n\n段落二很长很长很长很长很长很长很长很长很长很长。"
+    chunks = mod.split_preserving_boundaries(text, max_chars=20)
+    assert len(chunks) >= 2
+    stats = mod.chunk_stats(chunks)
+    assert stats["count"] == len(chunks)
+    assert stats["max_len"] <= 25
+
+
+def test_v3_2_hybrid_and_rerank():
+    mod_hybrid = _load_v3_2_mod("part2-rag/2.8-hybrid-search/hybrid_search.py", "v3_2_l26_hybrid")
+    list1 = ["doc_a", "doc_b", "doc_c"]
+    list2 = ["doc_b", "doc_a", "doc_d"]
+    fused = mod_hybrid.rrf_fuse([list1, list2], k=60)
+    top_doc = fused[0]["id"]
+    # doc_a 与 doc_b 都在前两位，得分最高
+    assert top_doc in {"doc_a", "doc_b"}
+
+    mod_rerank = _load_v3_2_mod(
+        "part2-rag/2.11-multimodal-rerank/multimodal_rerank.py", "v3_2_l26_rerank"
+    )
+    r1 = mod_rerank.recall_at_k(["d1", "d2"], ["d2", "d3"], k=2)
+    assert r1 == 0.5
+
+
+def test_v3_2_query_rewrite_agentic():
+    mod = _load_v3_2_mod("part2-rag/2.9-query-rewrite/query_rewrite.py", "v3_2_l27_agentic")
+    Hit = mod.Hit
+
+    def dummy_search(q: str):
+        return [
+            Hit(source="s1", index=1, score=0.9, text="退货规则"),
+            Hit(source="s1", index=2, score=0.85, text="换货规则"),
+        ]
+
+    def dummy_rewrite(q: str, hits: list):
+        return None  # 结果满意停止
+
+    res = mod.agentic_retrieve("如何退货", search_fn=dummy_search, rewrite_fn=dummy_rewrite, max_rounds=3, min_hits=2)
+    assert res.rounds == 1
+    assert len(res.hits) == 2
+    assert res.hits[0].source == "s1"
+
+
+def test_v3_2_chroma_persist_hash():
+    mod = _load_v3_2_mod("part2-rag/2.10-chroma-persist/chroma_persist.py", "v3_2_l28_persist")
+    h1 = mod.make_chunk_id("file1.txt", 1, "hello world")
+    h2 = mod.make_chunk_id("file1.txt", 1, "hello world")
+    h3 = mod.make_chunk_id("file1.txt", 2, "hello world")
+    assert h1 == h2
+    assert h1 != h3
+
+
+def test_v3_2_static_context_skills():
+    mod = _load_v3_2_mod("part2-rag/2.13-static-context-skills/skills_loader.py", "v3_2_l29_skills")
+    raw_md = "---\nname: calc-tool\ndescription: math calculate numbers\n---\nBody instructions"
+    skill = mod.parse_skill_md(raw_md, "skills/calc-tool/SKILL.md")
+    assert skill.meta.name == "calc-tool"
+
+    index_text = mod.build_index([skill], budget_tokens=50, count_tokens=lambda t: len(t.split()))
+    assert "calc-tool" in index_text
+
+    selected = mod.select_skills("calculate numbers for task", [skill], limit=1)
+    assert selected == ["calc-tool"]
+
+
+def test_v3_2_memory_compaction():
+    mod = _load_v3_2_mod("part2-rag/2.14-memory-compaction/memory_compaction.py", "v3_2_l210_mem")
+    store = mod.MemoryStore()
+    assert store.remember("t1", "u1", "k1", "v1", source="user", confirmed=False) is True
+    assert store.remember("t1", "u1", "k2", "v2", source="model", confirmed=False) is False
+    assert store.remember("t1", "u1", "k2", "v2", source="model", confirmed=True) is True
+    assert store.recall("t1", "u1", "k1") == "v1"
+    assert store.recall("t2", "u1", "k1") is None
+
+    msgs = [
+        {"role": "system", "content": "SYS"},
+        {"role": "user", "content": "U1"},
+        {"role": "assistant", "content": "A1"},
+        {"role": "user", "content": "U_PIN", "pinned": True},
+        {"role": "assistant", "content": "A2"},
+        {"role": "user", "content": "U_LAST"},
+    ]
+    res = mod.compact_history(msgs, budget=10, summarize_fn=lambda x: "SUM", keep_last=1)
+    assert res.messages[0]["content"] == "SYS"
+    assert any(m.get("pinned") for m in res.messages)
+    assert res.messages[-1]["content"] == "U_LAST"
+
+
+def test_v3_2_kb_pipeline_gate():
+    mod = _load_v3_2_mod("part2-rag/2.15-real-corpus-kb-gate/kb_pipeline.py", "v3_2_l212_kb")
+    files = [
+        mod.SourceFile("scan", (None,)),
+        mod.SourceFile("table_doc", ("line1\n| A | B |\nline2",)),
+    ]
+    report = mod.ingest(files, lambda t: [t])
+    assert len(report.failures) == 1
+    assert report.failures[0] == ("scan", 1, "no_text_layer")
+    table_chunks = [c for c in report.chunks if "|" in c.text]
+    assert len(table_chunks) == 1
+
+    passing = {"citation_accuracy": 0.95, "refusal_accuracy": 0.95, "hit_at_5": 0.85}
+    assert mod.gate_thresholds(passing) == []
+    failing = {"citation_accuracy": 0.85, "refusal_accuracy": 0.85, "hit_at_5": 0.70}
+    fails = mod.gate_thresholds(failing)
+    assert len(fails) == 3

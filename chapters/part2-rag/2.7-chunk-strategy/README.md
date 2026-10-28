@@ -84,9 +84,9 @@ python tools/run_chapter.py 2.7
 
 对照时只回答：
 
-1. 参考实现用 `RecursiveCharacterTextSplitter` 的 `separators` 优先级；你的 gate 实现了哪几层？
+1. 参考实现用原生消融对比（含滑动窗口与保结构切分）；你的 gate 实现了哪几层优先级？
 2. 参考实现用 `chunk_overlap` 处理边界；本 gate 为什么没要求 overlap？
-3. 参考实现比较三组参数；你会用哪些指标判断哪组更好？
+3. 参考实现比较四组参数并输出了消融表；你会用哪些指标判断哪组更好？
 
 ## 概念地图
 
@@ -98,6 +98,6 @@ python tools/run_chapter.py 2.7
 
 ## 边界
 
-- gate 用固定文本和字符预算，不验证 embedding/召回质量。
-- 通过 gate 只证明切分边界策略正确；哪种切法更好要用 2.9 的评测。
-- 真实递归分隔符、overlap、多格式文档见参考实现。
+- gate 用固定短文本，不验证真实大语料上的统计分布。
+- 通过 gate 只证明切分优先级与统计计算正确。
+- 更多切分策略（Markdown 按标题、代码按语法）见 2.1。

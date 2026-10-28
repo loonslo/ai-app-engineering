@@ -3,8 +3,8 @@ project_id: langchain-learning
 updated: 2026-10-28
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "V3-0 已通过；V3-1 复核结论为修改后通过（剩 M4-r：0.5 README 市场数据出处，见 docs/v3/reviews/V3-1.md）。以下为实施者在 wip-v3-1 分支完成的修复：1.10 README 验收命令改为默认检查闭卷骨架；Pydantic AI gate 补齐字段契约并独立闭卷运行（骨架 0/6 退出 1，参考解 6/6 退出 0）；1.1 移除私有类改为标准公开异常与分类器；统一 5 个 gate 脚本规范（--module/stdout/gate_report.json）；按模板重写 6 篇 README；清理 2.5 ruff 错误与密钥硬编码；纠正 0.5 招聘数据引用；1.10 cases 扩充至 24 条且评测达标；明确 Pydantic AI 2.31.1 安全使用限制并登记 5 条安全公告；conventions 11 节命令 1–10 逐项通过（骨架 0/参考解全通、测试 54+34 passed、断链 0、ruff 0 errors、LangChain 泄漏 0、v2 map 111 unchanged、v3 map 6 篇新建/改写章节全部 unchanged、13 个参考实现通过 run_chapter 正常离线启动、capstone baseline 100% 通过）。未运行真实外部模型与公网部署。证据见 docs/gate-v3-1-validation.md。"
-next: "修复 V3-1 的 M4-r（0.5 README 市场数据出处与措辞）后，由审核者复核这一项；确认后将 wip-v3-1 合入 master，再推进 V3-2（L2 上下文工程与检索）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
+progress: "V3-0、V3-1 审核均已通过（记录见 docs/v3/reviews/）；V3-1 待合入 master。V3-1 在 wip-v3-1 分支完成的修复包括：1.10 README 验收命令改为默认检查闭卷骨架；Pydantic AI gate 补齐字段契约并独立闭卷运行（骨架 0/6 退出 1，参考解 6/6 退出 0）；1.1 移除私有类改为标准公开异常与分类器；统一 5 个 gate 脚本规范（--module/stdout/gate_report.json）；按模板重写 6 篇 README；清理 2.5 ruff 错误与密钥硬编码；纠正 0.5 招聘数据引用；1.10 cases 扩充至 24 条且评测达标；明确 Pydantic AI 2.31.1 安全使用限制并登记 5 条安全公告；conventions 11 节命令 1–10 逐项通过（骨架 0/参考解全通、测试 54+34 passed、断链 0、ruff 0 errors、LangChain 泄漏 0、v2 map 111 unchanged、v3 map 6 篇新建/改写章节全部 unchanged、13 个参考实现通过 run_chapter 正常离线启动、capstone baseline 100% 通过）。未运行真实外部模型与公网部署。证据见 docs/gate-v3-1-validation.md。"
+next: "将 wip-v3-1 快进合入 master，然后推进 V3-2（L2 上下文工程与检索）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
 evidence:
   - README.md
   - TASKS.md
@@ -120,3 +120,8 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 - 剩余 M4-r：0.5 README 中“4.5%–12%”仍标注为 Rockstar 的数据（原文只有引自 Indeed 的 4.5%），另有一处措辞与两处缺失的链接。修完由审核者复核这一项，然后合入 master。
 
 记录见 `docs/v3/reviews/V3-1.md`。
+
+同日审核者复核 M4-r（提交 0a444fe），结论为通过。
+- 修正内容：4.5% 标为 Indeed（经 Rockstar 汇总），12% 标为 Axial；“硬性要求”改为“提到”；5 年 / 2 年补上 Axial 职业指南页链接，已核对原文；无出处的 FDE 比例已删去。
+- 复跑：断链 0、v2 标签无变化、状态文件自检通过。本次只改了文档，gate 与测试沿用上一轮复核的结果。
+- V3-1 全部问题关闭，可以快进合入 master。

@@ -247,6 +247,35 @@ def test_l1_1_pure_functions():
     assert timeout_res["error"] == "timeout"
     assert timeout_res["content"] == ""
 
+    # 4. classify_api_error 离线分类与重试研判（覆盖 demonstrate_error_handling）
+    import httpx
+    req = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+
+    auth_err = openai.AuthenticationError(
+        message="Invalid key",
+        response=httpx.Response(401, request=req),
+        body=None,
+    )
+    auth_info = mod.classify_api_error(auth_err)
+    assert auth_info["category"] == "auth"
+    assert auth_info["retryable"] is False
+    assert auth_info["status_code"] == 401
+
+    timeout_err = openai.APITimeoutError(request=req)
+    timeout_info = mod.classify_api_error(timeout_err)
+    assert timeout_info["category"] == "timeout"
+    assert timeout_info["retryable"] is True
+
+    rate_limit_err = openai.RateLimitError(
+        message="Too many requests",
+        response=httpx.Response(429, request=req),
+        body=None,
+    )
+    rate_info = mod.classify_api_error(rate_limit_err)
+    assert rate_info["category"] == "rate_limit"
+    assert rate_info["retryable"] is True
+    assert rate_info["status_code"] == 429
+
 
 # =========================================================================
 # L1.2 LLM 工作原理纯函数测试

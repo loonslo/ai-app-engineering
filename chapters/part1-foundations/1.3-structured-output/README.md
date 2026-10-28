@@ -93,8 +93,8 @@ python chapters/part1-foundations/1.3-structured-output/structured_output.py
 
 > [!IMPORTANT]
 > **厂商生态与思考模型重要边界**：
-> - 根据主流框架调研（来源：Pydantic AI 官方文档与社区追踪，核验读取日期：**2026-10-27**），DeepSeek 官方的 Chat Completions API 端点目前**不接受严格的 JSON Schema 语法**（即 `response_format={"type": "json_schema"}` 会报错或被忽略）；在接入 DeepSeek 时应使用方式一或方式二进行结构化提取。
-> - 在推理模型（如 DeepSeek-R1 / V4）中，模型默认开启内部思考过程。在思考模式下，端点通常**不接受强制 `tool_choice` 参数**。在需要严格、高确定性结构化提取的业务中，必须显式关闭思考或使用非推理通用模型。
+> - 根据主流框架调研（来源：[Pydantic AI 官方文档与端点兼容性列表](https://ai.pydantic.dev/models/)，核验读取日期：**2026-10-28**），DeepSeek 官方的 Chat Completions API 端点目前**不接受严格的 JSON Schema 语法**（即 `response_format={"type": "json_schema"}` 会报错或被忽略）；在接入 DeepSeek 时应使用方式一（JSON Object + Pydantic 校验）或方式二（工具即输出）进行结构化提取。
+> - 在推理模型（如官方当前主打模型 `deepseek-flash`，即 DeepSeek-V4.1-Flash-1017；来源：[DeepSeek 官方定价与模型文档](https://api-docs.deepseek.com/quick_start/pricing)，读取日期：**2026-10-28**）中，模型默认开启内部思考过程。在思考模式下，端点通常**不接受强制 `tool_choice` 参数**。在需要严格、高确定性结构化提取的业务中，必须显式关闭思考（如设置思考参数关闭）或使用非推理通用模型。
 
 对照时思考并回答：
 

@@ -5,7 +5,7 @@
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0 基础设施已复核通过；V3-1（L0 + L1 全部 15 章）已完成实施与自检，待审核者验收；下一步推进 V3-2（L2 检索与知识系统）。审核记录写入 `docs/v3/reviews/`。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0 复核结论为修改后通过；V3-1 审核退回的 11 条必改项（含 V3-0 复核新增的 N1）已在 `wip-v3-1` 分支完成修复并全量复测通过（见 `docs/gate-v3-1-validation.md` 复核修复小节），等待审核人复核；复核通过前不合入 master、不开始 V3-2。审核记录见 `docs/v3/reviews/`。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
@@ -16,10 +16,20 @@
 ## Someday
 
 - [ ] **求职准备** - 只从 `capstone/docs/portfolio/` 和真实报告提取可证明结论
+- [ ] **Pydantic AI 升级（待 LangChain 解除 openai 3 限制后）** - 当 LangChain 依赖集允许 openai>=3 时，将 `pydantic-ai-slim` 升级至 >=2.53.0，并消除 2.31.1 的 5 条安全公告限制（PYSEC-2026-4284..4291），复核 OTel 追踪与工具支持。
 
 ## Done
 
-- [x] **v3 阶段 0 与阶段 1 V3-1 批次落地（2026-10-28）** - 依据 `docs/v3/specs/L0.md` 与 `docs/v3/specs/L1.md` 完成 L0.1–L0.5 与 L1.1–L1.10 全量内容改造：
+- [x] **V3-1 复核修复与全量验证（2026-10-28）** - 针对审核记录（`docs/v3/reviews/V3-1.md`）退回的 3 个阻断项（B1–B3）、6 个主要问题（M1–M6）、5 个次要问题（m1–m5）以及 V3-0 复核的 N1 规范要求，在 `wip-v3-1` 分支完成系统性修复：
+  1. 阻断项清零：B1（1.10 README 验收命令改为默认检查闭卷骨架，参考解移入通过后对照）、B2（`starter_pai.py` 补齐字段契约与 DTO 说明，`gate_check_pai.py` 替换测试 6 并解决命名空间隔离，骨架 0/6 退出 1、参考解 6/6 退出 0）、B3（1.1 移除 `FinalRequestOptions` 私有类，基于标准 `httpx` 与公开异常实现 mock 与分类器，新增离线单元测试覆盖）；
+  2. 主要问题到位：M1（统一 0.4/1.7/1.9/1.10 的 5 个 gate 支持 `--module`、stdout 输出与 `gate/gate_report.json` 写入）、M2（按 conventions 4.1/4.2 补齐 6 篇 README 的故障注入/闭卷规则/通过后对照等小节）、M3（2.5 清理 ruff 错误与密钥硬编码，`common.py` 新增 `deepseek_api_key()`）、M4（0.5 纠正招聘数据引用并补充官方链接与读取日期）、M5（1.10 `cases.json` 扩充订单号格式错误与超长文本至 24 条，离线评测模拟 LLM 100%、规则兜底 75%）、M6（1.10 明确写明 Pydantic AI 2.31.1 安全使用限制）；
+  3. 次要与新增项：N1（`requirements-course.txt` 完整登记 2.31.1 的 5 条安全公告及课程缓解策略）、m1（starter 统一抛出 `NotImplementedError`）、m2（`FeatureDeps` 增加 `clock` 默认值）、m3（`.tmp/gate_solutions/v3` 清理与命名对齐）、m4（外部模型名称更新）、m5（2.5 README 配置说明补齐）；
+  4. 全量验证通过：conventions 11 节命令 1–10 逐一验证（gate 骨架 0 通过/参考解全通、pytest 54+34 passed、断链 0、ruff 0 errors、LangChain 泄漏 0、`apply_v2_map` 111 unchanged、`apply_v3_map` 6 篇新建/改写章节全部 unchanged、13 个参考实现通过 run_chapter 正常启动、capstone baseline 100% 通过）。未运行真实外部模型与公网部署。证据见 `docs/gate-v3-1-validation.md`。
+- [x] **V3-0 复核与 V3-1 审核（2026-10-28）**
+  - V3-0 复核为修改后通过：全新虚拟环境中依赖解析成功（pydantic-ai-slim 2.31.1、openai 2.54.0、langchain-openai 1.3.3），其余必改项逐条确认；新发现 N1（2.31.1 的 5 条安全公告），已在 conventions.md 第 9 节写入规避规则。
+  - V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂；测试 54 + 34 项通过；断链 0；无 LangChain 泄漏。阻断项：L1.10 验收命令直接跑参考实现；Pydantic AI gate 骨架 1/6 通过且依赖参考实现的类型；L1.1 参考实现默认运行崩溃。另有 6 个主要问题。
+  - 记录见 `docs/v3/reviews/V3-0.md`、`docs/v3/reviews/V3-1.md`
+- [x] **v3 阶段 0 与阶段 1 V3-1 批次落地（2026-10-28；审核结论：退回，见 `docs/v3/reviews/V3-1.md`）** - 依据 `docs/v3/specs/L0.md` 与 `docs/v3/specs/L1.md` 完成 L0.1–L0.5 与 L1.1–L1.10 全量内容改造：
   1. 5 个新建章节落地：L0.3（编码 Agent 工作流与审查，包含 practice_repo 真实演练与 check_task.py 退出码验证）、L0.4（Python 工程底座，12 项工程 Gate）、L0.5（岗位地图与差距诊断，包含 3 份求职对标模板与清单）、L1.7/1.9（Provider 抽象与成本 Gate，13 项断言，多 Provider 成本追踪与超时故障转移）、L1.10（嵌入式 LLM 功能综合，原生与 Pydantic AI 双解双 Gate，20 条工单评测集与 FastAPI 工单服务）；
   2. 8 个原生章节重构：L1.1（原生 OpenAI SDK 替换 LangChain）、L1.2/1.7（改写为原理 Gate，13 项纯数学离线断言）、L1.3（原生控制输出）、L1.4（原生结构化输出与 Pydantic）、L1.5（原生消息记忆与 Token 预算）、L1.6（原生工具调用与单轮/多轮 Tool Loop，原文件保留为 `tool_calling_langchain.py` 作为框架对照）、L1.8（增补配置与测试引用）、L1.9/1.8（原生 CLI 交互智能体）；
   3. Gate 与评测验证：5 个章节的 starter 骨架在未实现状态下全部退出 1，参考解全部通过（0.3 通过、0.4 12/12、1.7 13/13、1.9 13/13、1.10 原生 16/16、1.10 PAI 6/6，退出码均为 0）；1.10 的 Golden Set 评测模拟 LLM 准确率 100%、规则兜底 75%；

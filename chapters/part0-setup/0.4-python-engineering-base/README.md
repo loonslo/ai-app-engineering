@@ -1,143 +1,135 @@
-# 0.4 AI 应用的 Python 工程底座
+# 0.4 AI 应用的 Python 工程底座 · Gate
 
-- **课时**：3h（1h 读 + 1.5h 实现 + 0.5h 记录）
+[全书目录](../../README.md) · [上一章 L0.3](../0.3-coding-agent-workflow/README.md) · [下一章 L0.5](../0.5-job-map-gap/README.md)
+
+- **能力**：用 Pydantic v2 定义配置与数据契约并进行敏感信息脱敏；编写带指数退避与假时钟注入的异步重试；实现基于信号量的保序并发限流；用 httpx.MockTransport 构建离线确定性 HTTP 异常测试。
 - **v3 路径**：L0.4 / 核心（Gate；Python 工程底座）
 - **岗位任务 / 面试题型**：T5、T7 / F1、F4
-- **前置依赖**：已完成 [0.3 用编码 Agent 开发与审查](../0.3-coding-agent-workflow/README.md)
-- **学完能做**：用 Pydantic v2 定义配置与数据契约；写带超时、重试、并发上限的 async 代码；用 httpx 的 `MockTransport` 离线测试 HTTP 客户端。
+- **前置**：已完成 [L0.3 用编码 Agent 开发与审查](../0.3-coding-agent-workflow/README.md)
+- **时间盒**：3 小时（1h 读 + 1.5h 实现 + 0.5h 记录）
+- **闭卷规则**：只读本页、`gate/starter.py` 和 Python 标准库、Pydantic、httpx 官方文档；通过 gate 之前不要打开参考实现。
+- **验收命令**：
 
----
-
-## 1. 类型体系分工：`dataclass` 与 Pydantic `BaseModel`
-
-在现代 Python AI 应用与基础设施开发中，数据模型的类型分工非常明确：
-
-| 模型类型 | 适用场景 | 优势与开销 | 典型示例 |
-|---|---|---|---|
-| **Python 标准库 `dataclass`** | 内部确定性对象、管道内部传递的中间状态、纯数据载荷 | 轻量、无运行时校验开销、标准库零依赖 | 知识库检索片段 `Document`、Agent 内部状态快照 |
-| **Pydantic v2 `BaseModel`** | 外部边界输入、环境变量、LLM Structured Output（结构化提取）、HTTP 请求入参 | 严格的运行时类型强制转换、强校验规则（如范围、正则、枚举） | 环境变量配置 `Settings`、提取的用户工单 JSON |
-
-**核心工程原则**：
-> 凡是跨越系统信任边界的数据（来自网络、用户请求、外部环境变量或 LLM 生成的 JSON），必须经过 Pydantic 严格校验；凡是应用内部流转的受信数据结构，优先使用 `dataclass` 保持轻量与高效。
-
----
-
-## 2. Pydantic 校验错误剖析与错误脱敏
-
-当外界传入非法数据时，Pydantic 会抛出 `ValidationError`。例如：
-
-```python
-from pydantic import BaseModel, Field
-
-class ModelConfig(BaseModel):
-    api_key: str
-    temperature: float = Field(ge=0.0, le=2.0)
+```bash
+python chapters/part0-setup/0.4-python-engineering-base/gate/gate_check.py
 ```
 
-若传入 `{"api_key": "sk-1234567890", "temperature": 3.5}`，Pydantic 默认的 `exc.errors()` 结构中会包含：
-- `loc`: 出错字段路径，如 `('temperature',)`
-- `msg`: 错误描述
-- `type`: 错误类型
-- `input`: 用户输入的原始数据！
-
-### 安全陷阱：密钥泄露
-如果系统在捕获 `ValidationError` 后直接将 `str(exc)` 记录到日志或返回给客户端，而用户的输入恰好包含敏感的 `api_key` 或密码，**密钥就会直接泄露到外部响应或监控平台中**。
-
-### 正确的脱敏实践
-在配置加载（如 `load_settings`）层，应解析 `ValidationError.errors()`，只提取出错的字段名称（`loc`），向调用方返回结构清晰、不包含任何输入值的自定义异常：
-
-```python
-try:
-    return Settings(**data)
-except ValidationError as exc:
-    invalid_fields = sorted({str(err["loc"][0]) for err in exc.errors() if err["loc"]})
-    # 仅指出哪些字段出错，绝对不输出用户传入的敏感值
-    raise SettingsError(f"配置校验失败，无效字段: {', '.join(invalid_fields)}") from None
-```
+全部 PASS 才算通过；脚本会写 `gate/gate_report.json`。不允许改 `gate_check.py` 来绕过检查。
 
 ---
 
-## 3. 异步并发基础：超时与信号量限流
+## 为什么做这个 gate
 
-在 AI 应用中，LLM API 调用通常耗时在数百毫秒到数十秒之间，全链路异步化（`async`/`await`）是高吞吐服务的必备基础。
+很多初学者试图跳过 Python 工程底座直接去调用大模型框架，结果在面对网络偶发抖动、速率限制（429）、配置格式错误、并发打满连接池时手足无措。在现代 AI 后端系统中，模型只是一个可能随时超时或报错的外部 HTTP 依赖。如何防御外部依赖的不确定性，是区分“Demo 玩具”与“生产级工程”的分水岭。
 
-### 3.1 超时控制：`asyncio.wait_for` 与客户端超时
-网络挂起是导致服务雪崩的头号原因。每个异步调用都必须具备确定性的超时上限：
-```python
-# 客户端级别或单次请求级别必须指定 timeout
-async with httpx.AsyncClient(timeout=30.0) as client:
-    resp = await client.get(url)
-```
-
-### 3.2 并发限流：`asyncio.Semaphore`
-盲目使用 `asyncio.gather(*[call_llm(p) for p in prompts])` 在面对成千上万个任务时，会瞬间打满系统文件描述符或触发服务商的 Rate Limit（429 Too Many Requests）。
-
-使用 `asyncio.Semaphore` 可以精确控制正在执行的协程数量，同时保证返回结果的列表顺序与输入顺序严格对齐：
-
-```python
-async def gather_limited(factories, limit: int):
-    sem = asyncio.Semaphore(limit)
-    async def worker(f):
-        async with sem:
-            return await f()
-    return await asyncio.gather(*(worker(f) for f in factories))
-```
+这个 gate 检验四大核心工程能力：
+1. **边界校验与错误脱敏**：系统边界用 Pydantic，内部流转用 dataclass；校验失败时绝不把带有密钥的输入泄露到错误信息中；
+2. **带退避的确定性重试**：只对暂时性错误重试，支持假时钟注入，让重试单元测试毫秒级完成；
+3. **受控的异步并发**：用信号量严格控制并发上限，且保证返回结果列表顺序与输入严格一致；
+4. **离线测试替身**：用 `httpx.MockTransport` 在断网环境下 100% 模拟 500、畸形响应与超时。
 
 ---
 
-## 4. 带指数退避的重试：依赖注入与可测试性
+## 概念
 
-在遇到偶发性网络超时或 503 服务抖动时，重试是提升系统稳定性的核心手段。但重试设计有两项核心原则：
-1. **只重试可重试的异常**：网络超时、连接断开或特定的临时服务端错误可以重试；但参数校验失败、401 认证错误或语法错误绝不能重试。
-2. **避免羊群效应（Thundering Herd）**：采用指数退避机制（Exponential Backoff），第 $i$ 次重试等待时间为 $\text{base\_delay} \times 2^i$。
-3. **依赖注入时钟（Fake Sleep）**：
-   在编写单元测试时，如果真实调用 `time.sleep` 或 `asyncio.sleep`，几轮重试就会让测试运行变慢几秒甚至十几秒。
-   **将 sleep 协程作为参数注入**，在单元测试中传入不实际休眠的假时钟（仅记录调用时长），测试可以毫秒级瞬时完成！
+### 1. 类型体系分工：`dataclass` 与 Pydantic `BaseModel`
+- **Python 标准库 `dataclass`**：内部确定性对象、管道内部传递的中间状态、纯数据载荷。轻量、零运行时校验开销；
+- **Pydantic v2 `BaseModel`**：系统外部边界输入、环境变量、LLM 结构化提取。具备严格的运行时类型强制转换与验证规则。
+- **核心工程原则**：跨越信任边界的数据必须经过 Pydantic 严格校验；应用内部流转数据优先使用 `dataclass`。
+
+### 2. 校验错误脱敏与防泄密
+Pydantic 默认的 `ValidationError.errors()` 中包含 `input` 字段（即用户输入的原始内容）。若直接打印或抛出该异常，当输入恰好是 `api_key` 时密钥将直接泄露到外部响应或监控平台。必须解析错误字段定位（`loc`），仅提取出错字段名，绝不输出敏感值。
+
+### 3. 指数退避与时钟注入（Fake Sleep）
+在遇到偶发性网络抖动时，按 $\text{base\_delay} \times 2^i$ 进行指数退避。通过将 `sleep` 协程作为参数注入，单元测试中可传入仅记录时长而不实际休眠的假时钟，避免测试等待。
+
+### 4. 离线测试替身：`httpx.MockTransport`
+在内存中接管 HTTP 请求处理逻辑，脱离真实外部服务返回模拟状态码或异常。
 
 ---
 
-## 5. 离线测试替身：`httpx.MockTransport`
+## 任务
 
-作为测试工程师转向 AI 开发的核心优势之一，就是严谨的测试替身意识。
-在测试调用 OpenAI、DeepSeek 等第三方 API 的业务逻辑时，绝不能依赖真实网络环境。
+在 `gate/starter.py` 中实现以下 4 个核心函数：
 
-`httpx` 提供了极具威力的 `MockTransport`，允许我们拦截所有 HTTP 请求并在内存中返回模拟响应或触发特定网络异常：
+| 函数 | 你要交付的行为 |
+|---|---|
+| `load_settings(env)` | 读取 `LLM_PROVIDER`、`MODEL`、`TIMEOUT_S`、`MAX_RETRIES`；非法或超出范围抛 `SettingsError`，指出错误字段名且绝不包含敏感变量值 |
+| `retry_async(fn, attempts, base_delay, sleep, retry_on)` | 最多重试 `attempts` 次，退避间隔 $\text{base\_delay} \times 2^i$；只重试 `retry_on` 异常，其他立即抛出；次数用尽抛最后异常；`attempts < 1` 抛 `ValueError` |
+| `gather_limited(factories, limit)` | 运行协程工厂列表；并发度不超过 `limit`；返回结果顺序与输入完全对齐；`limit < 1` 抛 `ValueError` |
+| `fetch_json(client, url, timeout_s)` | GET 请求；非 2xx 抛 `HttpError("status:<code>")`；非字典 JSON 响应抛 `HttpError("invalid_json")`；超时抛 `HttpError("timeout")` |
 
-```python
-import httpx
+---
 
-# 离线模拟服务返回 500 状态码
-async def mock_handler(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(500, json={"error": "gateway overloaded"})
+## 关键约定
 
-transport = httpx.MockTransport(mock_handler)
-async with httpx.AsyncClient(transport=transport) as client:
-    # 请求完全在内存中执行，零网络 I/O，100% 确定性
-    ...
+- `SettingsError` 继承自 `ValueError`；错误信息必须包含出错的字段名，严禁包含该字段的实际取值；
+- `HttpError` 消息格式固定为 `"status:<code>"`、`"invalid_json"`、`"timeout"`；
+- `gather_limited` 必须保证 `result[i]` 对应 `factories[i]` 的执行结果；
+- `retry_async` 必须调用注入的 `sleep`，严禁在函数内调用全局 `asyncio.sleep`。
+
+---
+
+## 故障注入（必须亲手触发）
+
+| # | 注入场景 | 期望行为 |
+|---|---|---|
+| 1 | 传入非法的 `LLM_PROVIDER="foo"` | 抛出 `SettingsError`，消息中包含 `"provider"` |
+| 2 | 传入空白 `MODEL="   "` | 抛出 `SettingsError`，消息中包含 `"model"` |
+| 3 | 传入超出范围的 `TIMEOUT_S="200"` | 抛出 `SettingsError`，消息中包含 `"timeout_s"` |
+| 4 | 配置中包含非法密钥数据 | 抛出 `SettingsError`，错误信息中绝不出现密钥明文 |
+| 5 | 重试时遇到非 `retry_on` 列出的异常 | 立即抛出，不进入重试，假时钟调用次数为 0 |
+| 6 | 并发限流传入 `limit=0` 或负数 | 抛出 `ValueError` |
+| 7 | HTTP 请求返回 500 状态码 | 抛出 `HttpError("status:500")` |
+| 8 | HTTP 请求返回数组型 JSON `[1, 2, 3]` | 抛出 `HttpError("invalid_json")` |
+| 9 | HTTP 请求发生超时（TimeoutException） | 抛出 `HttpError("timeout")` |
+
+---
+
+## 验收标准
+
+`gate_check.py` 的 12 项检查全部 PASS：
+- **配置与脱敏 (1-4)**：非法 provider、空白 model、超时区间校验、错误信息脱敏无密钥明文；
+- **异步重试 (5-7)**：指数退避与假时钟注入、非可重试异常立即抛出、次数用尽抛最后异常；
+- **并发限流 (8-9)**：信号量并发受控与保序对齐、非法 limit 抛 ValueError；
+- **HTTP 异常封装 (10-12)**：非 2xx 状态码封装、非字典 JSON 封装、超时封装。
+
+---
+
+## 提交物
+
+- `gate/starter.py`（完成实现的闭卷代码）
+- `gate/gate_report.json`（12/12 全部通过报告）
+- [workbook.md](workbook.md) 中记录实验过程与反思
+
+---
+
+## 通过后对照参考实现
+
+通过 gate 之前不要阅读参考解。通过后运行参考实现进行对照：
+
+```bash
+python chapters/part0-setup/0.4-python-engineering-base/python_engineering_base.py
 ```
 
-本课程所有章节的离线 Gate 均基于这一设计，确保在断网、无 API 密钥的环境下依然可以 100% 确定性地自动化验证。
+对照思考以下问题：
+1. 参考实现如何通过集合推导式提取 `ValidationError` 中的字段名并脱敏？与你的写法有何区别？
+2. 在 `retry_async` 中，为什么假时钟参数注入能让原本需要数秒的重试在毫秒内完成？
+3. `gather_limited` 如何在保证 `asyncio.Semaphore` 限制并发的同时，保证返回列表下标与输入严格一致？
 
 ---
 
-## 6. 动手练习与 Gate 验证
+## 概念地图
 
-1. **阅读接口定义**：
-   打开 [gate/starter.py](gate/starter.py)，阅读待实现的 4 个核心工程组件：
-   - `load_settings`（配置加载与敏感信息脱敏）
-   - `retry_async`（指数退避与 fake_sleep 注入）
-   - `gather_limited`（信号量并发限流与顺序保持）
-   - `fetch_json`（httpx 请求与离线异常封装）
-2. **在 `starter.py` 中完成实现**。
-3. **执行离线 Gate 验证**：
-   ```powershell
-   python chapters/part0-setup/0.4-python-engineering-base/gate/gate_check.py
-   ```
-   检查全部 12 项注入与断言是否全部通过。
-4. **运行参考演示**：
-   可参考 [python_engineering_base.py](python_engineering_base.py) 的实现与本地运行输出：
-   ```powershell
-   python chapters/part0-setup/0.4-python-engineering-base/python_engineering_base.py
-   ```
-5. **记录证据**：
-   在 [workbook.md](workbook.md) 中记录实验观察与验证输出，并勾选 [gate/CHECKLIST.md](gate/CHECKLIST.md)。
+- **契约先行**：凡是来自外界的数据（配置、网络、LLM）必须经 Pydantic 校验；
+- **错误脱敏**：安全边界永远不向外泄露系统内部凭据；
+- **测试替身**：网络、时间、模型都应具备确定性的测试替身（MockTransport / Fake Sleep）；
+- **有界资源**：异步并发必须设定上限，网络调用必须设定硬超时。
+
+---
+
+## 边界
+
+- **非真实分布式限流**：`gather_limited` 仅针对单进程内部协程并发，多实例分布式限流需结合 Redis 或网关限流；
+- **重试不包含抖动因子**：本章实现为纯指数退避，生产高并发下建议引入 Full Jitter 避免羊群效应；
+- **离线替身不代表真实网络延迟**：通过 MockTransport 验证了状态处理逻辑，不代表公网下的网络抖动已实测。

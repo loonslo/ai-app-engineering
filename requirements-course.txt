@@ -20,7 +20,14 @@ tenacity
 numpy
 
 # v3 核心 SDK 与观测
-pydantic-ai-slim[openai]==2.31.1  # v3：L1.10、L4.5、L4.8、L4.17 (锁定兼容 openai<3 且支持 Python 3.11+ 的最新版本)
+# 注：pydantic-ai-slim 2.31.1 是兼容 openai<3 的最后版本（2.32.0 起强制要求 openai>=3）。
+# PyPI 登记了 5 条安全公告（PYSEC-2026-4284 / 4285 / 4286 / 4290 / 4291），修复版本均要求 openai 3。
+# 课程规避措施（conventions.md 第 9 节）：
+# 1) 不启用自带 OpenTelemetry 埋点（PYSEC-2026-4284: include_content=False 仍可能泄漏 prompt，统一改用 L5.6 opentelemetry-sdk 手动埋点）；
+# 2) 禁用 web_fetch_tool、FileUrl 本地下载与 ConcurrencyLimitedModel；
+# 3) DeepSeekProvider 调用时显式关闭 thinking 思考模式；
+# 4) 待 LangChain 锁定集允许 openai 3 后，升级 pydantic-ai-slim 到 >=2.53.0（已登记在 TASKS.md 待办中）。
+pydantic-ai-slim[openai]==2.31.1  # v3：L1.10、L4.5、L4.8、L4.17
 opentelemetry-sdk==1.44.0         # v3：L3.7、L5.6
 
 # 以下按章节选装

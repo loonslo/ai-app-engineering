@@ -17,7 +17,7 @@ def softmax(logits: list[float], temperature: float = 1.0) -> list[float]:
 
     temperature <= 0 抛 ValueError；数值稳定（先减最大值）；输出概率之和为 1.0。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 softmax 计算")
 
 
 def top_p_filter(probs: list[float], p: float) -> list[float]:
@@ -26,7 +26,7 @@ def top_p_filter(probs: list[float], p: float) -> list[float]:
     保留累计概率首次 >= p 的最小集合（按概率降序，同概率按下标升序），其余置 0 后重新归一化；
     p 不在 (0, 1] 时抛 ValueError。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 top_p 采样过滤")
 
 
 def top_k_filter(probs: list[float], k: int) -> list[float]:
@@ -35,7 +35,7 @@ def top_k_filter(probs: list[float], k: int) -> list[float]:
     保留概率最大的 k 个（同概率按下标升序）并重新归一化；
     k <= 0 抛 ValueError；k 大于长度时全部保留。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 top_k 采样过滤")
 
 
 def kv_cache_bytes(
@@ -51,7 +51,7 @@ def kv_cache_bytes(
     公式: 2 * layers * kv_heads * head_dim * seq_len * batch * bytes_per_value
     任一参数 <= 0 抛 ValueError。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 KV Cache 显存容量计算")
 
 
 def cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -59,7 +59,7 @@ def cosine_similarity(a: list[float], b: list[float]) -> float:
 
     长度不同或任一为全零向量时抛 ValueError。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现余弦相似度计算")
 
 
 def estimate_cost(
@@ -74,7 +74,7 @@ def estimate_cost(
     cached_input_tokens > input_tokens 或任一 token 数为负时抛 ValueError。
     返回成本值（单位与单价一致，通常为每百万 token 单价折算后的实际金额）。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现带缓存命中的成本估算")
 
 
 def precision_recall_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]:
@@ -83,4 +83,4 @@ def precision_recall_f1(tp: int, fp: int, fn: int) -> tuple[float, float, float]
     分母为 0 时对应指标记 0.0；任一参数为负数时抛 ValueError。
     返回 (precision, recall, f1)。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现分类评测指标计算")

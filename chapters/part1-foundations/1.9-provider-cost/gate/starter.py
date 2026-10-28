@@ -53,7 +53,7 @@ def normalize_usage(raw: Mapping[str, Any] | None) -> Usage:
 
     缺失时按 0 计，complete=False；None 直接返回全 0 且 complete=False。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 Usage 归一化")
 
 
 def estimate_cost(usage: Usage, price: PriceTable, at_utc_hour: int) -> float:
@@ -62,7 +62,7 @@ def estimate_cost(usage: Usage, price: PriceTable, at_utc_hour: int) -> float:
     at_utc_hour 必须在 0–23 之间，否则抛 ValueError。
     若 at_utc_hour 落在任一 offpeak 窗口内，整笔成本乘以 offpeak_multiplier。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现带时段与缓存的成本计算")
 
 
 def is_retryable(error: ProviderError) -> bool:
@@ -71,7 +71,7 @@ def is_retryable(error: ProviderError) -> bool:
     可重试: timeout, rate_limit, server_error
     不可重试: auth, bad_request, content_filter, context_length
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现错误重试研判")
 
 
 def call_with_fallback(
@@ -87,7 +87,7 @@ def call_with_fallback(
     - 成功返回 {"ok": True, "provider": str, "result": Any, "attempts": list}；
     - 全部失败返回 {"ok": False, "provider": None, "result": None, "attempts": list}。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现带故障转移的调用调度")
 
 
 def compare_runs(run_a: dict[str, Any], run_b: dict[str, Any]) -> dict[str, Any]:

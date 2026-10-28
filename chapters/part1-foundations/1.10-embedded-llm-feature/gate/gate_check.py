@@ -12,29 +12,69 @@ from __future__ import annotations
 import hashlib
 import importlib.machinery
 import importlib.util
-import json
 import sys
 from pathlib import Path
 from typing import Any
 
-current_dir = Path(__file__).resolve().parent
-if str(current_dir) not in sys.path:
-    sys.path.insert(0, str(current_dir))
+import argparse
+import json
+
+HERE = Path(__file__).resolve().parent
+CHAPTER_DIR = HERE.parent
+if str(HERE) not in sys.path:
+    sys.path.insert(0, str(HERE))
+if str(CHAPTER_DIR) not in sys.path:
+    sys.path.insert(0, str(CHAPTER_DIR))
 
 target_module: Any = None
-if len(sys.argv) > 1 and sys.argv[1].endswith(".py"):
-    target_path = Path(sys.argv[1]).resolve()
-    loader = importlib.machinery.SourceFileLoader("embedded_impl", str(target_path))
-    spec = importlib.util.spec_from_loader(loader.name, loader)
-    if spec and spec.loader:
-        target_module = importlib.util.module_from_spec(spec)
-        sys.modules[loader.name] = target_module
-        spec.loader.exec_module(target_module)
-else:
-    try:
-        import starter as target_module  # type: ignore
-    except ImportError:
-        target_module = None
+
+
+def load_module(path: Path):
+    global target_module
+    if not path.exists():
+        raise SystemExit(f"找不到实现文件：{path}")
+    sys.path.insert(0, str(path.parent))
+    spec = importlib.util.spec_from_file_location("candidate_l110", path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"无法加载模块：{path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["candidate_l110"] = module
+    spec.loader.exec_module(module)
+    target_module = module
+    return module
+
+
+class Gate:
+    def __init__(self) -> None:
+        self.rows: list[dict[str, Any]] = []
+
+    def check(self, name: str, fn) -> None:
+        try:
+            fn()
+        except Exception as exc:  # noqa: BLE001
+            self.rows.append({"name": name, "ok": False, "error": f"{type(exc).__name__}: {exc}"})
+        else:
+            self.rows.append({"name": name, "ok": True, "error": ""})
+
+    def report(self, module_path: Path, gate_name: str) -> int:
+        passed = sum(row["ok"] for row in self.rows)
+        total = len(self.rows)
+        for row in self.rows:
+            mark = "PASS" if row["ok"] else "FAIL"
+            print(f"[{mark}] {row['name']}" + ("" if row["ok"] else f"  <- {row['error']}"))
+        print(f"\n{passed}/{total} passed")
+        if passed != total:
+            print("gate 未通过：先修 FAIL 项，不要打开参考实现。")
+        out = {
+            "gate": gate_name,
+            "module": str(module_path),
+            "passed": passed,
+            "total": total,
+            "ok": passed == total,
+            "checks": self.rows,
+        }
+        (HERE / "gate_report.json").write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
+        return 0 if passed == total else 1
 
 
 def make_deps(
@@ -337,31 +377,20 @@ ALL_CHECKS = [
 ]
 
 
-def run_checks(mod: Any) -> bool:
-    print(f"=== 开始执行 1.10 原生 Gate 检查（共 {len(ALL_CHECKS)} 项，目标模块: {getattr(mod, '__name__', str(mod))}）===")
-    all_passed = True
-    for title, check_fn in ALL_CHECKS:
-        try:
-            check_fn(mod)
-            print(f"  [PASS] {title}")
-        except Exception as exc:
-            print(f"  [FAIL] {title} -> {exc}", file=sys.stderr)
-            all_passed = False
-    return all_passed
-
-
 def main() -> int:
-    if target_module is None:
-        print("[FAIL] 无法加载待测试模块", file=sys.stderr)
-        return 1
+    parser = argparse.ArgumentParser(description="1.10 原生嵌入式功能 Gate 检查")
+    parser.add_argument("--module", default=str(HERE / "starter.py"), help="待测试模块路径")
+    parser.add_argument("positional", nargs="?", default=None, help="位置参数（兼容旧调用）")
+    args = parser.parse_args()
 
-    passed = run_checks(target_module)
-    if passed:
-        print("[PASS] 1.10 原生全部 16 项嵌入式功能断言通过！")
-        return 0
-    else:
-        print("[FAIL] 1.10 存在未通过检查项，请检查实现。", file=sys.stderr)
-        return 1
+    module_path = Path(args.positional or args.module).resolve()
+    core = load_module(module_path)
+    gate = Gate()
+
+    for title, check_fn in ALL_CHECKS:
+        gate.check(title, lambda fn=check_fn: fn(core))
+
+    return gate.report(module_path, "L1.10-embedded-feature")
 
 
 if __name__ == "__main__":

@@ -16,9 +16,7 @@ import json
 import math
 import re
 import sys
-import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -33,55 +31,47 @@ except ImportError:
     chat_model_name = None  # type: ignore
     get_openai_client = None  # type: ignore
 
-CATEGORIES = ("refund", "shipping", "account", "technical", "other")
-PRIORITIES = ("low", "medium", "high", "urgent")
-ORDER_ID_PATTERN = r"^ORD-\d{6}$"
+_local_gate_starter = Path(__file__).resolve().parent / "gate" / "starter.py"
+_local_starter = Path(__file__).resolve().parent / "starter.py"
+_target_starter = _local_gate_starter if _local_gate_starter.is_file() else _local_starter
+
+if "starter" in sys.modules and hasattr(sys.modules["starter"], "CATEGORIES"):
+    _mod = sys.modules["starter"]
+elif _target_starter.is_file():
+    import importlib.util
+
+    _mod_name = "gate_starter_1_10"
+    _spec = importlib.util.spec_from_file_location(_mod_name, _target_starter)
+    assert _spec is not None and _spec.loader is not None
+    _mod = importlib.util.module_from_spec(_spec)
+    sys.modules[_mod_name] = _mod
+    if "starter" not in sys.modules:
+        sys.modules["starter"] = _mod
+    _spec.loader.exec_module(_mod)
+else:
+    from gate.starter import (  # type: ignore
+        CATEGORIES,
+        PRIORITIES,
+        ORDER_ID_PATTERN,
+        CallRecord,
+        ChatReply,
+        FeatureDeps,
+        OutputError,
+        TicketInsight,
+    )
+    _mod = None
+
+if _mod is not None:
+    CATEGORIES = _mod.CATEGORIES
+    PRIORITIES = _mod.PRIORITIES
+    ORDER_ID_PATTERN = _mod.ORDER_ID_PATTERN
+    CallRecord = _mod.CallRecord
+    ChatReply = _mod.ChatReply
+    FeatureDeps = _mod.FeatureDeps
+    OutputError = _mod.OutputError
+    TicketInsight = _mod.TicketInsight
+
 COMPARE_FIELDS = ("category", "priority", "order_id", "amount", "needs_human")
-
-
-class OutputError(ValueError):
-    """模型输出不合法（消息为 "invalid_json" 或 "schema:<字段名>"）。"""
-
-
-@dataclass(frozen=True)
-class ChatReply:
-    content: str
-    usage: dict[str, int]
-
-
-@dataclass(frozen=True)
-class FeatureDeps:
-    tenant_id: str
-    user_id: str
-    chat_fn: Callable[[list[dict[str, str]]], ChatReply]
-    order_exists: Callable[[str, str], bool]
-    clock: Callable[[], float] = time.perf_counter
-    prompt_version: str = "v1"
-    refund_human_threshold: float = 500.0
-
-
-@dataclass(frozen=True)
-class TicketInsight:
-    category: str
-    priority: str
-    order_id: str | None
-    amount: float | None
-    needs_human: bool
-    source: str  # "llm" | "rules"
-    reasons: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class CallRecord:
-    tenant_id: str
-    user_ref: str  # sha256(user_id) 的前 12 位
-    prompt_version: str
-    latency_ms: int
-    prompt_tokens: int
-    completion_tokens: int
-    retries: int
-    fallback: bool
-    validation_error: str | None
 
 
 def build_messages(ticket_text: str, prompt_version: str = "v1") -> list[dict[str, str]]:

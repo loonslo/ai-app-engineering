@@ -38,7 +38,7 @@ def load_settings(env: Mapping[str, str]) -> Settings:
 
     校验失败抛 SettingsError，消息列出出错的字段名，不包含任何敏感变量的值。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现配置读取与校验")
 
 
 async def retry_async(
@@ -55,7 +55,7 @@ async def retry_async(
     只对 retry_on 中的异常重试，其他异常立即抛出；
     次数用尽时抛出最后一次的异常。attempts < 1 抛 ValueError。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现指数退避异步重试")
 
 
 async def gather_limited(
@@ -63,7 +63,7 @@ async def gather_limited(
     limit: int,
 ) -> list[T]:
     """factories 是返回协程的无参函数列表；同时运行的协程不超过 limit；结果顺序与输入一致；limit < 1 抛 ValueError。"""
-    raise NotImplementedError
+    raise NotImplementedError("实现有序并发限流调度")
 
 
 async def fetch_json(
@@ -78,4 +78,4 @@ async def fetch_json(
     响应体不是 JSON 对象抛 HttpError("invalid_json")；
     超时（httpx.TimeoutException）抛 HttpError("timeout")。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现带异常封装的 HTTP GET 请求")

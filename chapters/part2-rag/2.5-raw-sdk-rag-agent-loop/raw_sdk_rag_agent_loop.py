@@ -19,27 +19,21 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import re
+import urllib.error
 import urllib.request
 from collections import Counter
 from dataclasses import dataclass
 from typing import Callable
 
-import sys
-from pathlib import Path
 from dotenv import load_dotenv
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from common import DEEPSEEK_BASE_URL, SAMPLE_DOC, _deepseek_api_key, chat_model_name
+from common import DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, SAMPLE_DOC, deepseek_api_key
 
 load_dotenv()
 
 API_URL = DEEPSEEK_BASE_URL.rstrip("/") + "/chat/completions"
-MODEL = chat_model_name()
+MODEL = DEEPSEEK_MODEL
 
 
 @dataclass
@@ -84,7 +78,7 @@ def retrieve(query: str, chunks: list[Chunk], k: int = 3) -> list[Chunk]:
 
 def chat(messages: list[dict[str, str]], temperature: float = 0.0) -> str:
     """直接调 OpenAI 兼容接口。没有 key 时返回离线提示，保证文件可读可跑。"""
-    api_key = _deepseek_api_key()
+    api_key = deepseek_api_key()
     if not api_key:
         return "（离线模式）未配置 DEEPSEEK_API_KEY；这里会发送 messages 给模型并返回 content。"
 
@@ -102,9 +96,12 @@ def chat(messages: list[dict[str, str]], temperature: float = 0.0) -> str:
         },
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        data = json.loads(resp.read().decode("utf-8"))
-    return data["choices"][0]["message"]["content"]
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return data["choices"][0]["message"]["content"]
+    except urllib.error.URLError as exc:
+        return f"（网络异常）连接模型接口失败: {exc}。请检查网络连接、代理或 API 地址。" 
 
 
 def raw_rag_answer(question: str, chunks: list[Chunk]) -> str:

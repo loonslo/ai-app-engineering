@@ -161,6 +161,11 @@ grep -rlE "^\s*(from|import) (langchain|langgraph)" chapters --include=*.py \
 - gate 中用 `TestModel` 或 `FunctionModel`，并在 gate_check 开头设置 `pydantic_ai.models.ALLOW_MODEL_REQUESTS = False`。
 - 真实调用走 `DeepSeekProvider`（或通用的 OpenAI 兼容 provider），模型名取自 `common.chat_model_name()`。
 - Pydantic AI 发版频繁。接口以锁定版本的官方文档为准，引用文档时写读取日期。
+- **锁定版本 2.31.1 的限制**（2026-10-28 复核时确认）：它是最后一个兼容 `openai<3` 的版本，PyPI 上登记了 5 条安全公告，修复都在 2.44.0 及以后。因此课程内：
+  - 不启用 Pydantic AI 自带的 OpenTelemetry 埋点（`instrument=True`、`Agent.instrument_all()`）。PYSEC-2026-4284：即使设置 `include_content=False`，正文仍会经由异常事件等途径导出。追踪统一用 L5.6 的 `opentelemetry-sdk` 写法；
+  - 不使用 `web_fetch_tool`、`FileUrl` 的 allow-local 下载与 `ConcurrencyLimitedModel`；
+  - 它的 `DeepSeekProvider` 不识别 `deepseek-flash`，真实调用时须显式关闭思考。
+  - 待 LangChain 锁定集允许 openai 3 后，升级到 ≥2.53.0，并复核本条。
 
 ## 10. 依赖与版本
 

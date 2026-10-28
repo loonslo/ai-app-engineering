@@ -101,6 +101,7 @@ python tools/run_chapter.py 2.5 raw_sdk_rag_agent_loop.py
 
 ## 边界
 
+- 本章参考实现面向 DeepSeek 官方兼容 HTTP 端点（`DEEPSEEK_BASE_URL`）并使用 `DEEPSEEK_MODEL`（默认 `deepseek-flash`）；密钥查找顺序为显式进程环境变量（`DEEPSEEK_API_KEY`） > Windows 用户环境变量 > 本地 `.env` 文件。未配置密钥时运行为全离线模拟提示；若遇网络不可达，脚本会捕获 `URLError` 并输出友好提示，不会直接报出底层堆栈。
 - 本章的检索用简化评分，不追求效果；真实系统用 embedding/BM25/混合检索（第 2 篇后半）。
 - 本章的工具是无副作用示例；有副作用的工具需要授权、审批和审计（4.11、4.12）。
 - 通过 gate 只证明 harness 结构正确，不证明 RAG 答案质量；质量要看 2.9 的评测。

@@ -140,7 +140,7 @@ def select_tools(task: str, specs: list[ToolSpec], limit: int) -> list[str]:
 5. 用量上限（请求数、工具调用数），给循环设边界。
 6. 人工审批：工具标记为需要审批，运行结束时返回待审请求，审完再续跑（deferred tools）。
 7. 测试：`TestModel`、`FunctionModel`、`Agent.override`、`ALLOW_MODEL_REQUESTS`。
-8. OpenTelemetry 追踪；持久执行引擎的接入（只讲概念并列出引擎）。
+8. OpenTelemetry 追踪；持久执行引擎的接入（只讲概念并列出引擎）。锁定版本下不启用 Pydantic AI 自带的埋点，原因见 [conventions.md 第 9 节](../conventions.md#9-pydantic-ai-约定)。
 9. 与 OpenAI Agents SDK 的对照表：handoff、guardrail、session，取自 curriculum-v3.md 第 6.1 节。
 
 以上 API 名称以锁定版本的官方文档为准；若与这里不同，按新名称实现，并在验证记录说明。

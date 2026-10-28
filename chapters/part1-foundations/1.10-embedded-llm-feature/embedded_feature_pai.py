@@ -99,3 +99,36 @@ def extract_with_agent(
         # 异常或重试耗尽时回退至规则降级
         fallback = rules_fallback(ticket_text)
         return fallback
+
+if __name__ == "__main__":
+    from pydantic_ai.messages import ModelResponse, ToolCallPart
+    from pydantic_ai.models.function import FunctionModel
+
+    def demo_model_fn(messages: list, info: Any) -> ModelResponse:
+        tool_name = info.output_tools[0].name
+        return ModelResponse(
+            parts=[
+                ToolCallPart(
+                    tool_name,
+                    {
+                        "category": "refund",
+                        "priority": "urgent",
+                        "order_id": "ORD-123456",
+                        "amount": 199.0,
+                    },
+                )
+            ]
+        )
+
+    demo_agent = build_agent(FunctionModel(demo_model_fn))
+    demo_deps = FeatureDeps(
+        tenant_id="tenant_demo",
+        user_id="user_demo_01",
+        chat_fn=lambda msgs: None,  # type: ignore
+        order_exists=lambda tid, oid: True,
+    )
+    result = extract_with_agent(demo_agent, "我要退款 199 元，订单号 ORD-123456", demo_deps)
+    print("=== 1.10 Pydantic AI 离线演示 (FunctionModel) ===")
+    print(f"提取结果: category={result.category}, priority={result.priority}, order_id={result.order_id}, amount={result.amount}")
+    print(f"安全状态: needs_human={result.needs_human}, source={result.source}, reasons={result.reasons}")
+

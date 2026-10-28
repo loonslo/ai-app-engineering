@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import httpx
 import openai
 
 # 导入共享配置与客户端工厂
@@ -183,35 +184,66 @@ def demonstrate_live_call() -> None:
         print(f"【调用异常】其他错误: {type(exc).__name__}: {exc}")
 
 
+def classify_api_error(err: Exception) -> dict[str, Any]:
+    """对三类典型 API 错误进行分类与重试研判。
+
+    返回字典包含：
+    - category: "auth" | "timeout" | "rate_limit" | "other"
+    - status_code: int | None
+    - retryable: bool
+    - strategy: 处理建议
+    """
+    if isinstance(err, openai.AuthenticationError):
+        return {
+            "category": "auth",
+            "status_code": 401,
+            "retryable": False,
+            "strategy": "认证失败（401）：不可重试，应立即告警并检查配置密钥。",
+        }
+    if isinstance(err, openai.APITimeoutError):
+        return {
+            "category": "timeout",
+            "status_code": None,
+            "retryable": True,
+            "strategy": "网络或读取超时：属于可重试错误，应采用指数退避（Exponential Backoff）重试。",
+        }
+    if isinstance(err, openai.RateLimitError):
+        return {
+            "category": "rate_limit",
+            "status_code": 429,
+            "retryable": True,
+            "strategy": "速率限制（429）：可重试错误，应读取 Retry-After 头部或增加重试等待间隔。",
+        }
+    return {
+        "category": "other",
+        "status_code": getattr(err, "status_code", None),
+        "retryable": False,
+        "strategy": f"其他错误: {type(err).__name__}: {err}",
+    }
+
+
 def demonstrate_error_handling() -> None:
-    """演示三类典型 API 错误的识别与分类逻辑。"""
+    """演示三类典型 API 错误的识别与分类逻辑（使用公开 API 构造响应替身）。"""
     print("\n=== 2. 三类关键 API 异常的识别与处理策略 ===")
+    req = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
     error_cases = [
-        (
-            openai.AuthenticationError(
-                message="Incorrect API key provided",
-                response=openai._models.FinalRequestOptions(method="post", url="/chat/completions"),  # type: ignore
-                body={"error": {"message": "Invalid API key"}},
-            ),
-            "认证失败（401）：不可重试，应立即告警并检查配置密钥。",
+        openai.AuthenticationError(
+            message="Incorrect API key provided",
+            response=httpx.Response(401, request=req),
+            body={"error": {"message": "Invalid API key"}},
         ),
-        (
-            openai.APITimeoutError(request=None),  # type: ignore
-            "网络或读取超时：属于可重试错误，应采用指数退避（Exponential Backoff）重试。",
-        ),
-        (
-            openai.RateLimitError(
-                message="Rate limit reached",
-                response=openai._models.FinalRequestOptions(method="post", url="/chat/completions"),  # type: ignore
-                body={"error": {"message": "Rate limit exceeded"}},
-            ),
-            "速率限制（429）：可重试错误，应读取 Retry-After 头部或增加重试等待间隔。",
+        openai.APITimeoutError(request=req),
+        openai.RateLimitError(
+            message="Rate limit reached",
+            response=httpx.Response(429, request=req),
+            body={"error": {"message": "Rate limit exceeded"}},
         ),
     ]
 
-    for err, strategy in error_cases:
+    for err in error_cases:
+        info = classify_api_error(err)
         err_name = type(err).__name__
-        print(f"  - 识别捕获 [{err_name}]: {strategy}")
+        print(f"  - 识别捕获 [{err_name}] (分类: {info['category']}, 可重试: {info['retryable']}): {info['strategy']}")
 
 
 if __name__ == "__main__":

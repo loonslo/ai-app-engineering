@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import time
 
 CATEGORIES = ("refund", "shipping", "account", "technical", "other")
 PRIORITIES = ("low", "medium", "high", "urgent")
@@ -26,7 +27,7 @@ class FeatureDeps:
     user_id: str
     chat_fn: Callable[[list[dict]], ChatReply]  # 可能抛 TimeoutError 或 RuntimeError
     order_exists: Callable[[str, str], bool]  # (tenant_id, order_id) -> 是否存在
-    clock: Callable[[], float]  # 返回秒数
+    clock: Callable[[], float] = time.perf_counter  # 返回秒数
     prompt_version: str = "v1"
     refund_human_threshold: float = 500.0
 
@@ -63,7 +64,7 @@ def build_messages(ticket_text: str, prompt_version: str) -> list[dict]:
     - 工单原文放进 user 消息，并用固定边界分隔符（如 ===TICKET===）包裹；
     - 防范提示词注入攻击。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 build_messages")
 
 
 def parse_llm_output(raw: str) -> dict:
@@ -73,7 +74,7 @@ def parse_llm_output(raw: str) -> dict:
     - 非合法 JSON 抛 OutputError("invalid_json")；
     - 缺少 category / priority / order_id / amount 字段或类型不符抛 OutputError("schema:<字段>")。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 parse_llm_output")
 
 
 def to_dto(parsed: dict, deps: FeatureDeps) -> TicketInsight:
@@ -88,7 +89,7 @@ def to_dto(parsed: dict, deps: FeatureDeps) -> TicketInsight:
     - category == "refund" 且 (amount is None 或 amount >= refund_human_threshold) 时 needs_human=True；
     - 忽略 parsed 中的 tenant_id、user_id 等任何由模型输出的伪造身份字段。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 to_dto")
 
 
 def rules_fallback(ticket_text: str) -> TicketInsight:
@@ -96,7 +97,7 @@ def rules_fallback(ticket_text: str) -> TicketInsight:
 
     source="rules"；判定为退款相关时一律 needs_human=True（fail-closed 安全策略）。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 rules_fallback")
 
 
 def extract_insight(
@@ -112,7 +113,7 @@ def extract_insight(
     - 与退款相关（规则判断或模型中间输出任一认为是退款）且走了回退时，needs_human=True（fail-closed）；
     - 生成 CallRecord 记录可观测字段，严禁记录工单原文，user_ref 为 sha256 前 12 位。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 extract_insight")
 
 
 def run_eval(
@@ -130,4 +131,4 @@ def run_eval(
 
     比较的字段：category, priority, order_id, amount, needs_human。
     """
-    raise NotImplementedError
+    raise NotImplementedError("实现 run_eval")

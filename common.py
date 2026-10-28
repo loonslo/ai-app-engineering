@@ -112,6 +112,14 @@ def _deepseek_api_key() -> str | None:
     )
 
 
+def deepseek_api_key() -> str | None:
+    """获取 DeepSeek API 密钥（公开访问接口）。
+
+    查找优先级：显式进程环境变量 > Windows 用户环境变量 > 本地 .env 文件。
+    """
+    return _deepseek_api_key()
+
+
 def _required_environment(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:

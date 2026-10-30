@@ -140,7 +140,7 @@ python chapters/part2-rag/2.12-context-engineering/context_engineering.py --live
 ## 概念地图
 
 - **前缀确定性**：static 段落严格前置；
-- **预算硬约束**：优先丢弃低优，保证 required 绝对交付；
+- **预算硬约束**：优先丢弃低优，保证 required 段落完整交付；
 - **缓存健康度**：Lint 拦截动态时间戳污染；
 - **信息密度**：单段体积预警，拒绝巨型臃肿文档直接灌入。
 

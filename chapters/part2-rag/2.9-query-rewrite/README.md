@@ -120,6 +120,13 @@ python chapters/part2-rag/2.9-query-rewrite/gate/gate_check.py
 | **数据新鲜度** | 依赖定时索引同步（存在分钟至小时级延迟） | 直读最新源头工具（秒级实时性） |
 | **召回控制** | 确定性算法（BM25 + 向量 Top-K），行为可预测 | 依赖大模型意图理解与改写质量，存在波动性 |
 
+### 行业参考与实践指南
+
+查询改写（Query Expansion / Multi-Query）、假设性文档嵌入（HyDE）以及 Agentic 检索循环的业界参考：
+1. **Gao et al.**: *Retrieval-Augmented Generation for Large Language Models: A Survey* ([arXiv:2312.10997](https://arxiv.org/abs/2312.10997)，v5 更新于 2024-03-27；读取日期：2026-10-29；系统梳理 Pre-retrieval 阶段的 Query Rewriting、Sub-Query 与 Modular RAG 架构演进)。
+2. **arXiv:2601.07711**: *Is Agentic RAG worth it? An experimental comparison of RAG approaches* ([arXiv:2601.07711](https://arxiv.org/abs/2601.07711)，2026-01-12；读取日期：2026-10-29；论文在 FiQA、NQ、FEVER、CQADupStack-EN 四个数据集上比较 Agentic RAG 与自带改写、路由和重排的 Enhanced RAG：判断用户意图时，Agentic 在 FiQA、CQADupStack-EN 上略好，在 FEVER 上明显较差（F1 低 28.8 分）；Agentic 的查询改写带来更好的检索质量，Enhanced 的重排更准。成本与延迟分析（表 9：FiQA 与 CQADupStack-EN，GPT-4.1-nano 与 Qwen3 0.6B–32B，Agentic 最多 3 轮）显示，Agentic 的端到端延迟平均约 1.5 倍，输入 token 平均约 3.3 倍，成本最高约 3.6 倍。为上表的成本延迟对比提供实验依据)。
+3. **Anthropic Engineering**: *Introducing Contextual Retrieval* ([Anthropic 官网](https://www.anthropic.com/news/contextual-retrieval)，2024-09-19；读取日期：2026-10-29；探讨在索引切分阶段为分块补全文档上下文并结合 BM25 混合检索，实测使失败检索减少 49%，结合重排后减少 67%)。
+
 ## 通过后对照参考实现
 
 不要提前看。通过后再运行并对照：

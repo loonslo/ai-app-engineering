@@ -1,4 +1,4 @@
-# L2.11 RAG 评测基线 · Gate（原 2.4）
+# L2.9 RAG 评测基线 · Gate（原 2.4）
 
 [全书目录](../../README.md) · [上一章 2.3](../2.3-minimal-rag/README.md) · [下一章 2.5](../2.5-raw-sdk-rag-agent-loop/README.md)
 
@@ -60,12 +60,15 @@ python chapters/part2-rag/2.4-eval-seed/gate/gate_check.py
 ## 从 20 条到 50 条：评测集构建哲学
 
 根据 Anthropic 发布的工程指南 [《Demystifying evals for AI agents》](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)（2026-01-09 发布，核对读取日期：2026-10-28）：
-> "20-50 simple tasks drawn from real failures is a great start"（从真实失败中提炼 20–50 个简单任务，就是一个非常好的起点）。真实生产与实验中暴露的高信噪比用例，远比盲目生成海量未经验证的合成测试更有诊断价值。
+> "20-50 simple tasks drawn from real failures is a great start"
+> （从真实失败中提炼 20–50 个简单任务，就是一个非常好的起点。）
+
+Anthropic 在原文中指出，团队往往以为要准备数百个评测任务才能开始做系统评测；然而在系统开发早期，每次改动带来的影响往往十分显著、效应量大，因此 20–50 个高质量样本就已经足以捕获关键问题。在此基础上，本章认为从真实生产与实验中提炼的高信噪比用例，比盲目追求海量未经验证的合成测试集更具工程诊断价值。
 
 构建高质量 Golden Set 的演进路径：
 1. **20 条打底（核心边界覆盖）**：覆盖高频业务场景，显式注入并固化历史踩过的 Bug（如本章的 6 类典型失败：未召回漏引、跨界编造引用、拒答带证据、格式重复等）。这 20 条能够作为持续集成的快速烟雾测试门禁。
 2. **扩充至 50 条（压力与对抗样本）**：引入需要跨文档对比的多跳推理（Multi-hop）、相似但过期的版本冲突、语料外无解提问（检验拒答鲁棒性）、以及在文档中蓄意伪造的 Prompt 注入文本。
-3. **分层归因而非单一总分**：在评测中严禁仅记录一个笼统的 Accuracy，必须按照 Harness 范式将指标拆解为检索命中率（Retrieval Hit）、引用忠实度（Citation Accuracy）、拒答准确率（Refusal Accuracy）与语义关键词命中。
+3. **分层归因而非单一总分**：在评测中不要仅记录一个笼统的 Accuracy，必须按照 Harness 范式将指标拆解为检索命中率（Retrieval Hit）、引用忠实度（Citation Accuracy）、拒答准确率（Refusal Accuracy）与语义关键词命中。
 
 ## 故障注入（必须亲手触发）
 

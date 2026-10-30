@@ -30,8 +30,7 @@ python chapters/part2-rag/2.15-real-corpus-kb-gate/gate/gate_check.py
 
 本知识库采用公开、合规的开放许可证语料：
 1. **语料清单与许可证**：在 `corpus/SOURCES.md` 中登记全部 24 份语料的来源链接、许可证名称、许可证链接与读取日期。包含表格密集 PDF（`background-checks.pdf`）与扫描页 PDF（`ccitt.pdf`）。
-2. **自动化下载与哈希校验**：原始大文件不提交入 Git 仓库。通过 `fetch_corpus.py` 依据固定 Tag/Commit 下载并严格校验 SHA256 哈希；支持 `--dry-run` 离线校验。
-3. **隔离 Fixtures**：`gate/fixtures/` 仅存放经过合规许可的文本摘录（涵盖 SQLite 架构、SemVer 规范、Linux 指令与安全防御策略），供离线闭卷测试使用。
+2. **自动化下载与哈希校验**：原始大文件不提交入 Git 仓库。通过 `fetch_corpus.py` 依据固定 Tag/Commit 下载并严格校验 SHA256 哈希；支持 `--dry-run` 离线校验。端到端流水线统一从 `corpus/downloads/` 读取全部 24 份真实下载语料。
 
 ## 任务
 
@@ -65,7 +64,7 @@ python chapters/part2-rag/2.15-real-corpus-kb-gate/gate/gate_check.py
 2. 02 空白页记失败 (reason=empty_page)
 3. 03 表格行按行保留且不跨行合并
 4. 04 Chunk 字段完整性与页内索引起始规范
-5. 05 无足够支持证据时安全拒答且绝对不调 chat_fn
+5. 05 无足够支持证据时安全拒答且不调 chat_fn
 6. 06 引用格式严格遵循 source#p<page>#<index>
 7. 07 拦截引用未传给模型的幻觉片段
 8. 08 资料装配在 user 消息分隔符内且声明为数据
@@ -84,7 +83,13 @@ python chapters/part2-rag/2.15-real-corpus-kb-gate/gate/gate_check.py
 
 ## 真实运行与 workbook 产物
 
-通过 gate 闭卷后，运行参考流水线：
+通过 gate 闭卷后，首先确保已运行语料下载脚本：
+```bash
+# 下载并校验全部 24 份真实公开语料（未下载或下载不完整时 kb_pipeline.py 会逐个核对清单与哈希，给出明确可读提示并退出）
+python chapters/part2-rag/2.15-real-corpus-kb-gate/fetch_corpus.py
+```
+
+然后运行参考流水线：
 ```bash
 # 离线确定性运行（使用真实接入、分块、多策略检索与消融对比，模型使用离线提取器）
 python chapters/part2-rag/2.15-real-corpus-kb-gate/kb_pipeline.py
@@ -92,7 +97,7 @@ python chapters/part2-rag/2.15-real-corpus-kb-gate/kb_pipeline.py
 # 在线运行（可选：配置 API 密钥后体验大模型端到端真实生成）
 python chapters/part2-rag/2.15-real-corpus-kb-gate/kb_pipeline.py --live
 ```
-将运行得到的消融数据整理至 `workbook.md`，作为后续 P2 项目的最小上线技术基线。
+将运行得到的消融数据整理至 `workbook.md`，作为后续 P2 项目的最小上线技术基线（注：参考流水线基于 10 道独立留出样本进行阈值网格搜索校准，每题占 10% 权重，容易受单题影响；实际工程上线建议扩充至 50+ 道高代表性样本重新校准）。
 
 ## 通过后对照
 
@@ -111,3 +116,5 @@ python chapters/part2-rag/2.15-real-corpus-kb-gate/kb_pipeline.py --live
 
 - gate 验收完全离线执行，不依赖外网连接与付费模型。
 - 本课程知识库聚焦文字层提取，不包含 OCR 识别引擎与版面分析大模型（多模态版面解析作为选做）。
+- 按“含 `|` 的行按表格行保留”的切分规则，`linux-command` 语料中有 79 行 shell 管道命令（如 `ps aux | grep`）会被独立切为单行分块。
+- 在单页文档上，评测集标注的 gold 来源统一为 `#p1`，因此 hit@5 与引用准确率实际只检查是否召回并引用了正确的文档。

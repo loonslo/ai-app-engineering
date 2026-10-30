@@ -14,9 +14,20 @@
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+# 复用 2.1 递归切分与 2.2 向量检索索引组件
+SPLIT_DIR = Path(__file__).resolve().parents[1] / "2.1-load-split"
+EMBED_DIR = Path(__file__).resolve().parents[1] / "2.2-embed-retrieve"
+if str(SPLIT_DIR) not in sys.path:
+    sys.path.insert(0, str(SPLIT_DIR))
+if str(EMBED_DIR) not in sys.path:
+    sys.path.insert(0, str(EMBED_DIR))
+from embed_retrieve import VectorIndex  # noqa: E402
+from load_split import ZH_SEPARATORS, split_text_recursive  # noqa: E402
 
 try:
     from common import (
@@ -26,8 +37,6 @@ try:
         get_openai_client,
     )
 except ModuleNotFoundError:
-    import sys
-
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from common import (
         SAMPLE_DOC,
@@ -207,26 +216,24 @@ def load_document(file_path: str | Path) -> list[dict]:
 
 
 class NativeRetriever:
-    """基于原生向量与余弦相似度的纯 Python 检索器。返回 list[Document]。"""
+    """基于 2.2 VectorIndex 向量索引的纯 Python 检索器。返回 list[Document]。"""
 
     def __init__(self, chunks: list[Document], k: int = 4):
         self.chunks = chunks
         self.k = k
-        self.texts = [c.page_content for c in chunks]
-        self.vectors = embed_texts(self.texts) if self.texts else []
+        self.index = VectorIndex()
+        if chunks:
+            ids = [f"c_{i}" for i in range(len(chunks))]
+            texts = [c.page_content for c in chunks]
+            vectors = embed_texts(texts)
+            self.index.add(ids, vectors)
 
     def invoke(self, query: str) -> list[Document]:
-        if not self.chunks or not self.vectors:
+        if not self.chunks:
             return []
         q_vec = embed_texts([query])[0]
-        # 计算余弦相似度（embed_texts 默认归一化，点积即余弦值）
-        scores = []
-        for idx, v in enumerate(self.vectors):
-            dot = sum(a * b for a, b in zip(q_vec, v))
-            scores.append((dot, idx))
-        scores.sort(key=lambda x: x[0], reverse=True)
-        top = [self.chunks[idx] for _, idx in scores[: self.k]]
-        return top
+        results = self.index.search(q_vec, k=self.k)
+        return [self.chunks[int(r["id"].split("_")[1])] for r in results]
 
     def __call__(self, query: str) -> list[Document]:
         return self.invoke(query)
@@ -238,16 +245,18 @@ def build_retriever(file_path: str | Path, k: int = 4) -> NativeRetriever:
     if not docs:
         raise ValueError("没解析出任何文本（PDF 可能是扫描件，没有文字层）")
 
-    # 简单原生分块，封装为 Document
+    # 复用 2.1 split_text_recursive 与 ZH_SEPARATORS 进行保边界分块
     chunks: list[Document] = []
     chunk_idx = 1
-    chunk_size = 300
-    overlap = 50
-    step = chunk_size - overlap
     for doc in docs:
         text = doc["text"]
-        for start in range(0, len(text), step):
-            piece = text[start : start + chunk_size]
+        pieces = split_text_recursive(
+            text,
+            chunk_size=300,
+            overlap=50,
+            separators=list(ZH_SEPARATORS),
+        )
+        for piece in pieces:
             if piece.strip():
                 chunks.append(
                     Document(
@@ -260,8 +269,6 @@ def build_retriever(file_path: str | Path, k: int = 4) -> NativeRetriever:
                     )
                 )
                 chunk_idx += 1
-            if start + chunk_size >= len(text):
-                break
 
     return NativeRetriever(chunks, k=k)
 
@@ -285,9 +292,6 @@ class NativeRagChain:
         user_prompt = f"上下文：\n{context}\n\n问题：{question}"
 
         client = get_openai_client()
-        if client is None:
-            raise RuntimeError("未配置模型 API 密钥，请在 .env 中设置 DEEPSEEK_API_KEY 或使用 --live。")
-
         model = chat_model_name()
         resp = client.chat.completions.create(
             model=model,
@@ -297,7 +301,8 @@ class NativeRagChain:
                 {"role": "user", "content": user_prompt},
             ],
         )
-        return resp.choices[0].message.content or "文档中没有提到"
+        content = resp.choices[0].message.content
+        return content if content is not None else ""
 
 
 def build_rag_chain(retriever: Any, temperature: float = 0.0) -> NativeRagChain:

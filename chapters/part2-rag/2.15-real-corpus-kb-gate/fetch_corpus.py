@@ -22,14 +22,14 @@ DOWNLOAD_DIR = CORPUS_DIR / "downloads"
 CORPUS_MANIFEST = [
     {
         "id": "python-tutorial-zh",
-        "url": "https://raw.githubusercontent.com/python/python-docs-zh-cn/3.11/tutorial/introduction.po",
+        "url": "https://raw.githubusercontent.com/python/python-docs-zh-cn/615a836a374685116e0742508bf4961b50b9c403/tutorial/introduction.po",
         "sha256": "008139317c1882d3a2bf83a51a06103dfff3a9626991f73cb49c01db7777cc80",
         "license": "PSF License",
         "ext": "po",
     },
     {
         "id": "semver-spec-zh",
-        "url": "https://raw.githubusercontent.com/semver/semver.org/gh-pages/lang/zh-CN/spec/v2.0.0.md",
+        "url": "https://raw.githubusercontent.com/semver/semver.org/2cb4b39883d522b81ec42334730043dc541bfec9/lang/zh-CN/spec/v2.0.0.md",
         "sha256": "2fb860381902eaaf11fd75d10a037ce83a10c1e88742fe0933ad7ecb7c6a35b2",
         "license": "CC BY 3.0",
         "ext": "md",
@@ -38,14 +38,14 @@ CORPUS_MANIFEST = [
         "id": "table-pdf-background-checks",
         "url": "https://raw.githubusercontent.com/jsvine/pdfplumber/v0.11.4/examples/pdfs/background-checks.pdf",
         "sha256": "4f0ae6e017b0e97de211da8fd97316e55bd927af5740d6ce95e1b7b1539f9407",
-        "license": "MIT",
+        "license": "Public Domain (U.S. Govt)",
         "ext": "pdf",
     },
     {
         "id": "scanned-fax-ccitt",
         "url": "https://raw.githubusercontent.com/ocrmypdf/OCRmyPDF/v16.0.4/tests/resources/ccitt.pdf",
         "sha256": "5f4b129bf0eb0d32358a917cd1754c6fd68cac589ad79076b6d0191ebe84f0f1",
-        "license": "MPL 2.0",
+        "license": "GFDL-1.2-or-later or CC-BY-SA-3.0",
         "ext": "pdf",
     },
     {
@@ -201,7 +201,24 @@ def fetch_all(dry_run: bool = False) -> int:
     print(f"计划拉取/校验文档数：{len(CORPUS_MANIFEST)}")
 
     if dry_run:
-        print("[DRY-RUN] 清单配置校验通过：全部 24 份文档均配置固定 URL、SHA256 与明确许可证。")
+        # 严格检查每份文档配置：URL 必须是固定 commit (40 位十六进制) 或 release tag (如 v0.11.4)
+        for item in CORPUS_MANIFEST:
+            url = item["url"]
+            sha = item["sha256"]
+            lic = item["license"]
+            has_fixed_commit = any(len(seg) == 40 and all(c in "0123456789abcdefABCDEF" for c in seg) for seg in url.split("/"))
+            has_fixed_tag = "/v" in url and any(seg.startswith("v") and "." in seg for seg in url.split("/"))
+            if not (has_fixed_commit or has_fixed_tag):
+                print(f"[DRY-RUN-FAIL] 语料 {item['id']} 的 URL 未指向固定 commit 或 tag：{url}")
+                return 1
+            if len(sha) != 64 or not all(c in "0123456789abcdef" for c in sha):
+                print(f"[DRY-RUN-FAIL] 语料 {item['id']} 的 sha256 格式不合法：{sha}")
+                return 1
+            if not lic.strip():
+                print(f"[DRY-RUN-FAIL] 语料 {item['id']} 缺少明确许可证")
+                return 1
+
+        print("[DRY-RUN] 清单配置校验通过：全部 24 份文档均配置固定 URL (commit/tag)、有效 SHA256 与明确许可证。")
         for item in CORPUS_MANIFEST:
             print(f"  - [{item['license']}] {item['id']}.{item['ext']} (sha256: {item['sha256'][:12]}...)")
         return 0

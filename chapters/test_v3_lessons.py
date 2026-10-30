@@ -789,10 +789,12 @@ def test_v3_2_memory_compaction():
         {"role": "assistant", "content": "A2"},
         {"role": "user", "content": "U_LAST"},
     ]
-    res = mod.compact_history(msgs, budget=10, summarize_fn=lambda x: "SUM", keep_last=1)
+    res = mod.compact_history(msgs, budget=20, summarize_fn=lambda x: "SUM", keep_last=1)
     assert res.messages[0]["content"] == "SYS"
     assert any(m.get("pinned") for m in res.messages)
     assert res.messages[-1]["content"] == "U_LAST"
+    with pytest.raises(ValueError):
+        mod.compact_history(msgs, budget=10, summarize_fn=lambda x: "SUM", keep_last=1)
 
 
 def test_v3_2_kb_pipeline_gate():

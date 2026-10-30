@@ -127,10 +127,18 @@ def main() -> int:
 
     def test_post_compact_within_budget():
         msgs = build_test_history()
-        # 预算设为 160，摘要提供极长文本，验证压缩后总 Token 严格不超预算
+        # 1. 预算设为 160，摘要提供极长文本，验证压缩后总 Token 严格不超预算
         res = core.compact_history(msgs, budget=160, summarize_fn=lambda x: "超长冗余会话历史摘要说明内容" * 15, keep_last=2)
         total_tokens = sum(len(m.get("content", "")) for m in res.messages)
         expect(total_tokens <= 160, f"压缩后总 Token ({total_tokens}) 仍超出预算 (160)：{res.messages}")
+
+        # 2. 必须保留的消息本身已超预算时，必须抛出 ValueError
+        err_raised = False
+        try:
+            core.compact_history(msgs, budget=10, summarize_fn=lambda x: "summary", keep_last=2)
+        except ValueError:
+            err_raised = True
+        expect(err_raised, "必须保留的消息总预算超出 budget 时应抛出 ValueError")
 
     def test_prefix_changed():
         msgs = build_test_history()
@@ -152,9 +160,18 @@ def main() -> int:
 
     def test_model_unconfirmed_rejected():
         store = core.MemoryStore()
+        # 1. 未确认的模型写入必须被拒绝
         ok = store.remember("tenant_1", "user_a", "city", "Beijing", source="model", confirmed=False)
         expect(ok is False, "未确认的模型写入必须被拒绝")
         expect(store.recall("tenant_1", "user_a", "city") is None, "拒绝项不应写入存储")
+        # 2. 经确认的模型写入允许通过
+        ok_confirmed = store.remember("tenant_1", "user_a", "city", "Beijing", source="model", confirmed=True)
+        expect(ok_confirmed is True, "已确认的模型写入应当允许写入")
+        expect(store.recall("tenant_1", "user_a", "city") == "Beijing", "已确认模型写入应可召回")
+        # 3. 用户直接写入允许通过
+        ok_user = store.remember("tenant_1", "user_a", "theme", "dark", source="user", confirmed=True)
+        expect(ok_user is True, "用户写入应当允许写入")
+        expect(store.recall("tenant_1", "user_a", "theme") == "dark", "用户写入应可召回")
 
     def test_forget_and_export():
         store = core.MemoryStore()
@@ -179,7 +196,7 @@ def main() -> int:
     gate.check("07 压缩后总 token 不超预算", test_post_compact_within_budget)
     gate.check("08 压缩时 prefix_changed 判断正确", test_prefix_changed)
     gate.check("09 多租户与跨用户严格隔离", test_memory_isolation)
-    gate.check("10 未确认模型写入被拦截拒绝", test_model_unconfirmed_rejected)
+    gate.check("10 策略管控：未确认模型写入拦截、确认模型与用户写入通过", test_model_unconfirmed_rejected)
     gate.check("11 记忆遗忘与安全副本导出", test_forget_and_export)
     return gate.report(module_path)
 

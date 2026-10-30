@@ -22,7 +22,7 @@ python chapters/part2-rag/2.13-static-context-skills/gate/gate_check.py
 
 1. **项目级静态说明**：`AGENTS.md`（面向通用编码 Agent）、`CLAUDE.md` 等文件为智能体明确规定了仓库代码边界、禁止修改目录（如本项目的旗舰快照与日常 vault 边界）、构建命令与验证契约。
 2. **开放标准 Agent Skills**：2025-12-18 发布的 [agentskills.io](https://agentskills.io) 开放标准（*规范读取核对日期：2026-10-28*）定义了文件夹级的可复用技能单元：每个 Skill 包含带有 YAML frontmatter（声明 `name` 与 `description`）的 `SKILL.md`，以及可选的 `scripts/` 与 `references/`。
-3. **渐进披露（Progressive Disclosure）**：若在智能体初始化时将所有 Skill 的完整操作指南与脚本代码全量灌入 System Prompt，将引发明显的**指令膨胀（Instruction Bloat）**——无关 token 占用注意力窗口，首 Token 延迟升高，且互相冲突的规则容易被模型忽略。渐进披露要求启动阶段仅在上下文注入 `name` 和 `description` 索引列表；仅当任务命中时才按需读取完整 `body` 与参考文档。在本章参考实现的 3 个标准 Skill 场景实测下（使用字符与分词简易估算，全量加载 90 tokens 对比索引加载 34 tokens），渐进披露节省了约 62.2% 的静态上下文开销（随着 Skill 库规模扩充与正文指令丰富，节约比例通常可提升至 80% 以上）。
+3. **渐进披露（Progressive Disclosure）**：若在智能体初始化时将所有 Skill 的完整操作指南与脚本代码全量灌入 System Prompt，将引发明显的**指令膨胀（Instruction Bloat）**——无关 token 占用注意力窗口，首 Token 延迟升高，且互相冲突的规则容易被模型忽略。渐进披露要求启动阶段仅在上下文注入 `name` 和 `description` 索引列表；仅当任务命中时才按需读取完整 `body` 与参考文档。在本章参考实现的 3 个标准 Skill 场景实测下（使用字符与分词简易估算，全量加载 90 tokens 对比索引加载 34 tokens），渐进披露节省了约 62.2% 的静态上下文开销。据此推算（判断）：当技能库规模扩充且各 Skill 包含长篇详细说明时，按需加载的 Token 节约比例还会进一步扩大。
 4. **安全与供应链风险**：[Thoughtworks 技术雷达 Vol.34](https://www.thoughtworks.com/radar)（*核对日期：2026-10-28*）指出，恶意代码注入与不受控执行的风险已从 MCP 协议进一步延伸至 Agent Skills。说明文件中可能潜藏过期的硬编码密钥（如 `sk-`、`AKIA`），或诱导 Agent 运行非安全沙箱脚本的提示词注入。
 
 这个 gate 验证一个合规、安全、轻量且具备渐进披露能力的 Agent Skills 加载与巡检引擎。
@@ -34,7 +34,7 @@ python chapters/part2-rag/2.13-static-context-skills/gate/gate_check.py
 | 函数 / 接口 | 你要交付的行为 |
 |---|---|
 | `parse_skill_md` | 解析 `SKILL.md`：严格以 `---` 起止 frontmatter；单行解析 `key: value`（不依赖 PyYAML）；校验 name 与 description 约束；分离正文 body |
-| `build_index` | 构造摘要索引行 `"- <name>: <description>"`；超预算截断并追加 `"（另有 N 个 Skill 未列出）"`；索引绝不能包含正文 body |
+| `build_index` | 构造摘要索引行 `"- <name>: <description>"`；超预算截断并追加 `"（另有 N 个 Skill 未列出）"`；索引不得包含正文 body |
 | `select_skills` | 计算任务描述与 Skill 描述的分词交集重合度；按重合数降序初筛返回前 `limit` 个 name；无重合返回 `[]` |
 | `load_skill` | 渐进加载：首次加载返回 body 并记入 `loaded`；重复加载返回 `""`；未知技能抛 `SkillNotFound` |
 | `lint_instructions` | 静态安全质量巡检：行数超限报 `"too_long"`；重复非空行报 `"duplicate_line:<行号>"`；疑似硬编码密钥报 `"secret_like:<行号>"` |
@@ -52,7 +52,7 @@ python chapters/part2-rag/2.13-static-context-skills/gate/gate_check.py
 | 2 | 缺少 `---` 起始/闭合 frontmatter | 抛出 `SkillFormatError` | 02 |
 | 3 | frontmatter 缺少 `name` 字段 | 抛出 `SkillFormatError` | 03 |
 | 4 | `name` 含大写、以连字符结尾、含连续连字符或目录名不符 | 抛出 `SkillFormatError` | 04 |
-| 5 | 构建索引包含正文 body | 断言失败，索引严禁泄露正文 | 05 |
+| 5 | 构建索引包含正文 body | 断言失败，索引不能包含正文 | 05 |
 | 6 | 索引超出预算 | 截断并追加 `"（另有 N 个 Skill 未列出）"` 提示 | 06 |
 | 7 | 多关键词重合与单关键词重合 | 按重合数排序，高重合优先返回 | 07 |
 | 8 | 任务与所有技能零词汇重合 | 返回空列表 `[]` | 08 |

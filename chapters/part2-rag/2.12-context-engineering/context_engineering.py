@@ -219,16 +219,16 @@ def main() -> None:
     if args.live:
         print("\n=== 3. 真实模型 Prompt Caching 测试 ===")
         if get_openai_client is None or chat_model_name is None:
-            print("[可读提示] 缺少 common 依赖或未安装 openai SDK，无法执行 --live。")
-            return
+            print("[可读提示] 缺少 common 依赖或未安装 openai SDK，无法执行 --live。", file=sys.stderr)
+            sys.exit(1)
         try:
             client = get_openai_client()
         except Exception as exc:
-            print(f"[可读提示] 当前未配置模型 API 密钥（{exc}），请在 .env 中设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY。")
-            return
+            print(f"[可读提示] 当前未配置模型 API 密钥（{exc}），请在 .env 中设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY。", file=sys.stderr)
+            sys.exit(1)
         if client is None:
-            print("[可读提示] 当前未配置模型 API 密钥，请在 .env 中设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY。")
-            return
+            print("[可读提示] 当前未配置模型 API 密钥，请在 .env 中设置 DEEPSEEK_API_KEY 或 OPENAI_API_KEY。", file=sys.stderr)
+            sys.exit(1)
 
         model = chat_model_name()
         print(f"使用模型: {model}")
@@ -237,21 +237,25 @@ def main() -> None:
             {"role": "user", "content": user_query.text},
         ]
 
-        print("发起第 1 次调用（建立缓存）...")
-        resp1 = client.chat.completions.create(model=model, messages=messages, temperature=0.0)
-        u1 = getattr(resp1, "usage", None)
-        print(f"第 1 次调用 Usage: {u1}")
+        try:
+            print("发起第 1 次调用（建立缓存）...")
+            resp1 = client.chat.completions.create(model=model, messages=messages, temperature=0.0)
+            u1 = getattr(resp1, "usage", None)
+            print(f"第 1 次调用 Usage: {u1}")
 
-        print("发起第 2 次相同前缀调用（验证命中）...")
-        resp2 = client.chat.completions.create(model=model, messages=messages, temperature=0.0)
-        u2 = getattr(resp2, "usage", None)
-        print(f"第 2 次调用 Usage: {u2}")
-        if u2:
-            hit_tokens = getattr(u2, "prompt_cache_hit_tokens", None)
-            if hit_tokens is None and hasattr(u2, "prompt_tokens_details"):
-                hit_tokens = getattr(u2.prompt_tokens_details, "cached_tokens", None)
-            print(f"检测到缓存命中 Token: {hit_tokens}")
-        print(f"模型回复: {resp2.choices[0].message.content[:80]}...")
+            print("发起第 2 次相同前缀调用（验证命中）...")
+            resp2 = client.chat.completions.create(model=model, messages=messages, temperature=0.0)
+            u2 = getattr(resp2, "usage", None)
+            print(f"第 2 次调用 Usage: {u2}")
+            if u2:
+                hit_tokens = getattr(u2, "prompt_cache_hit_tokens", None)
+                if hit_tokens is None and hasattr(u2, "prompt_tokens_details"):
+                    hit_tokens = getattr(u2.prompt_tokens_details, "cached_tokens", None)
+                print(f"检测到缓存命中 Token: {hit_tokens}")
+            print(f"模型回复: {resp2.choices[0].message.content[:80]}...")
+        except Exception as exc:
+            print(f"[可读提示] 在线模型调用失败（{type(exc).__name__}: {exc}），请检查网络连接或 API 代理配置。", file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":

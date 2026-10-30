@@ -36,7 +36,7 @@ class AssembledContext:
 def count_tokens(text: str) -> int:
     """确定性近似 Token 计数：每个 CJK 字符记 1；其余部分按空白切分，每个非空片段记 1。
 
-    Gate 只用本函数以保证跨平台与无模型依赖下的绝对确定性。
+    Gate 只用本函数以保证跨平台与无模型依赖下的确定性结果。
     """
     raise NotImplementedError("实现 count_tokens")
 

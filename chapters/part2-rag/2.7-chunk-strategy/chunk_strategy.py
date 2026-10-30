@@ -24,11 +24,15 @@ except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from common import LONG_DOC, embed_texts
 
-# 复用 2.2 向量检索索引组件
+# 复用 2.1 递归切分与 2.2 向量检索索引组件
+SPLIT_DIR = Path(__file__).resolve().parents[1] / "2.1-load-split"
 EMBED_DIR = Path(__file__).resolve().parents[1] / "2.2-embed-retrieve"
+if str(SPLIT_DIR) not in sys.path:
+    sys.path.insert(0, str(SPLIT_DIR))
 if str(EMBED_DIR) not in sys.path:
     sys.path.insert(0, str(EMBED_DIR))
 from embed_retrieve import VectorIndex  # noqa: E402
+from load_split import ZH_SEPARATORS, split_text_recursive  # noqa: E402
 
 
 # ----------------------------------------------------------
@@ -166,6 +170,7 @@ def run_ablation() -> None:
         ("小块 + 无重叠", lambda t: sliding_window_split(t, 60, 0)),
         ("小块 + 有重叠", lambda t: sliding_window_split(t, 60, 20)),
         ("大块 + 有重叠", lambda t: sliding_window_split(t, 300, 50)),
+        ("递归字符切分(2.1)", lambda t: split_text_recursive(t, 120, overlap=20, separators=list(ZH_SEPARATORS))),
         ("保结构自然切分", lambda t: split_preserving_boundaries(t, 120)),
     ]
 

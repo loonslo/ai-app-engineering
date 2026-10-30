@@ -34,10 +34,14 @@ except ModuleNotFoundError:
         get_openai_client,
     )
 
-# 复用 2.2 向量检索索引组件
+# 复用 2.2 向量检索索引与 2.12 上下文装配组件
 EMBED_DIR = Path(__file__).resolve().parents[1] / "2.2-embed-retrieve"
+CONTEXT_ENG_DIR = Path(__file__).resolve().parents[1] / "2.12-context-engineering"
 if str(EMBED_DIR) not in sys.path:
     sys.path.insert(0, str(EMBED_DIR))
+if str(CONTEXT_ENG_DIR) not in sys.path:
+    sys.path.insert(0, str(CONTEXT_ENG_DIR))
+from context_engineering import Section, assemble_context  # noqa: E402
 from embed_retrieve import VectorIndex  # noqa: E402
 
 
@@ -133,7 +137,18 @@ def answer_with_rag(
         if src not in sources:
             sources.append(src)
 
-    context_str = format_context(included_docs)
+    # 复用 2.12 assemble_context 组装上下文
+    sections = [
+        Section(
+            name=d["source"],
+            text=f"[{d['source']}]\n{d['text']}",
+            kind="dynamic",
+            priority=100 - i,
+        )
+        for i, d in enumerate(included_docs)
+    ]
+    assembled = assemble_context(sections, budget=max_context_chars)
+    context_str = assembled.text
     system_prompt = (
         "你是严谨的知识库问答助手。\n"
         "请依据上下文回答问题。如果上下文没有提供足够证据，必须明确拒答回答'文档中没有提到。'，不编造内容。\n"
@@ -150,14 +165,14 @@ def answer_with_rag(
     except TimeoutError:
         return {
             "answer": "模型调用超时，请稍后重试。",
-            "sources": sources,
+            "sources": [],
             "refused": True,
             "error": "timeout",
         }
     except Exception as exc:
         return {
             "answer": f"模型调用失败：{exc}",
-            "sources": sources,
+            "sources": [],
             "refused": True,
             "error": "model_error",
         }
@@ -165,7 +180,7 @@ def answer_with_rag(
     if not isinstance(raw_ans, str) or not raw_ans.strip():
         return {
             "answer": "模型返回为空。",
-            "sources": sources,
+            "sources": [],
             "refused": True,
             "error": "empty_response",
         }
@@ -240,20 +255,21 @@ def make_chat_fn(live: bool) -> Callable[[list[dict]], str]:
         model = chat_model_name()
 
         def live_chat(messages: list[dict]) -> str:
-            resp = client.chat.completions.create(
-                model=model,
-                temperature=0.0,
-                messages=messages,
-            )
-            return resp.choices[0].message.content or ""
+            try:
+                resp = client.chat.completions.create(
+                    model=model,
+                    temperature=0.0,
+                    messages=messages,
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as exc:
+                print(f"[可读提示] 在线模型调用失败（{type(exc).__name__}: {exc}），请检查网络连接或 API 代理配置。")
+                sys.exit(1)
 
         return live_chat
 
     def offline_chat(messages: list[dict]) -> str:
         # 离线演示模式：从装配消息中清晰指出未调用模型
-        user_content = messages[-1].get("content", "")
-        if "没有提供足够证据" in user_content:
-            return "文档中没有提到。"
         return "[离线演示] 依据上下文匹配成功，已装配 Prompt；使用 --live 参数可调用真实模型生成。"
 
     return offline_chat

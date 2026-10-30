@@ -106,7 +106,7 @@ def main() -> int:
         expect(c2.source == "docA" and c2.page == 1 and c2.index == 2, f"c2 字段不对：{c2}")
         expect(c3.source == "docA" and c3.page == 2 and c3.index == 1, f"c3 字段不对：{c3}")
 
-    # 05 无证据拒答且绝对不得调用 chat_fn (m1)
+    # 05 无证据拒答且不得调用 chat_fn (m1)
     def test_low_score_refusal():
         chunk = core.Chunk(source="doc", page=1, index=1, text="无关内容")
         chat_called = False
@@ -124,7 +124,7 @@ def main() -> int:
         )
         expect(ans.get("refused") is True, "低分匹配应拒答")
         expect(ans.get("citations") == [], "拒答时引用必须为空列表")
-        expect(chat_called is False, "拒答时绝对不得调用 chat_fn")
+        expect(chat_called is False, "拒答时不得调用 chat_fn")
 
     # 06 引用格式规范
     def test_citation_format():
@@ -270,7 +270,7 @@ def main() -> int:
     gate.check("02 空白页记失败 (reason=empty_page)", test_empty_page)
     gate.check("03 表格行按行保留且不跨行合并", test_table_preservation)
     gate.check("04 Chunk 字段完整性与页内索引起始规范", test_chunk_fields)
-    gate.check("05 无足够支持证据时安全拒答且绝对不调 chat_fn", test_low_score_refusal)
+    gate.check("05 无足够支持证据时安全拒答且不调 chat_fn", test_low_score_refusal)
     gate.check("06 引用格式严格遵循 source#p<page>#<index>", test_citation_format)
     gate.check("07 拦截引用未传给模型的幻觉片段", test_hallucinated_citation_rejected)
     gate.check("08 资料装配在 user 消息分隔符内且声明为数据", test_prompt_isolation_delimiters)

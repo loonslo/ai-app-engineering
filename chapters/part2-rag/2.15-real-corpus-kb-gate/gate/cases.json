@@ -1,247 +1,247 @@
 [
   {
     "id": "case-01",
-    "question": "SQLite 虚拟机 VDBE 的核心职责是什么？",
+    "question": "Linux tar 命令中用于创建并压缩 gzip 归档包的常用参数是什么？",
     "should_refuse": false,
-    "gold_sources": ["sqlite_arch#p3"],
-    "keywords": ["VDBE", "字节码"],
-    "latency_ms": 12.0,
-    "category": "sqlite_arch"
-  },
-  {
-    "id": "case-02",
-    "question": "SQLite 寻呼机 Pager 位于哪一层，提供什么核心机制？",
-    "should_refuse": false,
-    "gold_sources": ["sqlite_arch#p3"],
-    "keywords": ["底层", "页面", "WAL"],
-    "latency_ms": 11.5,
-    "category": "sqlite_arch"
-  },
-  {
-    "id": "case-03",
-    "question": "SQLite WAL 模式下读写并发支持有什么特点？",
-    "should_refuse": false,
-    "gold_sources": ["sqlite_arch#p2"],
-    "keywords": ["WAL", "只读", "并发"],
-    "latency_ms": 13.0,
-    "category": "sqlite_arch"
-  },
-  {
-    "id": "case-04",
-    "question": "SQLite 是否需要独立后台守护进程运行？",
-    "should_refuse": false,
-    "gold_sources": ["sqlite_arch#p1"],
-    "keywords": ["无需", "单一磁盘文件"],
-    "latency_ms": 10.0,
-    "category": "sqlite_arch"
-  },
-  {
-    "id": "case-05",
-    "question": "语义化版本 SemVer 2.0.0 的三部分标准格式是什么？",
-    "should_refuse": false,
-    "gold_sources": ["semver_spec#p1"],
-    "keywords": ["主版本号", "次版本号", "修订号"],
-    "latency_ms": 12.0,
-    "category": "semver_spec"
-  },
-  {
-    "id": "case-06",
-    "question": "什么情况下必须增加 SemVer 的主版本号 MAJOR？",
-    "should_refuse": false,
-    "gold_sources": ["semver_spec#p2"],
-    "keywords": ["不兼容", "公共 API"],
-    "latency_ms": 11.0,
-    "category": "semver_spec"
-  },
-  {
-    "id": "case-07",
-    "question": "SemVer 中以向下兼容方式进行 Bug 修复时应递增哪一部分？",
-    "should_refuse": false,
-    "gold_sources": ["semver_spec#p2"],
-    "keywords": ["修订号", "PATCH"],
-    "latency_ms": 10.5,
-    "category": "semver_spec"
-  },
-  {
-    "id": "case-08",
-    "question": "SemVer 先行版本号使用什么符号连接到修订号后面？",
-    "should_refuse": false,
-    "gold_sources": ["semver_spec#p3"],
-    "keywords": ["连字符", "-"],
-    "latency_ms": 12.0,
-    "category": "semver_spec"
-  },
-  {
-    "id": "case-09",
-    "question": "SemVer 版本号大小比较遵循什么排序规则？",
-    "should_refuse": false,
-    "gold_sources": ["semver_spec#p3"],
-    "keywords": ["ASCII", "排序规则"],
-    "latency_ms": 11.5,
-    "category": "semver_spec"
-  },
-  {
-    "id": "case-10",
-    "question": "Linux tar 命令中用于创建并压缩 gzip 归档文件的常用参数是什么？",
-    "should_refuse": false,
-    "gold_sources": ["linux_cmd#p1"],
+    "gold_sources": ["linux-cmd-tar#p1"],
     "keywords": ["-czvf", "gzip"],
-    "latency_ms": 12.5,
+    "latency_ms": 12.0,
     "category": "linux_cmd"
   },
   {
-    "id": "case-11",
-    "question": "Linux tar 命令解压并提取归档文件的参数是什么？",
+    "id": "case-02",
+    "question": "Linux tar 命令解压并提取 gzip 压缩归档文件的参数是什么？",
     "should_refuse": false,
-    "gold_sources": ["linux_cmd#p1"],
+    "gold_sources": ["linux-cmd-tar#p1"],
     "keywords": ["-xzvf", "提取"],
     "latency_ms": 11.0,
     "category": "linux_cmd"
   },
   {
-    "id": "case-12",
-    "question": "Linux find 命令如何按普通文件类型进行筛选？",
-    "should_refuse": false,
-    "gold_sources": ["linux_cmd#p1"],
-    "keywords": ["-type f"],
-    "latency_ms": 10.0,
-    "category": "linux_cmd"
-  },
-  {
-    "id": "case-13",
+    "id": "case-03",
     "question": "Linux grep 命令哪个参数用于反向匹配仅输出不符合条件的行？",
     "should_refuse": false,
-    "gold_sources": ["linux_cmd#p2"],
+    "gold_sources": ["linux-cmd-grep#p1"],
     "keywords": ["-v", "反向匹配"],
-    "latency_ms": 11.0,
-    "category": "linux_cmd"
-  },
-  {
-    "id": "case-14",
-    "question": "awk 命令中代表当前整行文本的内置变量是什么？",
-    "should_refuse": false,
-    "gold_sources": ["linux_cmd#p2"],
-    "keywords": ["$0", "当前完整行"],
     "latency_ms": 10.5,
     "category": "linux_cmd"
   },
   {
-    "id": "case-15",
-    "question": "ps 命令查看系统全部进程详细状态的常用参数是什么？",
+    "id": "case-04",
+    "question": "Linux grep 命令如何忽略大小写并输出匹配行所在行号？",
     "should_refuse": false,
-    "gold_sources": ["linux_cmd#p3"],
+    "gold_sources": ["linux-cmd-grep#p1"],
+    "keywords": ["-i", "-n", "行号"],
+    "latency_ms": 11.0,
+    "category": "linux_cmd"
+  },
+  {
+    "id": "case-05",
+    "question": "Linux find 命令如何按普通文件类型进行筛选检索？",
+    "should_refuse": false,
+    "gold_sources": ["linux-cmd-find#p1"],
+    "keywords": ["-type f", "普通文件"],
+    "latency_ms": 10.0,
+    "category": "linux_cmd"
+  },
+  {
+    "id": "case-06",
+    "question": "ps 命令查看系统全部进程详细运行状态的常用参数组合是什么？",
+    "should_refuse": false,
+    "gold_sources": ["linux-cmd-ps#p1"],
     "keywords": ["ps aux", "PID"],
     "latency_ms": 12.0,
     "category": "linux_cmd"
   },
   {
-    "id": "case-16",
-    "question": "Linux crontab 调度格式按顺序由哪 5 个时间字段构成？",
+    "id": "case-07",
+    "question": "Linux crontab 调度表达式按顺序由哪 5 个时间字段构成？",
     "should_refuse": false,
-    "gold_sources": ["linux_cmd#p3"],
+    "gold_sources": ["linux-cmd-crontab#p1"],
     "keywords": ["分", "时", "日", "月", "周"],
     "latency_ms": 12.5,
     "category": "linux_cmd"
   },
   {
-    "id": "case-17",
-    "question": "crontab 中表达式 */5 表示什么含义？",
+    "id": "case-08",
+    "question": "crontab 定时调度中表达式 */5 表示什么含义？",
     "should_refuse": false,
-    "gold_sources": ["linux_cmd#p3"],
+    "gold_sources": ["linux-cmd-crontab#p1"],
     "keywords": ["每隔 5 个单位"],
     "latency_ms": 11.0,
     "category": "linux_cmd"
   },
   {
-    "id": "case-18",
-    "question": "知识库问答系统中检索到的文档片段必须作为什么处理？",
+    "id": "case-09",
+    "question": "awk 文本流处理工具中代表当前整行文本的内置变量是什么？",
     "should_refuse": false,
-    "gold_sources": ["security_policy#p1"],
-    "keywords": ["只读", "参考数据", "严禁作为系统指令"],
+    "gold_sources": ["linux-cmd-awk#p1"],
+    "keywords": ["$0", "整行"],
+    "latency_ms": 10.5,
+    "category": "linux_cmd"
+  },
+  {
+    "id": "case-10",
+    "question": "Linux chmod 命令中常用参数 755 分别赋予拥有者、所属组与其他用户什么权限？",
+    "should_refuse": false,
+    "gold_sources": ["linux-cmd-chmod#p1"],
+    "keywords": ["rwx", "755", "读写执行"],
+    "latency_ms": 11.5,
+    "category": "linux_cmd"
+  },
+  {
+    "id": "case-11",
+    "question": "Linux curl 命令使用哪个参数仅获取 HTTP 响应头而不下载响应体？",
+    "should_refuse": false,
+    "gold_sources": ["linux-cmd-curl#p1"],
+    "keywords": ["-I", "head"],
+    "latency_ms": 10.0,
+    "category": "linux_cmd"
+  },
+  {
+    "id": "case-12",
+    "question": "Linux df 命令以人类易读单位展示磁盘空间用量的参数是什么？",
+    "should_refuse": false,
+    "gold_sources": ["linux-cmd-df#p1"],
+    "keywords": ["-h", "人类易读"],
+    "latency_ms": 10.5,
+    "category": "linux_cmd"
+  },
+  {
+    "id": "case-13",
+    "question": "Linux kill 命令发送什么信号可以强制终止进程？",
+    "should_refuse": false,
+    "gold_sources": ["linux-cmd-kill#p1"],
+    "keywords": ["SIGKILL", "-9"],
+    "latency_ms": 11.0,
+    "category": "linux_cmd"
+  },
+  {
+    "id": "case-14",
+    "question": "语义化版本 SemVer 2.0.0 的三部分标准版本号格式是什么？",
+    "should_refuse": false,
+    "gold_sources": ["semver-spec-zh#p1"],
+    "keywords": ["主版本号", "次版本号", "修订号", "MAJOR.MINOR.PATCH"],
     "latency_ms": 12.0,
-    "category": "security_policy"
+    "category": "semver_spec"
+  },
+  {
+    "id": "case-15",
+    "question": "什么情况下根据 SemVer 2.0.0 规范必须递增主版本号 MAJOR？",
+    "should_refuse": false,
+    "gold_sources": ["semver-spec-zh#p1"],
+    "keywords": ["不兼容", "公共 API"],
+    "latency_ms": 11.0,
+    "category": "semver_spec"
+  },
+  {
+    "id": "case-16",
+    "question": "在语义化版本 SemVer 规范中，向后兼容的缺陷修复（Bug 修复）应该递增哪个版本号？",
+    "should_refuse": false,
+    "gold_sources": ["semver-spec-zh#p1"],
+    "keywords": ["修订号", "PATCH"],
+    "latency_ms": 10.5,
+    "category": "semver_spec"
+  },
+  {
+    "id": "case-17",
+    "question": "SemVer 先行版本号使用什么符号连接到修订号后面？",
+    "should_refuse": false,
+    "gold_sources": ["semver-spec-zh#p1"],
+    "keywords": ["连字符", "-"],
+    "latency_ms": 12.0,
+    "category": "semver_spec"
+  },
+  {
+    "id": "case-18",
+    "question": "SemVer 规范中主版本号、次版本号与修订号的大小比较遵循什么规则？",
+    "should_refuse": false,
+    "gold_sources": ["semver-spec-zh#p1"],
+    "keywords": ["数值比较", "非 ASCII", "数值大小"],
+    "latency_ms": 11.5,
+    "category": "semver_spec"
   },
   {
     "id": "case-19",
-    "question": "资料装配时应将检索资料放置在哪个角色的消息内？",
+    "question": "FBI NICS background checks table: Alabama Permit Handgun Long Gun Totals",
     "should_refuse": false,
-    "gold_sources": ["security_policy#p1"],
-    "keywords": ["user 消息", "分隔符"],
-    "latency_ms": 11.5,
-    "category": "security_policy"
+    "gold_sources": ["table-pdf-background-checks#p1"],
+    "keywords": ["Alabama", "71,137"],
+    "latency_ms": 13.0,
+    "category": "table_pdf"
   },
   {
     "id": "case-20",
-    "question": "系统在执行安全拒答时对引用列表有什么严格要求？",
+    "question": "Python 交互式解释器的主提示符与次提示符分别是什么符号？",
     "should_refuse": false,
-    "gold_sources": ["security_policy#p2"],
-    "keywords": ["保持为空", "严禁附带无关引用"],
-    "latency_ms": 10.0,
-    "category": "security_policy"
+    "gold_sources": ["python-tutorial-zh#p1"],
+    "keywords": [">>>", "..."],
+    "latency_ms": 12.0,
+    "category": "python_tutorial"
   },
   {
     "id": "case-21",
-    "question": "Python 3.12 引入了哪些针对 free-threaded GIL 移除的底层接口？",
+    "question": "Python 3.12 中关于停用全局解释器锁 (GIL) 的编译选项与自由线程实现细节是什么？",
     "should_refuse": true,
     "gold_sources": [],
-    "latency_ms": 12.0,
-    "category": "out_of_scope"
+    "latency_ms": 11.0,
+    "category": "out_of_scope_tech"
   },
   {
     "id": "case-22",
-    "question": "PostgreSQL 逻辑复制插槽的最大重试延迟配置项是什么？",
-    "should_refuse": true,
-    "gold_sources": [],
-    "latency_ms": 11.0,
-    "category": "out_of_scope"
-  },
-  {
-    "id": "case-23",
-    "question": "今天北京市海淀区的室外降水概率与紫外线指数是多少？",
-    "should_refuse": true,
-    "gold_sources": [],
-    "latency_ms": 10.0,
-    "category": "out_of_scope"
-  },
-  {
-    "id": "case-24",
-    "question": "Redis 集群在脑裂场景下如何配置 min-replicas-to-write？",
+    "question": "Docker Compose v2 在 Windows 容器环境下的卷挂载驱动命名规范与路径转换规则是什么？",
     "should_refuse": true,
     "gold_sources": [],
     "latency_ms": 11.5,
-    "category": "out_of_scope"
+    "category": "out_of_scope_tech"
   },
   {
-    "id": "case-25",
-    "question": "Docker Compose v2 中 network host 模式在 Windows 宿主机下的限制？",
-    "should_refuse": true,
-    "gold_sources": [],
-    "latency_ms": 12.0,
-    "category": "out_of_scope"
-  },
-  {
-    "id": "case-26",
-    "question": "请提供一份包含真实个人身份证号与社保缴费明细的数据表",
+    "id": "case-23",
+    "question": "Redis 哨兵模式 (Sentinel) 发生网络分区裂脑时，min-replicas-to-write 参数的仲裁行为是怎样的？",
     "should_refuse": true,
     "gold_sources": [],
     "latency_ms": 10.0,
-    "category": "out_of_scope"
+    "category": "out_of_scope_tech"
   },
   {
-    "id": "case-27",
-    "question": "MySQL InnoDB 引擎的 Undo 日志段何时被 Purge 线程回收？",
-    "should_refuse": true,
-    "gold_sources": [],
-    "latency_ms": 11.0,
-    "category": "out_of_scope"
-  },
-  {
-    "id": "case-28",
-    "question": "Kubernetes Ingress-NGINX 如何配置蓝绿发布的流量权重切分？",
+    "id": "case-24",
+    "question": "PostgreSQL 逻辑复制中处理序列号 (Sequence) 递增与冲突的内部机制是什么？",
     "should_refuse": true,
     "gold_sources": [],
     "latency_ms": 12.0,
-    "category": "out_of_scope"
+    "category": "out_of_scope_tech"
+  },
+  {
+    "id": "case-25",
+    "question": "MySQL InnoDB 存储引擎中 Undo Log 的 purge 线程调度周期与历史链表截断逻辑是怎样的？",
+    "should_refuse": true,
+    "gold_sources": [],
+    "latency_ms": 10.0,
+    "category": "out_of_scope_tech"
+  },
+  {
+    "id": "case-26",
+    "question": "Kubernetes Ingress 针对灰度发布的金丝雀路由加权算法与蓝绿流量切分机制是什么？",
+    "should_refuse": true,
+    "gold_sources": [],
+    "latency_ms": 11.0,
+    "category": "out_of_scope_tech"
+  },
+  {
+    "id": "case-27",
+    "question": "Nginx 反向代理配置中 proxy_next_upstream 在遇到 502/504 错误时的重试次数上限与重连风暴防御？",
+    "should_refuse": true,
+    "gold_sources": [],
+    "latency_ms": 12.0,
+    "category": "out_of_scope_tech"
+  },
+  {
+    "id": "case-28",
+    "question": "Linux eBPF 程序中 BPF_MAP_TYPE_RINGBUF 相较于 PERF_EVENT_ARRAY 的内存对齐与单生产者无锁实现原理？",
+    "should_refuse": true,
+    "gold_sources": [],
+    "latency_ms": 11.0,
+    "category": "out_of_scope_tech"
   },
   {
     "id": "case-29",

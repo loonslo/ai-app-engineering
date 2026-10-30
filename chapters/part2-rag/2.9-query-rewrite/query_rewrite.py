@@ -15,11 +15,16 @@
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-import numpy as np
+# 复用 2.2 向量检索索引组件
+EMBED_DIR = Path(__file__).resolve().parents[1] / "2.2-embed-retrieve"
+if str(EMBED_DIR) not in sys.path:
+    sys.path.insert(0, str(EMBED_DIR))
+from embed_retrieve import VectorIndex  # noqa: E402
 
 try:
     from common import (
@@ -29,8 +34,6 @@ try:
         get_openai_client,
     )
 except ModuleNotFoundError:
-    import sys
-
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from common import (
         SAMPLE_DOC,
@@ -193,27 +196,31 @@ _IS_LIVE = False
 
 
 def call_llm(prompt: str) -> str:
-    """调用大模型；仅在 --live 模式下发起真实网络调用，离线时返回明确标注的确定性示例。"""
+    """调用大模型；仅在 --live 模式下发起真实网络调用，离线时返回纯净的确定性示例。"""
     if _IS_LIVE:
         try:
             client = get_openai_client()
         except Exception as exc:
-            print(f"[错误] 未能初始化客户端（未配置有效 API 密钥）：{exc}")
+            print(f"[可读提示] 未能初始化客户端（未配置有效 API 密钥）：{exc}")
             sys.exit(1)
         model = chat_model_name()
-        resp = client.chat.completions.create(
-            model=model,
-            temperature=0.0,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return resp.choices[0].message.content or ""
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                temperature=0.0,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as exc:
+            print(f"[可读提示] 在线模型调用失败（{type(exc).__name__}: {exc}），请检查网络连接或 API 代理配置。")
+            sys.exit(1)
 
-    # 离线确定性示例
+    # 离线确定性示例（返回纯净检索文本，标签仅在输出展示中打印）
     if "改写" in prompt or "不同角度" in prompt:
-        return "[离线确定性改写] 向量数据在磁盘上的持久化存储方法\n向量数据库在生产环境的选型落地\nFAISS 与 Chroma 存储差异"
+        return "向量数据在磁盘上的持久化存储方法\n向量数据库在生产环境的选型落地\nFAISS 与 Chroma 存储差异"
     if "假设性" in prompt:
-        return "[离线确定性 HyDE 假设文本] 向量数据通常通过专用的向量数据库（如 Chroma、Milvus）或轻量嵌入索引库（如 FAISS）进行磁盘持久化存储与索引落盘。"
-    return f"[离线确定性文本] 针对问题：{prompt[:30]}"
+        return "向量数据通常通过专用的向量数据库（如 Chroma、Milvus）或轻量嵌入索引库（如 FAISS）进行磁盘持久化存储与索引落盘。"
+    return f"针对问题：{prompt[:30]}"
 
 
 def generate_hyde_query(question: str) -> str:
@@ -226,6 +233,8 @@ def generate_hyde_query(question: str) -> str:
 
 
 class SimpleIndex:
+    """基于 2.2 VectorIndex 向量索引的轻量检索器。"""
+
     def __init__(self, doc_path: str | Path):
         self.doc_path = Path(doc_path)
         text = self.doc_path.read_text(encoding="utf-8")
@@ -244,23 +253,23 @@ class SimpleIndex:
                     )
                 )
                 idx += 1
-        self.vectors = embed_texts([c.text for c in self.chunks]) if self.chunks else []
+        self.index = VectorIndex()
+        if self.chunks:
+            ids = [f"{c.source}#{c.index}" for c in self.chunks]
+            vecs = embed_texts([c.text for c in self.chunks])
+            self.index.add(ids, vecs)
+        self.chunk_map = {f"{c.source}#{c.index}": c for c in self.chunks}
 
     def search(self, query: str, top_k: int = 3, min_score: float = 0.35) -> list[Hit]:
-        if not self.chunks or not self.vectors:
+        if not self.chunks:
             return []
         qv = embed_texts([query])[0]
-        mat = np.array(self.vectors, dtype=np.float32)
-        q = np.array(qv, dtype=np.float32)
-        scores = np.dot(mat, q)
-        top_idx = np.argsort(-scores)[:top_k]
-
+        results = self.index.search(qv, k=top_k)
         hits = []
-        for i in top_idx:
-            s = float(scores[i])
-            if s >= min_score:
-                c = self.chunks[i]
-                hits.append(Hit(source=c.source, index=c.index, score=s, text=c.text))
+        for r in results:
+            if r["score"] >= min_score:
+                c = self.chunk_map[r["id"]]
+                hits.append(Hit(source=c.source, index=c.index, score=r["score"], text=c.text))
         return hits
 
 

@@ -62,7 +62,7 @@ python chapters/part2-rag/2.14-memory-compaction/gate/gate_check.py
 | `MemoryStore` | 多租户与跨用户隔离长期记忆库：实现 `remember`、`recall`、`forget`、`export`，严格拦截未确认的模型写入 (`source="model"` 且 `confirmed=False`) |
 
 关键约定：
-1. **压缩后不超预算**：若生成摘要后（system + 摘要 + pinned + tail）总 Token 超出 budget，对摘要内容截断并追加 `...[截断]`，使总 Token 严格不超过 budget；若除去摘要外的必须保留消息本身已超 budget，抛出 `ValueError`。
+1. **压缩后不超预算**：若生成摘要后（system + 摘要 + pinned + tail）总 Token 超出 budget，对摘要内容截断并追加 `...[截断]`，使总 Token 严格不超过 budget；若除去摘要外的必须保留消息（system + pinned + tail）本身已超 budget，抛出带原因的 `ValueError`。
 2. **prefix_changed 准则**：指示首条 system 消息之后的内容（`messages[1:]`）是否发生了实质改变。
 
 ## 故障注入自测表
@@ -90,7 +90,7 @@ python chapters/part2-rag/2.14-memory-compaction/gate/gate_check.py
 7. 07 压缩后总 token 不超预算
 8. 08 压缩时 prefix_changed 判断正确
 9. 09 多租户与跨用户严格隔离
-10. 10 未确认模型写入被拦截拒绝
+10. 10 策略管控：未确认模型写入拦截、确认模型与用户写入通过
 11. 11 记忆遗忘与安全副本导出
 
 ## 提交物

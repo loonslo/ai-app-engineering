@@ -1,7 +1,7 @@
 """L3.6 回归对比 · 闭卷骨架
 
 规则：只读本文件和本章 README 的 gate 任务书；通过 gate 之前不要打开
-regression_curve.py。实现下面四个函数，然后运行：
+regression_curve.py。实现下面的函数，然后运行：
 
     python chapters/part3-evals/3.7-eval-regression-curve/gate/gate_check.py
 """
@@ -55,3 +55,28 @@ def regression_alerts(baseline: dict, candidate: dict) -> list[str]:
     没有退化 -> []。
     """
     raise NotImplementedError("实现回归告警")
+
+
+def pass_at_k(n: int, c: int, k: int) -> float:
+    """n 次独立尝试中有 c 次成功时，“k 次里至少成功 1 次”的无偏估计：1 - C(n-c, k) / C(n, k)。
+
+    k > n、c > n 或任一参数为负时抛 ValueError；n - c < k 时返回 1.0。
+    """
+    raise NotImplementedError("实现 pass@k 无偏估计")
+
+
+def pass_all_k(success_rate: float, k: int) -> float:
+    """单次成功率为 p 时，连续 k 次全部成功的概率 p**k；p 不在 [0, 1] 或 k < 1 时抛 ValueError。"""
+    raise NotImplementedError("实现 pass^k 概率计算")
+
+
+def empirical_pass_all(results: dict[str, list[bool]], k: int) -> float:
+    """每个任务取前 k 次记录，统计“k 次全部通过”的任务占比；某任务记录不足 k 次时抛 ValueError。"""
+    raise NotImplementedError("实现经验 pass^all 统计")
+
+
+def split_suites(
+    results: dict[str, list[bool]], regression_floor: float = 0.95
+) -> tuple[list[str], list[str]]:
+    """通过率 >= regression_floor 的任务归入回归集，其余归入能力集；两个列表都按任务名排序。"""
+    raise NotImplementedError("实现评测套件拆分")

@@ -29,9 +29,9 @@ if HAS_KEY:
     os.environ["LANGSMITH_TRACING"] = "true"
     os.environ.setdefault("LANGSMITH_PROJECT", "rag-evaluation")
 
-import json
-from common import SAMPLE_DOC, SHARED_DATA_DIR
-from pdf_sources import build_retriever, build_rag_chain
+import json  # noqa: E402
+from common import SAMPLE_DOC, SHARED_DATA_DIR  # noqa: E402
+from pdf_sources import build_retriever, build_rag_chain  # noqa: E402
 
 
 def trace_demo():

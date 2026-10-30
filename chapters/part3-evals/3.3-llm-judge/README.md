@@ -90,9 +90,33 @@ python tools/run_chapter.py 3.3
 
 对照时只回答：
 
-1. 参考实现用 `with_structured_output` 拿分数；它把“格式错误”交给谁处理？你的重试逻辑补了什么？
-2. 参考实现评“正确性”和“忠实度”用了两个 prompt；为什么不能合并成一个总分？
-3. 参考实现没有校准；如果裁判偏爱长答案，校准会怎么显示这个问题？
+1. 原生参考实现如何通过 Tool-as-Output（`tools=[JUDGE_TOOL]`）与 `parse_verdict` 实现双重格式防御？
+2. 为什么在两两对比中需要通过“候选位置互换（Position Swap）”来减轻裁判的位置偏见？
+3. 当人工标签与裁判判定存在系统性偶然重合时，Cohen's Kappa（κ）相比粗略一致率（Agreement）提供了什么额外价值？
+
+## 判分器分级与工程选型阶梯
+
+在 AI 系统的质量评测中，判分机制应遵循严格的工程优先级阶梯，避免盲目引入高成本的大模型裁判：
+
+1. **代码判分（Code-based / Rule-based Evaluator）**：
+   - **手段**：精确字符串包含、正则匹配、JSON Schema 校验、SQL/AST 语法树断言、确定性算法（如 BM25 关键词匹配、编辑距离）。
+   - **优势**：执行速度极快（微秒/毫秒级）、零 API 费用、结果 100% 确定可复现。
+   - **原则**：**优先用代码判分**；凡是能用规则量化、格式约束或代码判决的指标，绝不上模型。
+
+2. **模型判分（Model-based / LLM-as-Judge）**：
+   - **手段**：利用通用或微调的大模型依据预设 Rubric（打分量表）评估语义正确性、忠实度、总结完整性等主观维度。
+   - **局限**：存在自相矛盾、格式脆弱、长度偏见（偏好冗长文本）与位置偏见（Position Bias）。
+   - **原则**：代码判不了的才用 LLM Judge，且必须结合结构化输出工具与重试终止边界。
+
+3. **人工校准（Human-in-the-loop Calibration）**：
+   - **手段**：资深业务专家或标注员对评测样本进行双盲标注，作为“金标准（Ground Truth）”。
+   - **原则**：**用人工标注校准 Judge**；通过混淆矩阵、一致率（Agreement Rate）与 Cohen's Kappa（κ）系数定期监控裁判退化，确认模型裁判能否可信替代人工抽检。
+
+> **行业参考**：上述判分阶梯与工程原则详见 Anthropic 发布的评测实践指南《Demystifying evals for AI agents》（[Anthropic 官网](https://www.anthropic.com/news/evals-for-ai-agents)，2026-01-09；读取日期：2026-10-30）。
+
+## 核心深入阅读
+
+- 进阶校准方法论、评分量表制定与群体裁判（Judge Committees）深度演练，请阅读 [8.5 LLM Judge 校准](../../part8-ai-quality-optional/8.5-judge-calibration/README.md)。
 
 ## 概念地图
 

@@ -814,3 +814,204 @@ def test_v3_2_kb_pipeline_gate():
     failing = {"citation_accuracy": 0.85, "refusal_accuracy": 0.85, "hit_at_5": 0.70}
     fails = mod.gate_thresholds(failing)
     assert len(fails) == 3
+
+
+
+# ======================================================================
+# V3-3 质量闭环（L3 系列纯函数与 OTel 离线单元测试）
+# ======================================================================
+
+
+def _load_v3_3_mod(rel_path: str, mod_name: str):
+    import importlib.util
+    import sys
+    from pathlib import Path
+
+    p = Path(__file__).resolve().parent / rel_path
+    spec = importlib.util.spec_from_file_location(mod_name, p)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[mod_name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_v3_3_llm_judge_cohens_kappa():
+    mod = _load_v3_3_mod("part3-evals/3.3-llm-judge/llm_judge.py", "v3_3_l34_judge")
+
+    # 1. calculate_agreement
+    assert mod.calculate_agreement([], []) == 0.0
+    assert mod.calculate_agreement([True, False, True], [True, False, True]) == 1.0
+    assert mod.calculate_agreement([True, False, True], [True, True, True]) == pytest.approx(2 / 3)
+
+    # 2. calculate_cohens_kappa
+    # 完全一致
+    assert mod.calculate_cohens_kappa([True, False, True, False], [True, False, True, False]) == 1.0
+    # 空列表或长度不等
+    assert mod.calculate_cohens_kappa([], []) == 0.0
+    assert mod.calculate_cohens_kappa([True], [True, False]) == 0.0
+
+    # 典型非平凡情况
+    h = [True, True, False, False, True]
+    j = [True, True, False, True, True]
+    kappa = mod.calculate_cohens_kappa(h, j)
+    assert 0.0 < kappa < 1.0
+
+    # 极端情况：全部为同一类（Pe = 1.0）
+    assert mod.calculate_cohens_kappa([True, True], [True, True]) == 1.0
+
+    # 3. parse_verdict
+    v1 = mod.parse_verdict('{"score": 4, "reason": "回答准确"}')
+    assert v1["score"] == 4
+    assert v1["reason"] == "回答准确"
+
+    # markdown 代码块包裹
+    v2 = mod.parse_verdict('```json\n{"score": 5, "reason": "非常详尽"}\n```')
+    assert v2["score"] == 5
+
+    # 异常抛出
+    with pytest.raises(mod.JudgeFormatError):
+        mod.parse_verdict('{"score": 6, "reason": "越界"}')
+    with pytest.raises(mod.JudgeFormatError):
+        mod.parse_verdict('{"score": 3}')
+
+
+def test_v3_3_regression_curve_metrics():
+    mod = _load_v3_3_mod("part3-evals/3.7-eval-regression-curve/regression_curve.py", "v3_3_l36_curve")
+
+    # 1. pass_at_k
+    # n=10, c=2, k=1 -> 1 - C(8, 1)/C(10, 1) = 1 - 8/10 = 0.2
+    assert mod.pass_at_k(10, 2, 1) == pytest.approx(0.2)
+    # n=10, c=2, k=2 -> 1 - C(8, 2)/C(10, 2) = 1 - 28/45 = 17/45
+    assert mod.pass_at_k(10, 2, 2) == pytest.approx(17 / 45)
+    # c >= n -> 1.0
+    assert mod.pass_at_k(5, 5, 2) == 1.0
+    # 非法输入
+    with pytest.raises(ValueError):
+        mod.pass_at_k(5, 6, 2)
+    with pytest.raises(ValueError):
+        mod.pass_at_k(5, 2, 0)
+
+    # 2. pass_all_k
+    assert mod.pass_all_k(0.8, 1) == pytest.approx(0.8)
+    assert mod.pass_all_k(0.5, 3) == pytest.approx(0.125)
+    with pytest.raises(ValueError):
+        mod.pass_all_k(1.2, 2)
+    with pytest.raises(ValueError):
+        mod.pass_all_k(0.5, 0)
+
+    # 3. empirical_pass_all
+    runs = {
+        "t1": [True, True, False],
+        "t2": [True, True, True],
+        "t3": [False, True, True],
+    }
+    assert mod.empirical_pass_all(runs, 2) == pytest.approx(2 / 3)  # t1, t2 前2次全 True
+    assert mod.empirical_pass_all(runs, 3) == pytest.approx(1 / 3)  # 仅 t2 前3次全 True
+    with pytest.raises(ValueError):
+        mod.empirical_pass_all(runs, 4)
+
+    # 4. split_suites
+    suite_runs = {
+        "task_perfect": [True, True, True],   # 100%
+        "task_border": [True, True, False],   # 66.7%
+        "task_fail": [False, False, False],   # 0%
+    }
+    reg, cap = mod.split_suites(suite_runs, regression_floor=0.8)
+    assert reg == ["task_perfect"]
+    assert sorted(cap) == ["task_border", "task_fail"]
+
+
+def test_v3_3_prompt_ab_metrics():
+    mod = _load_v3_3_mod("part3-evals/3.8-prompt-ab-judge/prompt_ab_judge.py", "v3_3_l36_ab")
+
+    # 1. looks_refused
+    assert mod.looks_refused("对不起，信息不足，无法回答。") is True
+    assert mod.looks_refused("RAG 是检索增强生成。") is False
+
+    # 2. refusal_alignment
+    assert mod.refusal_alignment("信息不足，无法回答。", should_refuse=True) == 1.0
+    assert mod.refusal_alignment("详细内容如下...", should_refuse=True) == 0.0
+    assert mod.refusal_alignment("详细内容如下...", should_refuse=False) == 1.0
+    assert mod.refusal_alignment("无法回答", should_refuse=False) == 0.0
+
+    # 3. citation_score
+    assert mod.citation_score("根据 [来源：prompt_comparison_notes] 显示", ["prompt_comparison_notes"]) == 1.0
+    assert mod.citation_score("没有提及来源", ["prompt_comparison_notes"]) == 0.0
+
+
+def test_v3_3_failure_diagnosis():
+    mod = _load_v3_3_mod("part3-evals/3.10-eval-report-failures/failure_diagnosis.py", "v3_3_l36_fail")
+
+    # 1. classify_by_hard_metrics
+    # refusal_ok = False
+    f1 = {"refusal_ok": False, "keyword_score": 1.0, "citation_score": 1.0}
+    layer1, _ = mod.classify_by_hard_metrics(f1)
+    assert "拒答" in layer1
+
+    # citation < threshold
+    f2 = {"refusal_ok": True, "keyword_score": 1.0, "citation_score": 0.5}
+    layer2, _ = mod.classify_by_hard_metrics(f2)
+    assert "引用" in layer2
+
+    # keyword < threshold
+    f3 = {"refusal_ok": True, "keyword_score": 0.4, "citation_score": 1.0}
+    layer3, _ = mod.classify_by_hard_metrics(f3)
+    assert "生成" in layer3
+
+    # 2. summarize_layers
+    records = [
+        {"layer_suspected": "生成层(疑似)"},
+        {"layer_suspected": "生成层(疑似)"},
+        {"layer_suspected": "拒答逻辑层(疑似)"},
+    ]
+    summary = mod.summarize_layers(records)
+    assert summary["生成层(疑似)"] == 2
+    assert summary["拒答逻辑层(疑似)"] == 1
+
+    # 3. load_failures 缺失文件抛 ValueError
+    with pytest.raises(ValueError):
+        mod.load_failures("nonexistent_failure_path_xyz.json")
+
+
+def test_v3_3_otel_tracing_offline():
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    mod = _load_v3_3_mod("part3-evals/3.6-langsmith-eval/otel_tracing_eval.py", "v3_3_l37_otel")
+
+    # 创建独立的内存 TracerProvider 与 Exporter
+    provider = TracerProvider()
+    exporter = InMemorySpanExporter()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test-tracer")
+
+    res = mod.run_scripted_rag_with_trace(
+        tracer=tracer,
+        question="什么是 RAG",
+        capture_content=False,
+    )
+
+    assert "RAG" in res["answer"]
+    assert res["spans_generated"] == ["rag_pipeline", "rag_retrieval", "assemble_context", "chat_completion"]
+
+    # 检验内存中捕获的所有 Span
+    spans = exporter.get_finished_spans()
+    span_names = [s.name for s in spans]
+    assert "rag_pipeline" in span_names
+    assert "rag_retrieval" in span_names
+    assert "assemble_context" in span_names
+    assert "chat_completion" in span_names
+
+    # 检验 GenAI 属性与脱敏保护
+    chat_span = next(s for s in spans if s.name == "chat_completion")
+    attrs = chat_span.attributes
+    assert attrs["gen_ai.system"] == "openai"
+    assert attrs["gen_ai.operation.name"] == "chat"
+    assert attrs["gen_ai.usage.input_tokens"] == 85
+    assert attrs["gen_ai.usage.output_tokens"] == 36
+    assert attrs["gen_ai.prompt.status"] == "redacted_for_privacy"
+
+    retrieval_span = next(s for s in spans if s.name == "rag_retrieval")
+    assert retrieval_span.attributes["gen_ai.retrieval.documents_count"] == 2

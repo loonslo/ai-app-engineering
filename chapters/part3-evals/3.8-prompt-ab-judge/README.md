@@ -25,9 +25,11 @@ A/B 选 prompt 不能靠感觉：全角/空白导致关键词误判、拒答词�
 
 | 指标 | 口径 |
 |---|---|
-| keyword | 命中关键词/全部；无关键词 1.0 |
-| citation | 命中来源/全部；无来源 1.0 |
-| refusal | 实际拒答==期望 -> 1，否则 0 |
+| `normalize` | 转小写并去除全部空白字符 |
+| `looks_refused` | 出现任一拒答提示词判定为 True |
+| `keyword_score` | 命中关键词/全部；无关键词记 1.0 |
+| `citation_score` | 命中来源/全部；无来源记 1.0 |
+| `refusal_alignment` | 实际拒答与用例期望一致记 1.0，否则记 0.0 |
 
 关键口径：`normalize` 小写并去所有空白。
 
@@ -44,6 +46,26 @@ A/B 选 prompt 不能靠感觉：全角/空白导致关键词误判、拒答词�
 ## 验收标准
 
 `gate_check.py` 的 5 项全部 PASS；通过后写 workbook 三个问题。
+
+## 通过后对照参考实现
+
+不要提前看。通过后再运行并对照：
+
+```bash
+python tools/run_chapter.py 3.8
+```
+
+对照时只回答：
+
+1. 原生参考实现如何通过 Strict 与 Helpful 两版 Prompt 控制回答风格与来源标注？
+2. 在关键词命中率与拒答一致性评测中，文本归一化（normalize）解决了什么现实问题？
+3. 为什么 A/B 测试必须在同一份黄金测试集上运行才能得出科学结论？
+
+## 提交物
+
+- `gate/starter.py`（实现后的版本）。
+- `gate/gate_report.json`（5/5）。
+- workbook 里的失败分析与三个问题的回答。
 
 ## 边界
 

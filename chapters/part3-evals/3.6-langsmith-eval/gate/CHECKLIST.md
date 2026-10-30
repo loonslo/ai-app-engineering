@@ -1,55 +1,30 @@
-# L3.6 LangSmith 可观测性 · 清单验收
+# L3.7 追踪与评测平台 · 清单验收
 
-> 3.6 依赖 LangSmith 外部服务，做不出可重复的离线 gate。这里用**可核对清单**代替 gate：
-> 不硬造 `gate_check.py`，也不把“跑通一次”当成可观测性验收。
+> 3.6 介绍现代 AI 可观测性标准（OpenTelemetry GenAI 语义约定）与主流评测平台。
+> 本章采用**可核对清单**形式在 [workbook.md](../workbook.md) 中记录验收证据；L5.6 将进一步通过自动化 Gate 深入检验复杂 Trace 断言。
 
 ## 前置
 
-- `LANGSMITH_API_KEY` 已配置（`.env`，不要提交）。
-- `DEEPSEEK_API_KEY` 和本地 embedding 模型可用。
-- 已运行 3.4/3.5 生成 `chapters/shared-data/eval_set_full.json`（在线评估需要）。
+- 已安装 `opentelemetry-api` 和 `opentelemetry-sdk`（本课程环境已内置）。
+- 离线默认运行无需配置任何密钥或外部服务。
 
-## 步骤
+## 验收清单
 
-1. 运行 `python tools/run_chapter.py 3.6`，确认输出一次 RAG 回答。
-2. 打开 LangSmith 的 `rag-evaluation` 项目，找到这次 trace；记录 experiment/run 链接或截图。
-3. 在 trace 里核对至少三步：
-   - retriever 召回了哪些片段；
-   - prompt 实际收到的上下文；
-   - LLM 的输入/输出。
-4. 故意制造一次失败（例如临时用错误的 `DEEPSEEK_API_KEY`，或把 `base_url` 指向不可达地址），再跑一次；在 trace 里找到失败的步骤和错误信息。
-5. 运行在线评估部分（配置了 key 时），确认 dataset 和 experiment 已创建；记录 experiment 名称。
-6. 检查证据里没有密钥、没有真实用户隐私；只保留脱敏后的链接/截图和文字观察。
+请完成以下 4 项核对，并将结果与思考记录在 [workbook.md](../workbook.md) 中：
 
-## 验收标准
+- [ ] **1. 运行本地 OTel 追踪**：
+  - 运行 `python tools/run_chapter.py 3.6 otel_tracing_eval.py`。
+  - 观察控制台输出的 Span 结构，理解根 Span `rag_pipeline` 与子 Span `rag_retrieval`、`assemble_context`、`chat_completion` 的父子嵌套关系。
+  - 核对各个 Span 中符合 OpenTelemetry GenAI 规范的属性（如 `gen_ai.system`、`gen_ai.operation.name`、`gen_ai.usage.input_tokens` 等）。
+- [ ] **2. 平台端 Trace 观察（可选）**：
+  - 若本地部署了 Langfuse / Phoenix 或配置了远程 OTLP 端点（或使用 LangSmith 运行 `langsmith_eval.py`），观察平台 UI 中展示的 Trace 瀑布图与元数据；若未配置外部服务，明确记录“未验证（离线通过控制台验证）”。
+- [ ] **3. 核心追踪字段设计**：
+  - 针对你实际的业务项目或 Capstone 项目，明确写出必须采集的 5 个关键字段（如 Token 消耗、检索片段数、工具调用参数、耗时分布、错误状态码等）并说明原因。
+- [ ] **4. 隐私安全与脱敏防线**：
+  - 明确写出生产环境中**绝对不能采集**或**必须脱敏后才能采集**的数据内容（如未经脱敏的 Prompt/回答正文、密码/API Key、用户个人身份识别信息 PII）。
 
-- [ ] 至少一条成功 trace 的链接/截图。
-- [ ] 能指出检索、prompt、LLM 三步的实际内容。
-- [ ] 至少一条失败 trace，并能说出失败发生在哪一步。
-- [ ] 在线评估的 dataset/experiment 已创建（没有 key 时明确写“未验证”）。
-- [ ] 证据中没有密钥、token、真实用户 PII。
+## 边界与纪律
 
-## 记录模板
-
-```text
-日期：
-LangSmith 项目：
-成功 trace（链接/截图）：
-三步观察：
-  1. retriever：
-  2. prompt：
-  3. LLM：
-失败 trace：
-  失败步骤：
-  错误信息：
-在线评估：
-  dataset：
-  experiment：
-未验证：
-```
-
-## 边界
-
-- LangSmith 是外部服务；离线测试通过不代表 trace 已上报。
-- trace 可视化不等于质量评测；质量仍要看 3.2–3.5、3.7。
-- 不要把 trace 链接、密钥、用户问题直接提交到公开仓库；先脱敏。
+- 默认离线控制台运行不发起任何外部网络请求。
+- 平台端 UI 观察属于可选外部验证，离线控制台 Span 属性正确即可满足本章入门要求。
+- 严禁将 API Key、密码或用户真实私密数据记录在 Trace 属性或提交到公开仓库。

@@ -142,6 +142,89 @@ def main() -> int:
         edge = {"error_rate": 0.0, "p99_latency_ms": 3000, "pass_rate": 0.785, "citation_score": 0.885, "refusal_ok": 0.9}
         expect(core.regression_alerts(base, edge) == [], f"边界不应告警：{core.regression_alerts(base, edge)}")
 
+    def test_pass_at_k():
+        # n=10, c=3, k=1 -> 0.3
+        val = core.pass_at_k(10, 3, 1)
+        expect(abs(val - 0.3) < 1e-9, f"n=10, c=3, k=1 应为 0.3，实际为 {val}")
+        # n - c < k 时返回 1.0 (例如 n=10, c=9, k=2 -> n-c=1 < 2)
+        expect(core.pass_at_k(10, 9, 2) == 1.0, "n-c < k 应返回 1.0")
+        # c = 0 时返回 0.0
+        expect(core.pass_at_k(10, 0, 1) == 0.0, "c=0 应返回 0.0")
+        # c = n 时返回 1.0
+        expect(core.pass_at_k(5, 5, 2) == 1.0, "c=n 应返回 1.0")
+
+    def test_pass_at_k_validation():
+        invalid_args = [
+            (-1, 3, 1),
+            (10, -1, 1),
+            (10, 3, -1),
+            (10, 3, 0),
+            (5, 3, 6),    # k > n
+            (5, 6, 2),    # c > n
+        ]
+        for n, c, k in invalid_args:
+            try:
+                core.pass_at_k(n, c, k)
+            except ValueError:
+                continue
+            raise AssertionError(f"pass_at_k({n}, {c}, {k}) 应抛 ValueError")
+
+    def test_pass_all_k():
+        val = core.pass_all_k(0.75, 3)
+        expect(abs(val - 0.421875) < 1e-6, f"0.75^3 应为 0.421875，实际为 {val}")
+        expect(core.pass_all_k(1.0, 5) == 1.0, "p=1.0 应返回 1.0")
+        expect(core.pass_all_k(0.0, 3) == 0.0, "p=0.0 应返回 0.0")
+        for bad_p in (-0.1, 1.1):
+            try:
+                core.pass_all_k(bad_p, 2)
+            except ValueError:
+                continue
+            raise AssertionError(f"pass_all_k({bad_p}, 2) 应抛 ValueError")
+        try:
+            core.pass_all_k(0.8, 0)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("pass_all_k(0.8, 0) 应抛 ValueError")
+
+    def test_empirical_pass_all():
+        data = {
+            "task_a": [True, True, True, False],
+            "task_b": [True, True, True, True],
+            "task_c": [True, False, True, True],
+            "task_d": [True, True, False, False],
+        }
+        # k=2: task_a, task_b, task_d are all True in first 2 runs -> 3/4 = 0.75
+        expect(core.empirical_pass_all(data, 2) == 0.75, "k=2 占比应为 0.75")
+        # k=3: only task_a, task_b are all True in first 3 runs -> 2/4 = 0.5
+        expect(core.empirical_pass_all(data, 3) == 0.5, "k=3 占比应为 0.5")
+        expect(core.empirical_pass_all({}, 2) == 0.0, "空字典应返回 0.0")
+        # 记录不足 k 次报错
+        short_data = {"t1": [True, True]}
+        try:
+            core.empirical_pass_all(short_data, 3)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("记录不足 k 次应抛 ValueError")
+
+    def test_split_suites():
+        results = {
+            "qa_refund": [True, True, True, True],       # 1.0 -> regression
+            "qa_policy": [True, True, True, False],      # 0.75 -> capability
+            "qa_login": [True, True, True, True],        # 1.0 -> regression
+            "qa_complex": [False, True, False, False],   # 0.25 -> capability
+        }
+        reg, cap = core.split_suites(results, regression_floor=0.95)
+        expect(reg == ["qa_login", "qa_refund"], f"回归套件排序或归类不对：{reg}")
+        expect(cap == ["qa_complex", "qa_policy"], f"能力套件排序或归类不对：{cap}")
+        for bad_floor in (-0.1, 1.1):
+            try:
+                core.split_suites(results, regression_floor=bad_floor)
+            except ValueError:
+                continue
+            raise AssertionError(f"floor={bad_floor} 应抛 ValueError")
+
     gate.check("01 分位数", test_percentile)
     gate.check("02 正确样本", test_score_pass)
     gate.check("03 关键词未命中", test_score_keyword_miss)
@@ -150,6 +233,11 @@ def main() -> int:
     gate.check("06 汇总指标", test_summarize)
     gate.check("07 回归告警", test_alerts)
     gate.check("08 告警边界", test_alert_boundary)
+    gate.check("09 pass@k 估计与边界", test_pass_at_k)
+    gate.check("10 pass@k 参数校验", test_pass_at_k_validation)
+    gate.check("11 pass^k 概率计算与边界", test_pass_all_k)
+    gate.check("12 经验连续通过率统计", test_empirical_pass_all)
+    gate.check("13 评测集划分与排序", test_split_suites)
     return gate.report(module_path)
 
 

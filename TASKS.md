@@ -1,11 +1,11 @@
 # Tasks
 
-状态核对：2026-10-29。课件全量结构完成：82 章 + 29 步均有 v2 标签与验收方式（75 章 gate + 7 章清单 + 29 步总清单）。v3 课程改造完成 V3-0 基础设施与 V3-1 批次（L0 + L1 共 15 章全量内容，5 个新建章 + 8 个原生重构章 + 1.10 原生/PAI 双解双 Gate 与离线评测 Harness）；V3-2 批次（L2 上下文工程与检索，4 个新建章 + 10 个旧章改写或增补）已审核通过，待提交并合入 master。统一入口见 `chapters/README.md`；目录与文件存在不代表本人已学完或真实环境验收通过。最新验证见 `docs/gate-v3-2-validation.md`；岗位对标与路径提案见 `docs/curriculum-v3.md`。
+状态核对：2026-10-30。课件全量结构完成：82 章 + 29 步均有 v2 标签与验收方式（75 章 gate + 7 章清单 + 29 步总清单）。v3 课程改造完成 V3-0 基础设施与 V3-1 批次（已合入 master）、V3-2 批次（第五次复核通过，已按 n1 更正并合入 master）；V3-3 批次（L3 质量闭环：3.3 LLM Judge 原生重构、3.7 回归曲线与 pass@k/pass^k 扩展 13 项 Gate、3.8 Prompt A/B 原生重构、3.10 失败诊断中性化与统计、3.6 OpenTelemetry GenAI 语义约定追踪落地与离线导出）已完成全量验证，等待审核者复审。统一入口见 `chapters/README.md`；目录与文件存在不代表本人已学完或真实环境验收通过。最新验证见 `docs/gate-v3-3-validation.md`；岗位对标与路径提案见 `docs/curriculum-v3.md`。
 
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0、V3-1 已通过并合入 master。V3-2（L2 上下文工程与检索）2026-10-29 第五次复核结论为通过，阻断项与主要问题全部关闭。下一步：提交时按审核记录 n1 改正 2.9 README 中一句引用的措辞（沿用了审核者上一轮的错误说法），然后提交并快进合入 master，删除 L2 与 V3-1 的临时参考解，再启动 V3-3（L3 质量闭环）。2.15 参考流水线在离线配置下未达到 L2 出口标准，留待真实环境验证。记录见 `docs/v3/reviews/V3-2.md`。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0、V3-1、V3-2 已通过并合入 master。V3-3（L3 质量闭环）已完成实施与 Section 11 命令 1–10 全量复跑，等待审核者复审。复审通过后删除 V3-3 临时参考解，启动 V3-4（L4 Agent 架构）。记录见 `docs/gate-v3-3-validation.md`。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
@@ -19,6 +19,14 @@
 - [ ] **Pydantic AI 升级（待 LangChain 解除 openai 3 限制后）** - 当 LangChain 依赖集允许 openai>=3 时，将 `pydantic-ai-slim` 升级至 >=2.53.0，并消除 2.31.1 的 5 条安全公告限制（PYSEC-2026-4284..4291），复核 OTel 追踪与工具支持。
 
 ## Done
+
+- [x] **v3 阶段 3 质量闭环 V3-3 批次落地与全量验证（2026-10-30）** - 依据 `docs/v3/specs/L3.md` 与 `docs/v3/conventions.md` 完成 L3.4、L3.6、L3.7 全量改造与离线验证（在 `wip-v3-3` 分支）：
+  1. 3.3 LLM Judge：完全移除 LangChain 依赖，使用原生 OpenAI SDK（`common.get_openai_client()` / `common.chat_model_name()`）；实现基于 JSON Schema 的 Tool-as-Output 结构化评测打分契约（`submit_verdict`），兼容器具思考模式自动禁用（DeepSeek 等）；实现 Position Swap 位置交换双向裁决消除首位偏好；实现 Cohen's Kappa 与一致率校准指标及混淆矩阵；引用 Anthropic 2026-01-09 裁判指南；Gate 14/14 全绿；
+  2. 3.7 回归曲线：追加 4 个纯函数（`pass_at_k`、`pass_all_k`、`empirical_pass_all`、`split_suites`），Gate 检查项扩展至 13 项（原有 8 项 + 新增 5 项）；原生 OpenAI SDK 调用，移除 LCEL；支持离线确定性演练与 `--live` 退出码 1；
+  3. 3.8 Prompt A/B：原生 OpenAI SDK 调用，对比 Strict 与 Helpful 两版 Prompt，支持 `--live` 与离线演练；Gate 5/5 全绿；
+  4. 3.10 失败诊断：语言中性化，`load_failures` 缺失文件抛 `ValueError` 对齐 Gate，导出 `summarize_layers`；Gate 5/5 全绿；
+  5. 3.6 追踪与评测平台：保留历史目录名 `3.6-langsmith-eval` 与平台示例 `langsmith_eval.py`；新建原生 OpenTelemetry 追踪实现 `otel_tracing_eval.py`，建立三层 Span 结构，对齐 GenAI 语义约定（`gen_ai.*` 属性），默认控制台离线导出且开启隐私掩码，支持 OTLP 端点；重写 README、CHECKLIST 与 workbook，阐明三大后端定位与隐私防线；
+  6. 单元测试与 Section 11 全量验证：`chapters/test_v3_lessons.py` 新增 5 项单元测试（总计 34 passed），回归套件 68 + 34 = 102 passed；366 篇 Markdown 0 断链；ruff py311 0 errors；Part 3 无非预期 LangChain 泄漏；v2 标签 111 unchanged；5 个参考实现离线 exit 0，`--live` 缺密钥规范 exit 1 无堆栈。未调用真实商用付费模型。证据见 `docs/gate-v3-3-validation.md`。
 
 - [x] **V3-2 第五次复核，批次通过（2026-10-29）** - 核对快照 `a66cd25`：2.9 README、验证记录、TASKS 与 PROJECT_STATUS 中对 arXiv:2601.07711 的转述已按原文改正（对比 Enhanced RAG，延迟平均约 1.5 倍，输入 token 约 3.3 倍，成本最高约 3.6 倍）；Anthropic 条目改为原文结论；验证记录补了命令 7 的 grep 命令。本轮只改了文档，断链 0，状态文件自检通过；gate 与测试沿用第四次复核的完整复跑结果。审核者更正了自己上一轮的两句错误说法（论文实际用了 4 个数据集；Agentic 只在部分数据集上判断用户意图更好），README 提交时按 n1 改正即可。V3-2 阻断项与主要问题全部关闭，结论为通过，记录见 `docs/v3/reviews/V3-2.md`。
 - [x] **V3-2 阶段 2 上下文工程与检索第四次复核整改完成（2026-10-29；第五次复核结论：通过，见 `docs/v3/reviews/V3-2.md` 的第五次复核一节）** - 针对审核记录 `docs/v3/reviews/V3-2.md`（2026-10-29 第四次复核一节）指出的阻断项 N9-r，在 `wip-v3-2` 分支完成彻底闭环：

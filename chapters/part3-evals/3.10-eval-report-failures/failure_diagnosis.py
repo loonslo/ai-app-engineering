@@ -35,7 +35,13 @@ import json
 import sys
 from pathlib import Path
 
-from common import SHARED_DATA_DIR
+try:
+    from common import SHARED_DATA_DIR
+except ImportError:
+    REPO_ROOT = Path(__file__).resolve().parents[3]
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from common import SHARED_DATA_DIR
 
 REPORTS = Path(__file__).resolve().parent / "reports"
 DIAGNOSIS = REPORTS / "failure_diagnosis.json"
@@ -58,21 +64,34 @@ def default_failures_path() -> Path:
     return real if real.exists() else SAMPLE_FAILURES
 
 
-def load_failures(path: Path) -> tuple[list[dict], str]:
+def load_failures(path: Path | str) -> tuple[list[dict], str]:
     """返回 (失败列表, 失败库来源模式)。
 
     来源模式通过是否携带真实 retrieval_context 推断：
       - 任一失败 case 带非空 retrieval_context → live 产物（维度分可信）
       - 否则 → offline 产物（只能做一级分流）
     """
-    if not path.exists():
-        print(f"[WARN] 未找到失败库：{path}")
-        print("  可先运行 3.7 并加 --write-failures 生成，或用 --input 指定文件。")
-        sys.exit(2)
-    data = json.loads(path.read_text(encoding="utf-8"))
-    failures = [d for d in data if not d.get("passed", True)]
-    is_live = any((f.get("retrieval_context") or "").strip() for f in failures)
+    p = Path(path)
+    if not p.exists():
+        raise ValueError(f"未找到失败库：{p}")
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ValueError(f"JSON 解析失败：{exc}") from exc
+    if not isinstance(data, list):
+        raise ValueError(f"顶层结构必须为列表：{type(data).__name__}")
+    failures = [d for d in data if isinstance(d, dict) and not d.get("passed", True)]
+    is_live = any(bool((f.get("retrieval_context") or "").strip()) for f in failures)
     return failures, ("live" if is_live else "offline")
+
+
+def summarize_layers(results: list[dict]) -> dict[str, int]:
+    """统计各 layer_suspected 的数量，返回 {layer: count}。"""
+    summary: dict[str, int] = {}
+    for r in results:
+        layer = r.get("layer_suspected", "未知")
+        summary[layer] = summary.get(layer, 0) + 1
+    return summary
 
 
 # ═══════════════════════════════════════════════════════════════

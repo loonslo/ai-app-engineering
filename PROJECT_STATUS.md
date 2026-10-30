@@ -1,10 +1,10 @@
 ---
 project_id: langchain-learning
-updated: 2026-10-29
+updated: 2026-10-30
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "V3-0、V3-1 审核已通过并合入 master。V3-2（L2 上下文工程与检索：4 个新建章 + 10 个旧章改写或增补）2026-10-29 第五次复核结论为通过，阻断项与主要问题全部关闭，尚未提交与合入。最后一次完整复跑（第四次复核）的结果：13 个 gate 骨架 0 通过、参考解全过且结果一致；测试 63 + 34 项通过；断链 0；ruff 通过；LangChain 边界无泄漏；v2 标签 111 个未变；16 个参考实现离线运行无堆栈，--live 两种失败场景都以 1 退出；2.15 下载并校验 24 份语料，语料不完整时流水线拒绝运行。2.15 参考流水线在离线配置下（没有重排权重，模型用离线替身）没有达到 L2 出口标准（Hybrid 拒答正确率 71.88%），已如实记录，留待真实环境验证。未调用真实模型。证据见 docs/v3/reviews/V3-2.md 与 docs/gate-v3-2-validation.md。"
-next: "提交时按 docs/v3/reviews/V3-2.md 第五次复核的 n1 改正 2.9 README 中一句引用的措辞，然后提交 wip-v3-2 的全部修改并快进合入 master，删除 L2 与 V3-1 的临时参考解，再开始 V3-3（L3 评测与错误分析）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、重排模型、数据库、Docker/GPU、远端 CI/staging 证据（含 2.15 能否达到 L2 出口标准）；核对第三方内容版权与课程时长。"
+progress: "V3-0、V3-1、V3-2 审核均已通过并合入 master。V3-3（L3 质量闭环：3.3 LLM Judge 原生重构、3.7 回归曲线扩展 13 项 Gate、3.8 Prompt A/B 原生重构、3.10 失败诊断中性化与统计、3.6 OpenTelemetry GenAI 约定追踪落地与离线导出）已完成全部改造并通过 Section 11 命令 1–10 全量复跑，等待审核者复审。实测结果：4 个涉及 gate 骨架 0 通过、参考解全过且结果一致（3.3 14/14、3.7 13/13、3.8 5/5、3.10 5/5）；pytest 68 + 34 项全部通过；断链 0；ruff 通过；LangChain 边界无泄漏；v2 标签 111 个未变；5 个参考实现离线运行退出码为 0，--live 缺密钥场景均以 1 退出且无堆栈；3.6 默认控制台离线导出并完成隐私脱敏。未调用真实商用模型。证据见 docs/gate-v3-3-validation.md。"
+next: "等待审核者复审 V3-3；复审通过后快进合入 master 并清理 V3-3 临时参考解，启动 V3-4（L4 Agent 架构）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、重排模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
 evidence:
   - README.md
   - TASKS.md
@@ -43,6 +43,7 @@ evidence:
   - docs/v3/reviews/V3-1.md
   - docs/gate-v3-2-validation.md
   - docs/v3/reviews/V3-2.md
+  - docs/gate-v3-3-validation.md
 ---
 
 # LangChain 学习记录 · 项目概览与进度
@@ -193,3 +194,12 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 - 核对：2.9 README、验证记录、TASKS 与 PROJECT_STATUS 中对 arXiv:2601.07711 的转述已按原文改正（对比 Enhanced RAG，延迟平均约 1.5 倍，输入 token 约 3.3 倍，成本最高约 3.6 倍）；Anthropic 条目改为原文结论。本轮只改了文档，断链 0，状态文件自检通过；gate 与测试沿用第四次复核的完整复跑结果。
 - 审核者更正：第四次复核中“论文只用了两个数据集”“Agentic 判断用户意图更好”两句不准确（论文用了 4 个数据集，Agentic 只在其中两个上略好）；README 沿用了这两句，提交时按审核记录的 n1 改正。
 - V3-2 阻断项与主要问题全部关闭，可以提交并快进合入 master。记录见 `docs/v3/reviews/V3-2.md`。
+
+2026-10-30 完成 v3 课程改造阶段 3（V3-3 批次：L3 质量闭环）落地与全量验证（在 `wip-v3-3` 分支，等待审核者复审）：
+- 3.3 LLM Judge 原生重构：基于 OpenAI SDK 原生接口，实现 Tool-as-Output 结构化评测打分（submit_verdict），兼容器具思考模式自动禁用；实现 Position Swap 候选位置互换双轮调用以缓解首位系统性偏好；实现一致率、Cohen's Kappa (κ) 与混淆矩阵；更新 README 树立三级裁判梯队体系并引用 Anthropic 2026-01-09 指南；Gate 14/14 保持全绿；
+- 3.7 回归曲线扩展：追加 pass_at_k、pass_all_k、empirical_pass_all、split_suites 纯函数，Gate 检查项扩展至 13 项（原有 8 项 + 新增 5 项）；regression_curve.py 移除 LCEL，采用原生调用，离线输出告警与套件拆分，--live 规范退出；
+- 3.8 Prompt A/B 原生重构：改用原生 OpenAI SDK 对比 Strict 与 Helpful 两版 Prompt，支持离线确定性演练与 --live 规范退出；Gate 5/5 全绿；
+- 3.10 失败诊断中性化：语言中性化，load_failures 缺失文件抛 ValueError 对齐 Gate，导出 summarize_layers；Gate 5/5 全绿；
+- 3.6 追踪与评测平台演进：保留目录名 3.6-langsmith-eval 与平台示例 langsmith_eval.py；新建原生 OpenTelemetry 追踪实现 otel_tracing_eval.py，三层 Span 对齐 GenAI 语义约定，默认控制台离线导出且开启隐私掩码，支持 OTLP 导出；重写 README、CHECKLIST 与 workbook；
+- 全量验证复跑：按 Section 11 命令 1–10 复跑，4 个涉及 Gate 骨架 0 通过退出 1、参考解全过退出 0 且两次输出一致；新增 5 项纯函数测试，总计 68 项工具与纯函数测试通过、34 项 Capstone 生产测试通过（102 passed）；366 篇 Markdown 0 断链；ruff 0 errors；Part 3 无非预期 LangChain 泄漏；v2 标签 111 unchanged；5 个参考实现离线运行退出码为 0，--live 缺密钥场景均以 1 退出无堆栈。未调用真实商用付费模型。证据见 `docs/gate-v3-3-validation.md`。
+

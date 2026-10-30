@@ -994,24 +994,122 @@ def test_v3_3_otel_tracing_offline():
     )
 
     assert "RAG" in res["answer"]
-    assert res["spans_generated"] == ["rag_pipeline", "rag_retrieval", "assemble_context", "chat_completion"]
+    assert res["spans_generated"] == ["rag_pipeline", "retrieval test_doc.txt", "assemble_context", "chat deepseek-flash"]
 
-    # 检验内存中捕获的所有 Span
+    # 检验内存中捕获的所有 Span（对齐 semconv: {operation} {model} 与 retrieval {data_source.id}）
     spans = exporter.get_finished_spans()
     span_names = [s.name for s in spans]
     assert "rag_pipeline" in span_names
-    assert "rag_retrieval" in span_names
+    assert "retrieval test_doc.txt" in span_names
     assert "assemble_context" in span_names
-    assert "chat_completion" in span_names
+    assert "chat deepseek-flash" in span_names
 
-    # 检验 GenAI 属性与脱敏保护
-    chat_span = next(s for s in spans if s.name == "chat_completion")
+    # 检验 GenAI semconv 属性（gen_ai.provider.name, usage, finish_reasons）与隐私脱敏
+    chat_span = next(s for s in spans if s.name == "chat deepseek-flash")
     attrs = chat_span.attributes
-    assert attrs["gen_ai.system"] == "openai"
+    assert attrs["gen_ai.provider.name"] == "deepseek"
     assert attrs["gen_ai.operation.name"] == "chat"
     assert attrs["gen_ai.usage.input_tokens"] == 85
     assert attrs["gen_ai.usage.output_tokens"] == 36
-    assert attrs["gen_ai.prompt.status"] == "redacted_for_privacy"
+    assert list(attrs["gen_ai.response.finish_reasons"]) == ["stop"]
+    assert attrs["app.prompt.status"] == "redacted_for_privacy"
 
-    retrieval_span = next(s for s in spans if s.name == "rag_retrieval")
-    assert retrieval_span.attributes["gen_ai.retrieval.documents_count"] == 2
+    retrieval_span = next(s for s in spans if s.name == "retrieval test_doc.txt")
+    assert retrieval_span.attributes["gen_ai.data_source.id"] == "test_doc.txt"
+    assert retrieval_span.attributes["app.retrieval.chunk_count"] == 2
+
+
+def test_v3_3_llm_judge_position_swap_scenarios():
+    """检验 3.3 位置互换执行与偏置检测的场景。"""
+    mod = _load_v3_3_mod("part3-evals/3.3-llm-judge/llm_judge.py", "v3_3_l34_judge_swap")
+
+    # 场景 1：完全一致（候选 A 始终胜出）
+    # 当选项正序 [A, B] 时选 A；当逆序 [B, A] 时选项 1 是 B、选项 2 是 A，裁判选 B (即位置 2 的候选 A)
+    def compare_cons_a(first: str, second: str) -> dict[str, str]:
+        return {"winner": "A" if first == "优质 A" else "B", "reason": "候选 A 内容更准确"}
+
+    res1 = mod.run_pairwise_comparison_with_position_swap(
+        compare_fn=compare_cons_a,
+        question="什么是 RAG",
+        answer_a="优质 A",
+        answer_b="劣质 B",
+        reference="标准参考",
+    )
+    assert res1["consensus_winner"] == "A"
+    assert res1["consistent"] is True
+    assert res1["position_bias_detected"] is False
+
+    # 场景 2：位置偏见检测（裁判总是选排在第一位的选项）
+    def compare_bias(first: str, second: str) -> dict[str, str]:
+        return {"winner": "A", "reason": "首个回答更精炼"}
+
+    res2 = mod.run_pairwise_comparison_with_position_swap(
+        compare_fn=compare_bias,
+        question="什么是 RAG",
+        answer_a="候选 A",
+        answer_b="候选 B",
+        reference="标准参考",
+    )
+    assert res2["consistent"] is False
+    assert res2["position_bias_detected"] is True
+    assert res2["consensus_winner"] == "inconsistent"
+
+
+def test_v3_3_llm_judge_dual_rubric():
+    """检验 3.3 双维度（正确性 + 忠实度）Rubric Prompt 构建。"""
+    mod = _load_v3_3_mod("part3-evals/3.3-llm-judge/llm_judge.py", "v3_3_l34_judge_dual")
+
+    prompt_c = mod.build_correctness_prompt("什么是 RAG", "RAG 是检索增强生成", "检索增强生成标准参考")
+    assert "正确性" in prompt_c
+    assert "检索增强生成标准参考" in prompt_c
+
+    prompt_f = mod.build_faithfulness_prompt("什么是 RAG", "RAG 是检索增强生成", "参考上下文文档分块")
+    assert "忠实度" in prompt_f
+    assert "参考上下文文档分块" in prompt_f
+
+
+def test_v3_3_failure_pipeline_compatibility():
+    """验证 3.7 写出的失败库与 3.10 诊断端到端字段完全兼容且不抛 KeyError。"""
+    from pathlib import Path
+    import tempfile
+
+    curve_mod = _load_v3_3_mod("part3-evals/3.7-eval-regression-curve/regression_curve.py", "v3_3_l36_curve_compat")
+    diag_mod = _load_v3_3_mod("part3-evals/3.10-eval-report-failures/failure_diagnosis.py", "v3_3_l36_diag_compat")
+
+    case = {
+        "id": "case_test_01",
+        "type": "fact",
+        "question": "测试问题",
+        "reference": "测试参考",
+        "keywords": ["关键词"],
+        "expected_sources": ["test.txt"],
+        "should_refuse": False,
+    }
+    cand_out = {"answer": "测试回答无来源", "latency_ms": 100.0, "runtime_error": None}
+    score = curve_mod.score_case(case, cand_out)
+    row = {
+        "case_id": case["id"],
+        "type": case["type"],
+        "question": case["question"],
+        "reference": case["reference"],
+        "retrieval_context": "真实上下文",
+        "answer": cand_out["answer"],
+        "latency_ms": cand_out["latency_ms"],
+        "runtime_error": cand_out["runtime_error"],
+        "keyword_score": score["keyword_score"],
+        "citation_score": score["citation_score"],
+        "refusal_ok": score["refusal_ok"],
+        "passed": score["passed"],
+    }
+    summary = curve_mod.summarize([row])
+    assert len(summary["failures"]) == 1
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_p = Path(tmpdir) / "failures.json"
+        curve_mod.write_failures_to_file(summary["failures"], out_p)
+        failures, mode = diag_mod.load_failures(out_p)
+        assert len(failures) == 1
+        assert mode == "live"
+        layer, _ = diag_mod.classify_by_hard_metrics(failures[0])
+        assert "引用" in layer
+

@@ -96,23 +96,24 @@ python tools/run_chapter.py 3.3
 
 ## 判分器分级与工程选型阶梯
 
-在 AI 系统的质量评测中，判分机制应遵循严格的工程优先级阶梯，避免盲目引入高成本的大模型裁判：
+在质量评测体系中，判分机制通常建议遵循由轻到重的选型阶梯：
 
-1. **代码判分（Code-based / Rule-based Evaluator）**：
-   - **手段**：精确字符串包含、正则匹配、JSON Schema 校验、SQL/AST 语法树断言、确定性算法（如 BM25 关键词匹配、编辑距离）。
-   - **优势**：执行速度极快（微秒/毫秒级）、零 API 费用、结果 100% 确定可复现。
-   - **原则**：**优先用代码判分**；凡是能用规则量化、格式约束或代码判决的指标，绝不上模型。
+1. **代码与规则判分（Code-based / Deterministic Grading）**：
+   - **手段**：精确匹配、正则比对、JSON Schema 校验、代码单测与断言。
+   - **优势**：执行速度快（毫秒级）、无 API 消耗、结果确定且完全可复现。
+   - **原则**：**优先使用确定性代码判分**；能通过确定性逻辑可靠评判的指标尽量先用代码规则检验。
 
-2. **模型判分（Model-based / LLM-as-Judge）**：
-   - **手段**：利用通用或微调的大模型依据预设 Rubric（打分量表）评估语义正确性、忠实度、总结完整性等主观维度。
+2. **模型裁判（Model-based / LLM-as-Judge）**：
+   - **手段**：利用大模型依据预设 Rubric（打分量表）评估语义正确性、忠实度、回答完整度等需要语言理解的维度。
    - **局限**：存在自相矛盾、格式脆弱、长度偏见（偏好冗长文本）与位置偏见（Position Bias）。
-   - **原则**：代码判不了的才用 LLM Judge，且必须结合结构化输出工具与重试终止边界。
+   - **原则**：规则难以覆盖的灵活语义理解场景采用 LLM Judge，且应结合结构化输出工具（Tool Calling）与重试边界。
+   - **DeepSeek 思考模式与工具调用**：使用 DeepSeek 模型进行工具评测时，若开启了思考模式（Thinking Mode），强制 `tool_choice` 会触发 400 错误（`Thinking mode does not support this tool_choice`）。在工程调用中，应通过 `extra_body={"thinking": {"type": "disabled"}}` 显式禁用思考模式，或平滑回退至 `tool_choice="auto"`。
 
 3. **人工校准（Human-in-the-loop Calibration）**：
-   - **手段**：资深业务专家或标注员对评测样本进行双盲标注，作为“金标准（Ground Truth）”。
-   - **原则**：**用人工标注校准 Judge**；通过混淆矩阵、一致率（Agreement Rate）与 Cohen's Kappa（κ）系数定期监控裁判退化，确认模型裁判能否可信替代人工抽检。
+   - **手段**：业务专家或标注员对评测样本进行抽样标注，提供金标准参照。
+   - **原则**：**用人工标注校准 Judge**；通过混淆矩阵、一致率（Agreement Rate）与 Cohen's Kappa（κ）系数定期监控裁判退化，确认模型裁判是否足以有效辅助人工抽检。
 
-> **行业参考**：上述判分阶梯与工程原则详见 Anthropic 发布的评测实践指南《Demystifying evals for AI agents》（[Anthropic 官网](https://www.anthropic.com/news/evals-for-ai-agents)，2026-01-09；读取日期：2026-10-30）。
+> **行业参考**：上述结合代码确定性判分与模型判分的实践讨论可参考 Anthropic 评测指南《Demystifying evals for AI agents》（[Anthropic 官网](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)，2026-01-09；读取日期：2026-10-30）。工程选型的优先级分层属于团队实践判断。
 
 ## 核心深入阅读
 

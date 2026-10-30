@@ -14,17 +14,17 @@
 
 - [ ] **1. 运行本地 OTel 追踪**：
   - 运行 `python tools/run_chapter.py 3.6 otel_tracing_eval.py`。
-  - 观察控制台输出的 Span 结构，理解根 Span `rag_pipeline` 与子 Span `rag_retrieval`、`assemble_context`、`chat_completion` 的父子嵌套关系。
-  - 核对各个 Span 中符合 OpenTelemetry GenAI 规范的属性（如 `gen_ai.system`、`gen_ai.operation.name`、`gen_ai.usage.input_tokens` 等）。
+  - 观察控制台输出的 Span 结构，理解根 Span `rag_pipeline` 与子 Span `retrieval {data_source.id}`、`assemble_context`、`chat {model}` 的父子嵌套关系与 SpanKind（CLIENT vs INTERNAL）。
+  - 核对各个 Span 中符合 OpenTelemetry GenAI 规范的标准属性（如 `gen_ai.provider.name`、`gen_ai.operation.name`、`gen_ai.usage.input_tokens`、`gen_ai.response.finish_reasons` 等）。
 - [ ] **2. 平台端 Trace 观察（可选）**：
-  - 若本地部署了 Langfuse / Phoenix 或配置了远程 OTLP 端点（或使用 LangSmith 运行 `langsmith_eval.py`），观察平台 UI 中展示的 Trace 瀑布图与元数据；若未配置外部服务，明确记录“未验证（离线通过控制台验证）”。
+  - 若本地部署了 Langfuse / Phoenix 或配置了远程 OTLP 端点（或使用 LangSmith 运行 `langsmith_eval.py`），观察平台 UI 中展示的 Trace 瀑布图与元数据；若未配置外部服务，在 workbook 中明确记录“未配置外部服务，通过本地控制台离线核对”。
 - [ ] **3. 核心追踪字段设计**：
-  - 针对你实际的业务项目或 Capstone 项目，明确写出必须采集的 5 个关键字段（如 Token 消耗、检索片段数、工具调用参数、耗时分布、错误状态码等）并说明原因。
+  - 针对你负责的项目或 Capstone 项目，明确写出必须采集的 5 个关键字段并说明设计原因。
 - [ ] **4. 隐私安全与脱敏防线**：
-  - 明确写出生产环境中**绝对不能采集**或**必须脱敏后才能采集**的数据内容（如未经脱敏的 Prompt/回答正文、密码/API Key、用户个人身份识别信息 PII）。
+  - 明确写出生产环境中不能直接采集或必须脱敏后才能采集的数据内容（如 Prompt/回答明文、敏感凭证、包含本地路径的完整异常堆栈）。
 
-## 边界与纪律
+## 边界
 
 - 默认离线控制台运行不发起任何外部网络请求。
 - 平台端 UI 观察属于可选外部验证，离线控制台 Span 属性正确即可满足本章入门要求。
-- 严禁将 API Key、密码或用户真实私密数据记录在 Trace 属性或提交到公开仓库。
+- 严禁将 API Key、密码或用户真实私密数据记录在 Trace 属性或提交到代码仓库。

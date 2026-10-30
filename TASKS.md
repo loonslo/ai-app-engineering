@@ -1,11 +1,11 @@
 # Tasks
 
-状态核对：2026-10-30。课件全量结构完成：82 章 + 29 步均有 v2 标签与验收方式（75 章 gate + 7 章清单 + 29 步总清单）。v3 课程改造完成 V3-0 基础设施与 V3-1 批次（已合入 master）、V3-2 批次（第五次复核通过，已按 n1 更正并合入 master）；V3-3 批次（L3 质量闭环：3.3 LLM Judge 原生重构、3.7 回归曲线与 pass@k/pass^k 扩展 13 项 Gate、3.8 Prompt A/B 原生重构、3.10 失败诊断中性化与统计、3.6 OpenTelemetry GenAI 语义约定追踪落地与离线导出）已完成全量验证，等待审核者复审。统一入口见 `chapters/README.md`；目录与文件存在不代表本人已学完或真实环境验收通过。最新验证见 `docs/gate-v3-3-validation.md`；岗位对标与路径提案见 `docs/curriculum-v3.md`。
+状态核对：2026-10-30。课件全量结构完成：82 章 + 29 步均有 v2 标签与验收方式（75 章 gate + 7 章清单 + 29 步总清单）。v3 课程改造完成 V3-0 基础设施与 V3-1 批次（已合入 master）、V3-2 批次（第五次复核通过，已按 n1 更正并合入 master）；V3-3 批次（L3 质量闭环：3.3、3.6、3.7、3.8、3.10）已针对 2026-10-30 审核退回意见（2 个阻断项、8 个主要问题、6 个次要问题）完成全量整改与复测（在 `wip-v3-3` 分支，4 个 gate 骨架 0 通过、参考解全过且结果一致；pytest 71 + 34 = 105 项通过；368 篇 Markdown 0 断链；ruff 通过；--live 缺密钥与模型不可达场景均以 1 退出无堆栈），等待审核者复审。统一入口见 `chapters/README.md`；目录与文件存在不代表本人已学完或真实环境验收通过。最新审核记录见 `docs/v3/reviews/V3-3.md`；岗位对标与路径提案见 `docs/curriculum-v3.md`。
 
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0、V3-1、V3-2 已通过并合入 master。V3-3（L3 质量闭环）已完成实施与 Section 11 命令 1–10 全量复跑，等待审核者复审。复审通过后删除 V3-3 临时参考解，启动 V3-4（L4 Agent 架构）。记录见 `docs/gate-v3-3-validation.md`。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - 按 `docs/v3/README.md` 的 V3-0 至 V3-10 推进：V3-0、V3-1、V3-2 已通过并合入 master。V3-3（L3 质量闭环）退回问题已全部整改并完成离线与 `--live` 全量复测（见 `docs/gate-v3-3-validation.md`），等待审核者复审；通过后快进合入 master，删除 V3-3 临时参考解，再启动 V3-4（L4 Agent 架构）。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
@@ -20,7 +20,23 @@
 
 ## Done
 
-- [x] **v3 阶段 3 质量闭环 V3-3 批次落地与全量验证（2026-10-30）** - 依据 `docs/v3/specs/L3.md` 与 `docs/v3/conventions.md` 完成 L3.4、L3.6、L3.7 全量改造与离线验证（在 `wip-v3-3` 分支）：
+- [x] **V3-3 退回问题整改与全量复测（2026-10-30；等待复审）** - 针对审核记录 `docs/v3/reviews/V3-3.md` 指出的 2 个阻断项（B1/B2）、8 个主要问题（M1–M8）与 6 个次要问题（m1–m6），在 `wip-v3-3` 完成彻底闭环并全量复测：
+  1. 阻断 B1（3.6 OTel GenAI 语义约定）：依据 `open-telemetry/semantic-conventions-genai` commit `3fe84604a5`，重构属性名为 `gen_ai.provider.name`，Span 命名对齐 `{operation} {model}`（CLIENT）与 `retrieval {data_source.id}`（INTERNAL），finish reasons 采用列表，自定义指标统一使用 `app.*` 前缀，彻底移除已废弃/自造属性；支持 OTLP HTTP（面向 Langfuse 缺省）与 gRPC 导出协议选择，默认离线控制台；`langsmith_eval.py` 补充 `--live` 开关与离线 exit 0 说明；补齐 README 模板各节与细则要点；清理 workbook 预填答案恢复为待填；锁定 `requirements-dev.txt` 中 OTel 依赖版本。
+  2. 阻断 B2（Anthropic 出处更正）：修正 3.3 与 3.7 引用的 Anthropic 链接为官网现存有效地址 `/engineering/demystifying-evals-for-ai-agents`；删除未见于原文的断言与编造引语，准确转述其按产品需求选择评测指标的核心逻辑。
+  3. 功能恢复与对接修复（M1、M2、M3、M4）：3.3 恢复针对被测 RAG 的正确性与忠实度双维度评测，恢复离线脚本化位置互换裁决，增加 retry 机制防御思考模式 400 冲突，严格类型与范围校验；3.7 恢复原生切片检索、逐条异常记录、`--fail-on-regression` 回归卡点退出与 3.10 兼容的失败案例写出；3.8 恢复 10 个测试用例的人工标注、原生 LLM Judge 评分、裁判与人工标注一致率与 Cohen's $\kappa$ 计算，恢复生成 `reports/prompt_ab_judge_agreement.json`（已通过 Capstone 证据门禁验证）；3.10 `load_failures` 缺文件时抛 `ValueError` 对齐 Gate，`main()` 统一捕获 `(ValueError, FileNotFoundError)` 规范退出 2 且零堆栈，安全防御可选 `deepeval` 导入缺失。
+  4. 规范与 Gate 对齐（M5、M7、m1–m6）：3.7 `starter.py` docstring 补充 $k<1$、空字典输入返回 0.0 与截断下界说明；恢复 workbook Q3/Q4 与概念图对应行；`pytest.ini` 补充 `pythonpath = .`。
+  5. 全量验证复跑：按 Section 11 命令 1–10 复跑，4 个 gate 骨架 0 通过退出 1，参考解全过退出 0 且两次输出一致；新增并更新测试，pytest 总计 71 + 34 = 105 passed；368 篇 Markdown 0 断链；ruff 0 errors；Part 3 无 LangChain 泄漏；v2 标签 111 unchanged；5 个参考实现离线运行退出码为 0；`--live` 缺密钥与模型不可达（127.0.0.1:9）两种失败场景均以退出码 1 结束且零堆栈。未调用真实商用付费模型。证据见 `docs/gate-v3-3-validation.md`。
+- [x] **V3-3 审核（2026-10-30）** - 复跑 `wip-v3-3` 的提交 `5a001c9`，结论为退回。
+  - 复跑结果：4 个 gate 骨架 0 通过，参考解全过且两次输出一致；测试 68 + 34 项通过；断链 0；ruff 通过；part3 无 LangChain 泄漏；v2 标签 111 个未变；`--live` 的缺密钥、模型不可达两种场景都以 1 退出。未调用真实模型。
+  - 阻断：B1，3.6 的 GenAI 语义约定属性有误：`gen_ai.system` 已弃用，应为 `gen_ai.provider.name`；`gen_ai.retrieval.documents_count` 不存在；`gen_ai.prompt` 和 `gen_ai.completion` 已移除；也没写依据的版本。B2，3.3 与 3.7 引用的 Anthropic 链接返回 404，pass@k / pass^k 等多处转述与原文不符。
+  - 主要问题：
+    - 3.3、3.7、3.8 换实现时删掉了原有演示步骤：被测 RAG、双维度评分、`--fail-on-regression`、judge 与人工一致率、报告；
+    - 3.7 写出的失败库让 3.10 报 KeyError；3.10 被改动后，缺文件时打印堆栈；
+    - 3.7 gate 有 3 项检查了 docstring 没写的行为；
+    - 3.6 的 workbook 预填了答案，README 缺模板各节和细则要点，OTLP 导出路径不对；
+    - 验证记录不完整，部分说法与代码不符。
+  - 记录见 `docs/v3/reviews/V3-3.md`。
+- [x] **v3 阶段 3 质量闭环 V3-3 批次落地与全量验证（2026-10-30；审核结论：退回，见 `docs/v3/reviews/V3-3.md`）** - 依据 `docs/v3/specs/L3.md` 与 `docs/v3/conventions.md` 完成 L3.4、L3.6、L3.7 全量改造与离线验证（在 `wip-v3-3` 分支）：
   1. 3.3 LLM Judge：完全移除 LangChain 依赖，使用原生 OpenAI SDK（`common.get_openai_client()` / `common.chat_model_name()`）；实现基于 JSON Schema 的 Tool-as-Output 结构化评测打分契约（`submit_verdict`），兼容器具思考模式自动禁用（DeepSeek 等）；实现 Position Swap 位置交换双向裁决消除首位偏好；实现 Cohen's Kappa 与一致率校准指标及混淆矩阵；引用 Anthropic 2026-01-09 裁判指南；Gate 14/14 全绿；
   2. 3.7 回归曲线：追加 4 个纯函数（`pass_at_k`、`pass_all_k`、`empirical_pass_all`、`split_suites`），Gate 检查项扩展至 13 项（原有 8 项 + 新增 5 项）；原生 OpenAI SDK 调用，移除 LCEL；支持离线确定性演练与 `--live` 退出码 1；
   3. 3.8 Prompt A/B：原生 OpenAI SDK 调用，对比 Strict 与 Helpful 两版 Prompt，支持 `--live` 与离线演练；Gate 5/5 全绿；

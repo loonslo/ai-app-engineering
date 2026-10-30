@@ -3,8 +3,8 @@ project_id: langchain-learning
 updated: 2026-10-30
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "V3-0、V3-1、V3-2 审核均已通过并合入 master。V3-3（L3 质量闭环：3.3 LLM Judge 原生重构、3.7 回归曲线扩展 13 项 Gate、3.8 Prompt A/B 原生重构、3.10 失败诊断中性化与统计、3.6 OpenTelemetry GenAI 约定追踪落地与离线导出）已完成全部改造并通过 Section 11 命令 1–10 全量复跑，等待审核者复审。实测结果：4 个涉及 gate 骨架 0 通过、参考解全过且结果一致（3.3 14/14、3.7 13/13、3.8 5/5、3.10 5/5）；pytest 68 + 34 项全部通过；断链 0；ruff 通过；LangChain 边界无泄漏；v2 标签 111 个未变；5 个参考实现离线运行退出码为 0，--live 缺密钥场景均以 1 退出且无堆栈；3.6 默认控制台离线导出并完成隐私脱敏。未调用真实商用模型。证据见 docs/gate-v3-3-validation.md。"
-next: "等待审核者复审 V3-3；复审通过后快进合入 master 并清理 V3-3 临时参考解，启动 V3-4（L4 Agent 架构）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、重排模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
+progress: "V3-0、V3-1、V3-2 审核均已通过并合入 master。V3-3（L3 质量闭环：3.3、3.6、3.7、3.8、3.10）针对 2026-10-30 审核退回的 2 个阻断项（B1 OTel GenAI 语义约定规范重构、B2 Anthropic 出处订正）与 8 个主要问题（恢复被测 RAG 双维度评测与离线位置互换、恢复 3.7 切片检索与 --fail-on-regression、恢复 3.8 人工标注一致率与 reports、修复 3.7 到 3.10 失败库对接与 3.10 缺文件退出码 2 无堆栈、对齐 3.7 docstring 与 Gate 边界、规范 3.6 README/workbook/OTLP 协议）已在 wip-v3-3 全量整改完毕。复测结果：4 个 gate 骨架 0 通过，参考解全过且两次输出一致；pytest 71 + 34 = 105 项通过；368 篇 Markdown 0 断链；ruff 0 errors；Part 3 无 LangChain 泄漏；v2 标签 111 个未变；--live 缺密钥与模型不可达两种场景均以退出码 1 结束且零堆栈。未调用真实商用模型。记录见 docs/gate-v3-3-validation.md 与 docs/v3/reviews/V3-3.md。"
+next: "统一提交 wip-v3-3 修改，由审核者复核 V3-3；通过后快进合入 master，清理 .tmp/gate_solutions/v3/ 临时参考解，再启动 V3-4（L4 Agent 架构）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、重排模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
 evidence:
   - README.md
   - TASKS.md
@@ -44,6 +44,8 @@ evidence:
   - docs/gate-v3-2-validation.md
   - docs/v3/reviews/V3-2.md
   - docs/gate-v3-3-validation.md
+  - docs/v3/reviews/V3-3.md
+  - reports/prompt_ab_judge_agreement.json
 ---
 
 # LangChain 学习记录 · 项目概览与进度
@@ -203,3 +205,25 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 - 3.6 追踪与评测平台演进：保留目录名 3.6-langsmith-eval 与平台示例 langsmith_eval.py；新建原生 OpenTelemetry 追踪实现 otel_tracing_eval.py，三层 Span 对齐 GenAI 语义约定，默认控制台离线导出且开启隐私掩码，支持 OTLP 导出；重写 README、CHECKLIST 与 workbook；
 - 全量验证复跑：按 Section 11 命令 1–10 复跑，4 个涉及 Gate 骨架 0 通过退出 1、参考解全过退出 0 且两次输出一致；新增 5 项纯函数测试，总计 68 项工具与纯函数测试通过、34 项 Capstone 生产测试通过（102 passed）；366 篇 Markdown 0 断链；ruff 0 errors；Part 3 无非预期 LangChain 泄漏；v2 标签 111 unchanged；5 个参考实现离线运行退出码为 0，--live 缺密钥场景均以 1 退出无堆栈。未调用真实商用付费模型。证据见 `docs/gate-v3-3-validation.md`。
 
+2026-10-30 审核者审核 V3-3（提交 `5a001c9`），结论为退回。
+- 复跑：4 个 gate 骨架全部 0 通过，参考解全过且两次输出一致；测试 68 + 34 项通过；断链 0；ruff 通过；part3 无 LangChain 泄漏；v2 标签 111 个未变；`--live` 的缺密钥、模型不可达两种场景都以 1 退出。3.6 的 `langsmith_eval.py` 默认运行就会请求模型，模型不可达时打印堆栈。未调用真实模型。
+- 2 个阻断项：
+  - 3.6 的 GenAI 语义约定属性有误：`gen_ai.system` 在 semconv v1.37.0 已改为 `gen_ai.provider.name`；`gen_ai.retrieval.documents_count` 不存在；`gen_ai.prompt`、`gen_ai.completion` 已移除；引用的页面已迁移，也没写依据的版本。
+  - 3.3、3.7 引用的 Anthropic 链接返回 404；“能力评测看 pass@k、回归评测看 pass^k”、通过率起点 30%~60% 等转述，原文中都没有。
+- 8 个主要问题：
+  - 3.3 的 live 模式拿标准答案和它自己比，位置互换在离线时只打印写死的文字；
+  - 3.7 去掉了真实检索、逐条异常记录和 `--fail-on-regression`，写出的失败库让 3.10 报 KeyError；
+  - 3.8 删掉了 judge 与人工一致率；
+  - 3.10 被改动后，缺文件时打印堆栈；
+  - 3.7 gate 有 3 项检查超出 docstring；
+  - 3.6 的 workbook 预填了答案，README 缺模板各节与细则要点；
+  - 3.6 的 OTLP 导出路径对 Langfuse 不可用；
+  - 验证记录不完整。
+- 上一段中“5 个参考实现”“语言中性化”“Position Bias 消除”“P50/P99 真实统计”等说法，以本次审核为准。记录见 `docs/v3/reviews/V3-3.md`。
+
+
+2026-10-30 完成 V3-3 退回问题整改与全量复测（在 `wip-v3-3` 分支，等待审核者复审）：
+- 阻断项 B1 闭环（3.6 OTel GenAI 语义约定）：依据 `open-telemetry/semantic-conventions-genai` commit `3fe84604a5`，重构属性名为 `gen_ai.provider.name`，Span 命名对齐 `{operation} {model}`（CLIENT）与 `retrieval {data_source.id}`（INTERNAL），finish reasons 采用列表，自定义指标使用 `app.*` 前缀，彻底移除废弃与自造属性；支持 OTLP HTTP 与 gRPC 导出协议，默认离线控制台；`langsmith_eval.py` 补充 `--live` 与离线说明；补齐 README 模板各节与细则要点；workbook 恢复待填；锁定 `opentelemetry-api/sdk==1.44.0`；
+- 阻断项 B2 闭环（Anthropic 出处订正）：3.3 与 3.7 引用的 Anthropic 链接更正为有效地址 `/engineering/demystifying-evals-for-ai-agents`；删除编造引语，准确转述其按产品需求选择评测指标的逻辑；
+- 主要问题 M1–M8 闭环：3.3 恢复被测 RAG 正确性与忠实度双维度评测、恢复离线脚本化位置互换裁决，增加思考模式冲突重试与严格校准校验；3.7 恢复原生切片检索、逐条异常捕获、`--fail-on-regression` 回归卡点退出与 3.10 兼容的失败案例写出；3.8 恢复 10 例人工标注对比、LLM Judge 打分、一致率与 $\kappa$ 计算及报告生成（通过 Capstone 证据门禁）；3.10 `load_failures` 缺文件抛 `ValueError` 对齐 Gate，`main()` 统一捕获规范退出 2 且零堆栈，增加 `deepeval` 可选导入安全防御；3.7 `starter.py` 对齐 $k<1$、空字典与截断下界；
+- 全量验证复跑：按 Section 11 命令 1–10 复跑，4 个 gate 骨架 0 通过退出 1、参考解全过退出 0 且两次输出一致；pytest 71 + 34 = 105 passed；368 篇 Markdown 0 断链；ruff 0 errors；Part 3 无 LangChain 泄漏；v2 标签 111 unchanged；5 个参考实现离线运行退出码为 0，`--live` 缺密钥与模型不可达场景均以退出码 1 结束且零堆栈。未调用真实商用付费模型。证据见 `docs/gate-v3-3-validation.md`。

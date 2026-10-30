@@ -1,131 +1,135 @@
-# L3.6 回归对比 · Gate（原 3.7）
+# 3.7 回归对比：Baseline、Candidate 与质量门禁
 
 [全书目录](../../README.md) · [上一章 3.6](../3.6-langsmith-eval/README.md) · [下一章 3.8](../3.8-prompt-ab-judge/README.md)
 
-- **能力**：用同一批样本比较 baseline/candidate 的通过率、引用、拒答、延迟和错误率，计算 pass@k 与 pass^k 稳定性，并触发回归告警。
+- **目标**：在同一批问题上对比基线（Baseline）与候选（Candidate）系统，计算质量指标、P50/P99 延迟与异常率，识别质量退化告警，掌握 pass@k 与 pass^k 的场景选型，构建可用于 CI 的回归门禁。
 - **v2 路径**：L3.6 / 核心（Gate；回归对比）
-- **前置**：3.2（指标）、3.5（评测集）。
-- **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 分析）。
-- **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `regression_curve.py`。
-- **验收命令**：
+- **前置**：2.3、3.2。
+- **环境**：默认完全离线运行；带 `--live` 可发起真实模型调用。
+- **命令**：`python chapters/part3-evals/3.7-eval-regression-curve/gate/gate_check.py`
+
+## 问题
+
+每次修改 Prompt、知识库切分策略或检索召回算法后，你可能会发现评测集上的“平均分”上升了 2 分。
+然而，平均分上升往往会掩盖局部严重的质量退化：
+1. 原本必对的合规/事实问题突然全部答错；
+2. 尾部 P99 延迟由于多次检索重试出现恶化；
+3. 偶发超时导致运行时错误率（Error Rate）升高。
+
+我们需要一种能够在同一基准集上并排对比版本指标、输出退化告警，并在退化发生时阻断发布的回归对比与门禁机制。
+
+## 概念
+
+- **Baseline vs Candidate**：基线是当前稳定运行的生产版本；候选是经过改动待发布的被测版本。两者必须在完全相同的评测集上运行才有统计可比性。
+- **P50 / P99 延迟**：均值容易被少量极端快/慢的值拉偏。P50 反映典型用户体验，P99 反映系统最慢的尾部延迟瓶颈。
+- **Error Rate**：仅统计请求抛出异常（网络超时、限流 429、代码崩溃）的运行时错误比例，与回答内容质量指标区分统计。
+- **回归告警（Regression Alerts）**：设定容忍阈值（如错误率上升、P99 增加超 2000ms、通过率下降超 2%），自动抓出性能退化。
+- **pass@k 与 pass^k（pass-all-k）**：
+  - **pass@k**：在 $k$ 次独立试验中至少成功 1 次的概率；
+  - **pass^k**：单次成功率为 $p$ 时，连续 $k$ 次全部成功的概率（$p^k$）。
+
+## 任务
+
+### 规则
+
+- 闭卷实现：只读本任务书，不打开 `regression_curve.py`。
+- 实现 `gate/starter.py` 中的 8 个核心函数并通过 13 项离线 Gate 检查：
+  - 原有 4 个函数：`percentile`、`score_case`、`summarize`、`regression_alerts`；
+  - 进阶追加 4 个函数：`pass_at_k`、`pass_all_k`、`empirical_pass_all`、`split_suites`。
+
+### 关键口径
+
+| 函数 | 输入 | 输出 | 关键约束与边界 |
+|---|---|---|---|
+| `percentile` | `values: list[float], pct: int` | `float` | 线性插值分位数；空列表返回 0.0；pct 不在 0–100 抛 ValueError |
+| `score_case` | `case: dict, outputs: dict` | `dict` | 计算 `keyword_score`、`citation_score`、`refusal_ok`；当 keyword>=0.67 且 citation>=0.67 且 refusal_ok==1.0 时 `passed=True` |
+| `summarize` | `rows: list[dict]` | `dict` | 汇总 cases、error_rate、p50_latency_ms、p99_latency_ms、pass_rate、keyword_score、citation_score、refusal_ok、failures 列表；空 rows 全 0 |
+| `regression_alerts` | `baseline: dict, candidate: dict` | `list[str]` | 检测 5 类退化：error_rate 上升 > 0、p99 上升 > 2000ms、pass_rate 下降 > 0.02、citation_score 下降 > 0.02、refusal_ok 下降 > 0 |
+| `pass_at_k` | `n: int, c: int, k: int` | `float` | 无偏估计 $1 - \frac{C(n-c, k)}{C(n, k)}$；当 $n-c < k$ 时返回 1.0；$k < 1$、$k > n$、$c > n$ 或任一参数为负抛 ValueError |
+| `pass_all_k` | `success_rate: float, k: int` | `float` | 计算 $p^k$；success_rate 不在 [0.0, 1.0] 或 $k < 1$ 抛 ValueError |
+| `empirical_pass_all` | `results: dict[str, list[bool]], k: int` | `float` | 统计前 $k$ 次记录全为 True 的任务比例；空字典 `{}` 返回 0.0；某任务记录不足 $k$ 次或 $k < 1$ 抛 ValueError |
+| `split_suites` | `results: dict, floor: float = 0.95` | `tuple[list, list]` | 按通过率划分 `(regression_suite, capability_suite)` 并按任务名排序；floor 不在 [0.0, 1.0] 抛 ValueError |
+
+### 故障注入预测
+
+在实现前，先在 [workbook.md](workbook.md) 中预测以下场景的行为：
+1. 平均分上升但某一类样本全部失败时，回归告警是否能够捕获；
+2. 包含网络超时的异常行如何影响 error_rate；
+3. 5 类指标退化的边界触发逻辑；
+4. pass@k 参数非法（$k < 1$、$k > n$）与边界场景；
+5. empirical_pass_all 在空输入与记录不足时的处理；
+6. split_suites 的 floor 越界校验。
+
+## 验收
 
 ```bash
 python chapters/part3-evals/3.7-eval-regression-curve/gate/gate_check.py
 ```
 
-全部 PASS 才算通过；脚本会写 `gate/gate_report.json`。不允许改 `gate_check.py` 绕过检查。
-
-## 为什么做这个 gate
-
-“平均分涨了”可能掩盖某类问题全错。回归对比最容易出这些错：
-
-- 基线和候选用了不同题集/配置，比较无意义；
-- 只报平均分，不保留失败样本；
-- 延迟分位数算错，p99 被最大值或均值替代；
-- 告警阈值写反（涨了当降了）；
-- 错误率和质量差混为一谈；
-- 混淆探索型场景的 pass@k 与生产稳定性场景的 pass^k。
-
-这个 gate 验证分位数、单条评分、汇总统计、告警阈值以及 pass@k / pass^k / 套件划分。
-
-## 任务
-
-实现 `gate/starter.py` 的函数：
-
-| 函数 | 你要交付的行为 |
-|---|---|
-| `percentile` | 线性插值分位数；空列表 0；pct 越界报错 |
-| `score_case` | keyword/citation/refusal 三项分 + `passed` |
-| `summarize` | cases/error_rate/p50/p99/pass_rate/三项均分/failures |
-| `regression_alerts` | 5 类退化告警；无退化返回 [] |
-| `pass_at_k` | n 次独立尝试中 c 次成功时“k 次里至少成功 1 次”的无偏估计：$1 - C(n-c, k) / C(n, k)$；参数非法报错；$n-c < k$ 返回 1.0 |
-| `pass_all_k` | 单次成功率为 p 时连续 k 次全部成功的理论概率 $p^k$；p 越界或 $k < 1$ 报错 |
-| `empirical_pass_all` | 每个任务取前 k 次记录统计“k 次全部通过”的任务占比；记录不足 k 次报错 |
-| `split_suites` | 通过率 $\ge$ `regression_floor` 归入回归集，其余归入能力集；两个列表均按任务名排序 |
-
-关键口径：
-
-- `keyword_score`/`citation_score` 没有对应标注时记 1.0。
-- `refusal_ok`：拒答词是否与 `should_refuse` 一致。
-- `passed`：keyword $\ge 0.67$、citation $\ge 0.67$、refusal_ok=1。
-- 告警：error 上升 >0；p99 上升 >2000ms；pass 下降 >0.02；citation 下降 >0.02；refusal 下降 >0。
-- 空 rows -> 全 0，`failures=[]`。
-- `pass_at_k` 中 $k > n$、$c > n$ 或任一参数为负抛 `ValueError`；$n - c < k$ 时返回 1.0。
-- `split_suites` 默认 floor 为 0.95，返回 `(regression_suite, capability_suite)`。
-
-## 故障注入（必须亲手触发）
-
-| # | 注入 | 期望 |
-|---|---|---|
-| 1 | 空/单值/插值 | 0 / 自身 / 5 |
-| 2 | 正确样本 | 三项满分，passed |
-| 3 | 关键词未命中 | score<0.67，failed |
-| 4 | 应拒未拒 / 正确拒答 | 0 / 1 |
-| 5 | 缺来源 | citation=0，failed |
-| 6 | 汇总含异常行 | error_rate=0.5、p50=20、p99=29.8 |
-| 7 | 5 类退化 | 5 条告警 |
-| 8 | 阈值边界 | 不误报 |
-| 9 | `pass_at_k` 传入负数或 $k > n$ | 抛出 `ValueError` |
-| 10 | `pass_at_k` 剩余失败数 $n - c < k$ | 返回 1.0 |
-| 11 | `pass_all_k` 传入 $p = -0.1$ 或 $k = 0$ | 抛出 `ValueError` |
-| 12 | `empirical_pass_all` 某任务记录不足 $k$ 次 | 抛出 `ValueError` |
-| 13 | `split_suites` 传入非法 `regression_floor`（如 1.2） | 抛出 `ValueError` |
-
-## 验收标准
-
-`gate_check.py` 的 13 项全部 PASS（原 8 项 + 追加 5 项）：
-
-- 原 8 项：分位数、正确样本、关键词、拒答、来源、汇总、告警、边界。
-- 追加 5 项：pass@k 估计与边界、pass@k 参数校验、pass^k 概率计算与边界、经验连续通过率统计、评测集划分与排序。
-
 通过后，在 [workbook.md](workbook.md) 写：
 
 1. 为什么平均分上涨仍可能藏着回归？
 2. p99 和均值各适合回答什么问题？
-3. 为什么面向客户的生产系统不能仅看 pass@k，而必须关注 pass^k？
+3. 告警阈值应该由谁定？定得太松/太紧的代价？
+4. 为什么面向客户的生产系统不能仅看 pass@k，而必须关注 pass^k？
 
 ## 提交物
 
 - `gate/starter.py`（实现后的版本）。
 - `gate/gate_report.json`（13/13）。
-- workbook 里的失败分析与三个问题的回答。
+- workbook 里的失败分析与四个问题的回答。
 
 ## 能力评测与回归评测的工程边界
 
-在构建持续评测（Continuous Evals）流水线时，必须明确区分两类性质完全不同的评测套件：
+在构建自动化评测套件时，工程实践中常区分两类不同用途的评测：
 
 1. **能力评测（Capability Evals）**：
-   - **目标**：摸高，探索模型在极端、复杂或新引入任务场景下的表现边界。
-   - **特性**：起点通过率通常较低（可能仅 30%~60%），刻意留出充足的提升与探索空间。
-   - **度量**：常关注 **pass@k**——在 $k$ 次独立尝试中只要有 1 次成功即可（适合代码生成、Agent 自主修复等“允许试错、最终对一次就算成功”的场景）。
+   - **目标**：摸索模型或系统在复杂、长尾、新引入任务场景下的表现边界。
+   - **特性**：初期通过率可能较低，重点在于观察迭代改进趋势。
+   - **度量**：常关注 **pass@k**——在 $k$ 次独立尝试中只要有 1 次成功即可（适合提供多样化备选答案、允许重试的场景；在编程基准测试中，开发实践通常重点关注首次通过率 pass@1）。
 
 2. **回归评测（Regression Evals）**：
-   - **目标**：守底，守住系统在已上线业务、关键用例与高频查询中的确定性基线。
-   - **特性**：预期通过率应无限接近 100%（例如 $\ge 95\%$ 或 $100\%$）。在发布门禁中，**任何通过率的微小下降或关键用例报错都是致命的退化信号**。
-   - **度量**：必须关注 **pass^k（pass-all-k）**——单次成功率为 $p$ 时连续 $k$ 次全部成功的概率（$p^k$）。对于面向客户的企业客服、金融问答、权限隔离等零容错场景，单次 95% 通过率在 5 轮交互后复合成功率仅剩约 $77.4\%$（$0.95^5$），必须以连续稳定全通为发布标准。
+   - **目标**：守住系统在已上线业务、核心查询和关键合规用例中的基线。
+   - **特性**：预期通过率应维持在高位（如 $\ge 95\%$ 或 $100\%$）。在发布门禁中，核心指标下降即为明显的退化信号。
+   - **度量**：适合关注 **pass^k（pass-all-k）**——单次成功率为 $p$ 时连续 $k$ 次独立试验全部成功的概率（$p^k$）。对于面向客户的企业客服、交易下单等需要高稳定性的场景，单次 95% 通过率在连续独立执行 5 次时复合全通率约为 $77.4\%$（$0.95^5$），稳定交付需关注连续通过率。
 
-> **行业参考**：关于能力评测与回归评测的分流规范，以及 pass@k 与 pass^k 的场景选型，详见 Anthropic 发布的权威指南《Demystifying evals for AI agents》（[Anthropic 官网](https://www.anthropic.com/news/evals-for-ai-agents)，2026-01-09；读取日期：2026-10-30）。
+> **行业参考**：关于 pass@k 与 pass^k 的场景选型讨论，可参考 Anthropic 评测指南《Demystifying evals for AI agents》（[Anthropic 官网](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)，2026-01-09；读取日期：2026-10-30）。将评测套件划分为能力集与回归集属于工程落地的测试策略。
 
 ## 通过后对照参考实现
 
-不要提前看。通过后再运行并对照：
+通过 gate 后，再运行并对照参考实现：
 
 ```bash
 python tools/run_chapter.py 3.7
 ```
 
-对照时只回答：
+### CI 回归门禁用法
 
-1. 原生参考实现如何脱离 LCEL 管道完成 Baseline 与 Candidate 的对照并统计 P50/P99 物理耗时？
-2. 在企业客服或合规 RAG 场景中，为什么衡量指标应当关注 pass^k（pass-all-k）而非 pass@k？
+参考实现支持作为 CI/CD 质量卡点：
+
+```bash
+# 当检测到回归退化告警时以非 0 退出（exit 1），阻止 CI 合并
+python tools/run_chapter.py 3.7 --fail-on-regression
+
+# 将候选版本的失败样本写入 shared-data/failures.json 供 3.10 诊断
+python tools/run_chapter.py 3.7 --write-failures
+
+# 指定自定义评测用例集
+python tools/run_chapter.py 3.7 --cases path/to/eval_set.json
+```
+
+对照时思考：
+1. 原生参考实现如何脱离 LCEL 完成 Baseline 与 Candidate 的对照并统计 P50/P99 耗时？
+2. 在面向终端用户的业务场景中，为什么衡量指标应当关注 pass^k 而非单一 pass@k？
 3. `split_suites` 将高通过率任务与低通过率任务分流，对 CI/CD 流水线的门禁策略有何指导意义？
 
 ## 概念地图
 
 - **基线与候选**：同一题集、同一配置才有可比性。
-- **平均分陷阱**：总分掩盖某类样本的集体退化。
+- **平均分陷阱**：总分掩盖某类样本的局部退化。
 - **分位数**：p50/p99 看尾部延迟，均值看总体。
 - **错误率**：只统计运行时异常，不混同质量差。
+- **门禁：阈值是业务风险选择**：技术只能给出退化幅度，阻断与否取决于业务能承受多少风险。
 - **pass@k 与 pass^k**：试错探索看 pass@k，稳定上线看 pass^k。
 - **套件分流（split_suites）**：回归集进 CI 强卡点，能力集进看板持续迭代。
 

@@ -2,24 +2,30 @@
 ==========================================================
 核心能力与架构演进：
 1. 为什么脱离单一厂商平台，转向 OpenTelemetry（OTel）标准化追踪？
-   - 传统方案将追踪深绑定在 LangSmith、Weights & Biases 等私有 SDK 中，造成厂商锁定（Vendor Lock-in）；
+   - 传统方案将追踪深绑定在特定平台 SDK 中，带来厂商锁定（Vendor Lock-in）风险；
    - OpenTelemetry 是 CNCF 云原生计算基金会的跨语言、开放行业标准；
-   - 统一协议（OTLP）可同时将调用链路无缝分流至 Langfuse、Phoenix、Jaeger、Datadog 等任意后端。
-2. OpenTelemetry GenAI Semantic Conventions（生成式 AI 语义约定，2026 开发中标准）：
-   - `gen_ai.system`: 模型厂商体系标识（如 openai、deepseek、anthropic 等）；
-   - `gen_ai.operation.name`: 操作类别（chat、text_completion、embeddings 等）；
+   - 统一协议（OTLP）可无缝将链路数据路由至 Langfuse、Phoenix、Jaeger、Datadog 等任意后端。
+2. OpenTelemetry GenAI Semantic Conventions（生成式 AI 语义约定，规范来源：
+   https://github.com/open-telemetry/semantic-conventions-genai，依据 commit 3fe84604a5，
+   截至 2026-10-30 处于 Development 实验演进状态）：
+   - `gen_ai.provider.name`: 模型提供方标识（如 deepseek、openai、anthropic；semconv v1.37.0+ 弃用 gen_ai.system）；
+   - `gen_ai.operation.name`: 操作类别（chat、text_completion、embeddings、retrieval 等）；
    - `gen_ai.request.model` / `gen_ai.response.model`: 请求与实际响应模型标识；
    - `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`: Token 消耗量指标；
-   - `gen_ai.retrieval.documents_count`: 检索命中片段数量。
+   - `gen_ai.response.finish_reasons`: 结束原因列表（如 ["stop"]）；
+   - 检索 Span 规范：Span 名为 `retrieval {gen_ai.data_source.id}`，属性包含 `gen_ai.data_source.id` 与 `gen_ai.retrieval.top_k`；
+   - 推理 Span 规范：Span 名为 `{gen_ai.operation.name} {gen_ai.request.model}`，SpanKind 为 CLIENT；
+   - 自定义属性约定：非官方约定的项目私有属性统一使用 `app.*` 前缀。
 3. 隐私与数据安全脱敏：
-   - Prompt 与生成的回答正文属于高敏感 PII，默认不采集（或占位脱敏）；
-   - 仅在明确开启授权选项并脱敏后采集。
+   - Prompt 与生成的回答正文属于高敏感数据，默认不采集（使用 [REDACTED_BY_DEFAULT] 占位）；
+   - 即使显式开启采集选项（--capture-content），也须先经过基础脱敏过滤器处理；
+   - 异常发生时，仅记录 error.type 与清洗后的错误描述，不写入包含本机文件路径的原始堆栈（stacktrace）。
 
 运行模式：
   默认离线控制台导出（无需外部 API Key 与网络，输出 Span 到 Console）：
     python tools/run_chapter.py 3.6 otel_tracing_eval.py
-  指定 OTLP 端点（如本地部署的 Langfuse / Phoenix）：
-    $env:OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4317"
+  指定 OTLP 端点（由 SDK 标准环境变量解析，支持 HTTP 与 gRPC）：
+    $env:OTEL_EXPORTER_OTLP_ENDPOINT="http://localhost:4318"
     python tools/run_chapter.py 3.6 otel_tracing_eval.py
   真实模型调用（需配置 API Key）：
     python tools/run_chapter.py 3.6 otel_tracing_eval.py --live
@@ -30,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -47,6 +54,7 @@ from opentelemetry.sdk.trace.export import (
 # 兼容 common 导入
 try:
     from common import (
+        LLM_PROVIDER,
         SAMPLE_DOC,
         chat_model_name,
         get_openai_client,
@@ -56,10 +64,38 @@ except ImportError:
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
     from common import (
+        LLM_PROVIDER,
         SAMPLE_DOC,
         chat_model_name,
         get_openai_client,
     )
+
+
+# --------------------------- 脱敏与隐私辅助函数 ---------------------------
+
+def sanitize_text(text: str) -> str:
+    """基础脱敏过滤器：掩码常见敏感信息（API Key、邮箱、手机号等）。"""
+    if not text:
+        return ""
+    # 掩码类似 sk-... 的 API 密钥
+    scrubbed = re.sub(r"sk-[A-Za-z0-9_-]{8,}", "sk-***", text)
+    # 掩码电子邮箱
+    scrubbed = re.sub(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", "***@***.com", scrubbed)
+    # 掩码手机号
+    scrubbed = re.sub(r"(?<!\d)1[3-9]\d{9}(?!\d)", "1**********", scrubbed)
+    return scrubbed
+
+
+def resolve_provider_name() -> str:
+    """根据配置解析符合 OpenTelemetry GenAI 约定的提供商标识。"""
+    prov = str(LLM_PROVIDER).strip().lower()
+    if prov in ("deepseek", "openai", "anthropic", "ollama", "azure"):
+        return prov
+    if "deepseek" in prov:
+        return "deepseek"
+    if "openai" in prov:
+        return "openai"
+    return "custom"
 
 
 # --------------------------- Tracer 初始化 ---------------------------
@@ -68,7 +104,9 @@ def setup_tracer(service_name: str = "rag-eval-service") -> trace.Tracer:
     """初始化并配置 TracerProvider 与导出器。
 
     默认使用 ConsoleSpanExporter 输出到控制台（离线无网络）。
-    当检测到环境变量 OTEL_EXPORTER_OTLP_ENDPOINT 时，尝试配置 OTLP 导出器。
+    当检测到环境变量 OTEL_EXPORTER_OTLP_ENDPOINT 时，按标准 SDK 环境变量规则接入 OTLP 导出器。
+    根据 OTEL_EXPORTER_OTLP_PROTOCOL 选择导出器协议（默认为 http/protobuf，适合 Langfuse 等）：
+    - 不再在代码中写死 endpoint 或 insecure，完全遵循 OpenTelemetry 标准环境变量约定。
     """
     resource = Resource.create({
         "service.name": service_name,
@@ -80,24 +118,36 @@ def setup_tracer(service_name: str = "rag-eval-service") -> trace.Tracer:
     otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").strip()
 
     if otlp_endpoint:
+        protocol = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf").strip().lower()
+        exporter = None
         try:
-            # 优先尝试 gRPC 导出器，其次 HTTP 导出器
-            try:
-                from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-                    OTLPSpanExporter,
-                )
-                exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
-                print(f"[OTel] 成功配置 OTLP gRPC 导出器 -> {otlp_endpoint}")
-            except ImportError:
-                from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-                    OTLPSpanExporter,
-                )
-                exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
-                print(f"[OTel] 成功配置 OTLP HTTP 导出器 -> {otlp_endpoint}")
+            if "grpc" in protocol:
+                try:
+                    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                        OTLPSpanExporter,
+                    )
+                    exporter = OTLPSpanExporter()
+                    print(f"[OTel] 成功配置 OTLP gRPC 导出器 (读取标准环境变量: {otlp_endpoint})")
+                except ImportError:
+                    print("[OTel 提示] 未安装 opentelemetry-exporter-otlp-proto-grpc，尝试 HTTP 导出器", file=sys.stderr)
 
-            provider.add_span_processor(SimpleSpanProcessor(exporter))
+            if exporter is None:
+                try:
+                    from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+                        OTLPSpanExporter,
+                    )
+                    exporter = OTLPSpanExporter()
+                    print(f"[OTel] 成功配置 OTLP HTTP 导出器 (读取标准环境变量: {otlp_endpoint})")
+                except ImportError:
+                    print("[OTel 提示] 未安装 opentelemetry-exporter-otlp-proto-http，无法启用 OTLP HTTP 导出", file=sys.stderr)
+
+            if exporter is not None:
+                provider.add_span_processor(SimpleSpanProcessor(exporter))
+            else:
+                print("[OTel 告警] 未找到可用的 OTLP 导出器包，降级为控制台输出", file=sys.stderr)
+                provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
         except Exception as exc:
-            print(f"[OTel 告警] 配置 OTLP 导出器失败 ({exc})，降级为 ConsoleSpanExporter", file=sys.stderr)
+            print(f"[OTel 告警] 初始化 OTLP 导出器失败 ({exc})，降级为 ConsoleSpanExporter", file=sys.stderr)
             provider.add_span_processor(SimpleSpanProcessor(ConsoleSpanExporter()))
     else:
         # 默认离线控制台导出
@@ -114,52 +164,77 @@ def run_scripted_rag_with_trace(
     question: str,
     capture_content: bool = False,
 ) -> dict[str, Any]:
-    """离线确定性 RAG 调用链路（完整展示三层 Span 嵌套与 GenAI 语义约定属性）。"""
-    with tracer.start_as_current_span("rag_pipeline") as root_span:
-        root_span.set_attribute("pipeline.type", "standard_rag")
-        root_span.set_attribute("user.query", question if capture_content else "[REDACTED]")
+    """离线确定性 RAG 调用链路（完整展示三层 Span 嵌套与 GenAI 语义约定标准属性）。"""
+    with tracer.start_as_current_span("rag_pipeline", kind=trace.SpanKind.INTERNAL) as root_span:
+        root_span.set_attribute("app.pipeline.type", "standard_rag")
+        root_span.set_attribute(
+            "app.user.query",
+            sanitize_text(question) if capture_content else "[REDACTED_BY_DEFAULT]",
+        )
 
-        # 1. 检索阶段 Span
-        with tracer.start_as_current_span("rag_retrieval") as ret_span:
+        data_source_id = "test_doc.txt"
+        mock_context = "RAG 是检索增强生成，先从外部知识库检索相关分块，再拼装上下文交给大模型。"
+
+        # 1. 检索阶段 Span（对齐 GenAI semconv: retrieval {gen_ai.data_source.id}）
+        retrieval_span_name = f"retrieval {data_source_id}"
+        with tracer.start_as_current_span(retrieval_span_name, kind=trace.SpanKind.INTERNAL) as ret_span:
             ret_span.set_attribute("gen_ai.operation.name", "retrieval")
+            ret_span.set_attribute("gen_ai.data_source.id", data_source_id)
             ret_span.set_attribute("gen_ai.retrieval.top_k", 3)
-            ret_span.set_attribute("gen_ai.retrieval.documents_count", 2)
-            ret_span.set_attribute("retrieval.source", "test_doc.txt")
+            # 自定义属性统一使用 app.* 前缀，避免污染 gen_ai.* 命名空间
+            ret_span.set_attribute("app.retrieval.chunk_count", 2)
+            ret_span.set_attribute("app.retrieval.source", data_source_id)
+            if capture_content:
+                ret_span.set_attribute("gen_ai.retrieval.query.text", sanitize_text(question))
             time.sleep(0.005)  # 模拟检索微量耗时
-            mock_context = "RAG 是检索增强生成，先从外部知识库检索相关分块，再拼装上下文交给大模型。"
 
-        # 2. 上下文拼装阶段 Span
-        with tracer.start_as_current_span("assemble_context") as ctx_span:
-            ctx_span.set_attribute("context.char_count", len(mock_context))
-            ctx_span.set_attribute("context.truncated", False)
+        # 2. 上下文拼装阶段 Span（内部业务阶段使用 app.*）
+        with tracer.start_as_current_span("assemble_context", kind=trace.SpanKind.INTERNAL) as ctx_span:
+            ctx_span.set_attribute("app.context.char_count", len(mock_context))
+            ctx_span.set_attribute("app.context.truncated", False)
 
-        # 3. 语言模型推理阶段 Span (严格对齐 OTel GenAI 语义约定)
-        with tracer.start_as_current_span("chat_completion") as llm_span:
-            llm_span.set_attribute("gen_ai.system", "openai")
+        # 3. 语言模型推理阶段 Span（对齐 GenAI semconv: {gen_ai.operation.name} {gen_ai.request.model}，CLIENT 类型）
+        model_name = "deepseek-flash"
+        inference_span_name = f"chat {model_name}"
+        with tracer.start_as_current_span(inference_span_name, kind=trace.SpanKind.CLIENT) as llm_span:
+            llm_span.set_attribute("gen_ai.provider.name", "deepseek")
             llm_span.set_attribute("gen_ai.operation.name", "chat")
-            llm_span.set_attribute("gen_ai.request.model", "deepseek-flash")
-            llm_span.set_attribute("gen_ai.response.model", "deepseek-flash-2026")
+            llm_span.set_attribute("gen_ai.request.model", model_name)
+            llm_span.set_attribute("gen_ai.response.model", f"{model_name}-2026")
             llm_span.set_attribute("gen_ai.request.temperature", 0.0)
             llm_span.set_attribute("gen_ai.usage.input_tokens", 85)
             llm_span.set_attribute("gen_ai.usage.output_tokens", 36)
+            llm_span.set_attribute("gen_ai.response.finish_reasons", ["stop"])
+
+            mock_answer = "RAG 结合了外部检索与生成模型，能有效抑制幻觉。【来源：test_doc.txt】"
 
             # 隐私合规约定：默认不写入真实 Prompt 与 Completion 正文
             if capture_content:
-                llm_span.set_attribute("gen_ai.prompt", f"问题：{question}\n上下文：{mock_context}")
-                llm_span.set_attribute("gen_ai.completion", "RAG 结合了外部检索与生成模型，能有效抑制幻觉。")
+                llm_span.set_attribute(
+                    "gen_ai.input.messages",
+                    [f"user: {sanitize_text(question)}", f"context: {sanitize_text(mock_context)}"],
+                )
+                llm_span.set_attribute(
+                    "gen_ai.output.messages",
+                    [f"assistant: {sanitize_text(mock_answer)}"],
+                )
             else:
-                llm_span.set_attribute("gen_ai.prompt.status", "redacted_for_privacy")
-                llm_span.set_attribute("gen_ai.completion.status", "redacted_for_privacy")
+                llm_span.set_attribute("app.prompt.status", "redacted_for_privacy")
+                llm_span.set_attribute("app.completion.status", "redacted_for_privacy")
 
             time.sleep(0.010)
-            mock_answer = "RAG 结合了外部检索与生成模型，能有效抑制幻觉。【来源：test_doc.txt】"
 
-        root_span.set_attribute("pipeline.success", True)
+        root_span.set_attribute("app.pipeline.success", True)
         return {
             "question": question,
             "answer": mock_answer,
             "mode": "scripted_offline",
-            "spans_generated": ["rag_pipeline", "rag_retrieval", "assemble_context", "chat_completion"],
+            "spans_generated": [
+                "rag_pipeline",
+                retrieval_span_name,
+                "assemble_context",
+                inference_span_name,
+            ],
         }
 
 
@@ -170,58 +245,91 @@ def run_live_rag_with_trace(
     question: str,
     capture_content: bool = False,
 ) -> dict[str, Any]:
-    """在线真实调用并通过 OpenTelemetry 记录真实耗时与 Token 使用。"""
-    with tracer.start_as_current_span("rag_pipeline") as root_span:
-        root_span.set_attribute("pipeline.type", "live_rag")
-        root_span.set_attribute("user.query", question if capture_content else "[REDACTED]")
+    """在线真实调用并通过 OpenTelemetry 记录链路属性、耗时与 Token 使用。"""
+    provider_name = resolve_provider_name()
+    data_source_id = str(SAMPLE_DOC.name)
+
+    with tracer.start_as_current_span("rag_pipeline", kind=trace.SpanKind.INTERNAL) as root_span:
+        root_span.set_attribute("app.pipeline.type", "live_rag")
+        root_span.set_attribute(
+            "app.user.query",
+            sanitize_text(question) if capture_content else "[REDACTED_BY_DEFAULT]",
+        )
 
         # 1. 真实检索（读取 SAMPLE_DOC 摘录）
-        with tracer.start_as_current_span("rag_retrieval") as ret_span:
+        retrieval_span_name = f"retrieval {data_source_id}"
+        with tracer.start_as_current_span(retrieval_span_name, kind=trace.SpanKind.INTERNAL) as ret_span:
             ret_span.set_attribute("gen_ai.operation.name", "retrieval")
+            ret_span.set_attribute("gen_ai.data_source.id", data_source_id)
+            ret_span.set_attribute("gen_ai.retrieval.top_k", 1)
+
             context = "这是本地示例文档内容：RAG 系统先从向量知识库中召回上下文片段，再生成回答。"
             if SAMPLE_DOC.exists():
                 context = SAMPLE_DOC.read_text(encoding="utf-8")[:500]
-            ret_span.set_attribute("gen_ai.retrieval.documents_count", 1)
-            ret_span.set_attribute("retrieval.source", str(SAMPLE_DOC.name))
+
+            ret_span.set_attribute("app.retrieval.chunk_count", 1)
+            ret_span.set_attribute("app.retrieval.source", data_source_id)
+            if capture_content:
+                ret_span.set_attribute("gen_ai.retrieval.query.text", sanitize_text(question))
 
         # 2. 上下文拼装
-        with tracer.start_as_current_span("assemble_context") as ctx_span:
-            ctx_span.set_attribute("context.char_count", len(context))
+        with tracer.start_as_current_span("assemble_context", kind=trace.SpanKind.INTERNAL) as ctx_span:
+            ctx_span.set_attribute("app.context.char_count", len(context))
             prompt = f"请根据上下文简明回答问题：\n上下文：{context}\n问题：{question}\n请在句末标注【来源：{SAMPLE_DOC.name}】。"
 
         # 3. 真实模型生成与 Token 记录
-        with tracer.start_as_current_span("chat_completion") as llm_span:
-            llm_span.set_attribute("gen_ai.system", "openai")
+        inference_span_name = f"chat {model}"
+        with tracer.start_as_current_span(inference_span_name, kind=trace.SpanKind.CLIENT) as llm_span:
+            llm_span.set_attribute("gen_ai.provider.name", provider_name)
             llm_span.set_attribute("gen_ai.operation.name", "chat")
             llm_span.set_attribute("gen_ai.request.model", model)
             llm_span.set_attribute("gen_ai.request.temperature", 0.0)
 
             t0 = time.perf_counter()
-            response = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.0,
-            )
-            dur_ms = (time.perf_counter() - t0) * 1000.0
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                )
+            except Exception as exc:
+                dur_ms = (time.perf_counter() - t0) * 1000.0
+                llm_span.set_attribute("app.latency_ms", dur_ms)
+                # 隐私防线：记录错误类型与脱敏描述，不记录包含本地路径的 stacktrace
+                err_type = exc.__class__.__name__
+                llm_span.set_attribute("error.type", err_type)
+                llm_span.set_status(trace.StatusCode.ERROR, description=sanitize_text(str(exc)[:200]))
+                root_span.set_attribute("app.pipeline.success", False)
+                root_span.set_status(trace.StatusCode.ERROR, description=f"LLM call failed with {err_type}")
+                raise
 
+            dur_ms = (time.perf_counter() - t0) * 1000.0
             ans = response.choices[0].message.content or ""
             usage = response.usage
             in_tokens = usage.prompt_tokens if usage else 0
             out_tokens = usage.completion_tokens if usage else 0
 
+            finish_reason = response.choices[0].finish_reason or "stop"
             llm_span.set_attribute("gen_ai.response.model", response.model or model)
             llm_span.set_attribute("gen_ai.usage.input_tokens", in_tokens)
             llm_span.set_attribute("gen_ai.usage.output_tokens", out_tokens)
-            llm_span.set_attribute("llm.latency_ms", dur_ms)
+            llm_span.set_attribute("gen_ai.response.finish_reasons", [str(finish_reason)])
+            llm_span.set_attribute("app.latency_ms", dur_ms)
 
             if capture_content:
-                llm_span.set_attribute("gen_ai.prompt", prompt)
-                llm_span.set_attribute("gen_ai.completion", ans)
+                llm_span.set_attribute(
+                    "gen_ai.input.messages",
+                    [f"user: {sanitize_text(prompt)}"],
+                )
+                llm_span.set_attribute(
+                    "gen_ai.output.messages",
+                    [f"assistant: {sanitize_text(ans)}"],
+                )
             else:
-                llm_span.set_attribute("gen_ai.prompt.status", "redacted_for_privacy")
-                llm_span.set_attribute("gen_ai.completion.status", "redacted_for_privacy")
+                llm_span.set_attribute("app.prompt.status", "redacted_for_privacy")
+                llm_span.set_attribute("app.completion.status", "redacted_for_privacy")
 
-        root_span.set_attribute("pipeline.success", True)
+        root_span.set_attribute("app.pipeline.success", True)
         return {
             "question": question,
             "answer": ans,
@@ -244,7 +352,7 @@ def main() -> int:
     print("  L3.7 追踪与评测平台（OpenTelemetry GenAI 语义约定标准）")
     print("==========================================================")
     print(f"当前输入问题: {args.query}")
-    print(f"正文采集策略: {'[开启正文采集]' if args.capture_content else '[默认脱敏保护: prompt/completion 不落盘]'}")
+    print(f"正文采集策略: {'[开启正文脱敏采集]' if args.capture_content else '[默认脱敏保护: [REDACTED_BY_DEFAULT]]'}")
 
     tracer = setup_tracer()
 
@@ -255,7 +363,7 @@ def main() -> int:
         print("\n--- 业务执行结果 ---")
         print(f"生成回答: {res['answer']}")
         print(f"生成的链路 Span: {res['spans_generated']}")
-        print("\n[离线演练完成] 控制台上方已打印各 Span 的标准属性（gen_ai.*）。")
+        print("\n[离线演练完成] 控制台已输出各 Span 及其标准属性（gen_ai.*）。")
         return 0
 
     print("\n[在线模式] 正在初始化原生 OpenAI 客户端...")

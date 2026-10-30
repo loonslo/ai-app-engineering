@@ -60,7 +60,7 @@ def regression_alerts(baseline: dict, candidate: dict) -> list[str]:
 def pass_at_k(n: int, c: int, k: int) -> float:
     """n 次独立尝试中有 c 次成功时，“k 次里至少成功 1 次”的无偏估计：1 - C(n-c, k) / C(n, k)。
 
-    k > n、c > n 或任一参数为负时抛 ValueError；n - c < k 时返回 1.0。
+    参数约束：k < 1、k > n、c > n 或任一参数为负时抛 ValueError；n - c < k 时返回 1.0。
     """
     raise NotImplementedError("实现 pass@k 无偏估计")
 
@@ -71,12 +71,15 @@ def pass_all_k(success_rate: float, k: int) -> float:
 
 
 def empirical_pass_all(results: dict[str, list[bool]], k: int) -> float:
-    """每个任务取前 k 次记录，统计“k 次全部通过”的任务占比；某任务记录不足 k 次时抛 ValueError。"""
+    """每个任务取前 k 次记录，统计“k 次全部通过”的任务占比；空字典返回 0.0；某任务记录不足 k 次或 k < 1 时抛 ValueError。"""
     raise NotImplementedError("实现经验 pass^all 统计")
 
 
 def split_suites(
     results: dict[str, list[bool]], regression_floor: float = 0.95
 ) -> tuple[list[str], list[str]]:
-    """通过率 >= regression_floor 的任务归入回归集，其余归入能力集；两个列表都按任务名排序。"""
+    """通过率 >= regression_floor 的任务归入回归集，其余归入能力集；两个列表都按任务名排序。
+
+    regression_floor 不在 [0.0, 1.0] 时抛 ValueError。
+    """
     raise NotImplementedError("实现评测套件拆分")

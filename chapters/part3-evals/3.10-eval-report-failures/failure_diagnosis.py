@@ -128,15 +128,21 @@ def measure_with_deepeval(failure: dict) -> dict:
     from dotenv import load_dotenv
     load_dotenv()
 
-    from deepeval.models.llms.deepseek_model import DeepSeekModel
-    from deepeval.metrics import (
-        FaithfulnessMetric,
-        AnswerRelevancyMetric,
-        ContextualPrecisionMetric,
-    )
-    from deepeval.test_case import LLMTestCase
+    try:
+        from deepeval.models.llms.deepseek_model import DeepSeekModel
+        from deepeval.metrics import (
+            FaithfulnessMetric,
+            AnswerRelevancyMetric,
+            ContextualPrecisionMetric,
+        )
+        from deepeval.test_case import LLMTestCase
+    except ImportError as e:
+        return {"error": f"deepeval 未安装: {e}"}
 
-    eval_model = DeepSeekModel(model="deepseek-chat")
+    try:
+        eval_model = DeepSeekModel(model="deepseek-chat")
+    except Exception as exc:
+        return {"error": f"初始化 DeepSeekModel 失败: {exc}"}
     retrieval_context = failure.get("retrieval_context") or ""
     expected_output = failure.get("reference") or failure.get("expected_output") or ""
 
@@ -172,6 +178,8 @@ def measure_with_deepeval(failure: dict) -> dict:
 
 def dims_to_evidence(dims: dict) -> str:
     """把维度分翻译成可读证据（标注为建议，非判决）。"""
+    if "error" in dims:
+        return f"跳过框架复核（{dims['error']}）"
     ev = []
     for key, label in [
         ("faithfulness", "答案不忠于上下文(疑似幻觉)"),
@@ -287,7 +295,12 @@ def main():
     args = parser.parse_args()
 
     source = args.input or default_failures_path()
-    failures, source_mode = load_failures(source)
+    try:
+        failures, source_mode = load_failures(source)
+    except (ValueError, FileNotFoundError) as exc:
+        print(f"[错误] 加载失败库失败：{exc}", file=sys.stderr)
+        print("  可先运行 3.7 并加 --write-failures 生成，或用 --input 指定有效文件。", file=sys.stderr)
+        sys.exit(2)
     mode = args.mode or source_mode
     if args.mode and args.mode != source_mode:
         print(f"[WARN] 显式 --mode={args.mode}，但失败库推断为 {source_mode} 产物。"

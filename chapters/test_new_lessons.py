@@ -67,13 +67,13 @@ def test_error_localization(changes, expected):
 
 
 def test_tool_loop_succeeds_and_repeated_action_terminates():
-    result = agents.build_graph().invoke(agents.initial_state())
+    result = agents.run_agent(agents.initial_state())
     assert result["status"] == "done" and result["observations"] == [5]
 
     def repeating(_):
         return {"action": "add", "a": 2, "b": 3}
 
-    result = agents.build_graph(repeating, max_steps=2).invoke(agents.initial_state())
+    result = agents.run_agent(agents.initial_state(), repeating, max_steps=2)
     assert result["status"] == "failed" and result["steps"] == 2
 
 
@@ -81,25 +81,29 @@ def test_unknown_tool_and_invalid_arguments_cannot_succeed():
     def invalid(_):
         return {"action": "delete", "a": 2, "b": 3}
 
-    result = agents.build_graph(invalid).invoke(agents.initial_state())
+    result = agents.run_agent(agents.initial_state(), invalid)
     assert result["status"] == "failed" and result["steps"] == 0
 
     def invalid_args(_):
         return {"action": "add", "a": "bad", "b": 3}
 
-    result = agents.build_graph(invalid_args).invoke(agents.initial_state())
+    result = agents.run_agent(agents.initial_state(), invalid_args)
     assert result["status"] == "failed" and result["observations"] == []
 
 
-def test_checkpoint_resume_does_not_repeat_completed_tool():
-    from langgraph.checkpoint.memory import InMemorySaver
+def test_checkpoint_resume_does_not_repeat_completed_tool(monkeypatch):
+    # 检查点属于后续图/HITL 章节，不再挂在 4.1 的原生控制流上。
+    from langgraph.types import Command
 
-    graph = agents.build_graph(checkpointer=InMemorySaver(), pause_before_tool=True)
+    hitl = load("checkpoint_hitl_lesson", "part4-agents-langgraph/4.11-streaming-hitl/streaming_hitl.py")
+    prepared = []
+    monkeypatch.setattr(hitl, "prepare", lambda state: prepared.append(state["target"]) or {})
+    graph = hitl.build_app()
     config = {"configurable": {"thread_id": "offline-lesson"}}
-    paused = graph.invoke(agents.initial_state(), config)
-    assert paused["steps"] == 0 and graph.get_state(config).next == ("tool",)
-    resumed = graph.invoke(None, config)
-    assert resumed["status"] == "done" and resumed["observations"] == [5]
+    paused = graph.invoke({"target": "example.txt", "result": ""}, config)
+    assert paused["__interrupt__"] and prepared == ["example.txt"]
+    resumed = graph.invoke(Command(resume="yes"), config)
+    assert "已模拟删除" in resumed["result"] and prepared == ["example.txt"]
     assert graph.get_state(config).next == ()
 
 

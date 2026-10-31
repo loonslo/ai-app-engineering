@@ -4,6 +4,7 @@
 
 - **能力**：设计工具 schema、校验参数、处理未知工具/异常、给有副作用的工具加审批，并把工具结果当不可信数据。
 - **v2 路径**：L4.4 / 核心（Gate；ReAct 与工具设计）
+- **岗位任务 / 面试题型**：T3 / F3、F4。
 - **前置**：4.3（分支与循环）、1.5（工具调用）。
 - **时间盒**：8 小时（1h 读 + 5h 实现 + 2h 故障注入与记录）。
 - **闭卷规则**：只读本页、`gate/starter.py`；**通过 gate 之前不要打开** `react_loop.py`、`react_reliability.py`、`react_agent.py`。
@@ -118,13 +119,60 @@ python chapters/part4-agents-langgraph/4.5-react-agent/gate/gate_check.py
 ```bash
 python tools/run_chapter.py 4.5 react_loop.py
 python tools/run_chapter.py 4.5 react_reliability.py
+python tools/run_chapter.py 4.5 react_agent.py
+python tools/run_chapter.py 4.5 react_agent.py --live
 ```
 
 对照时只回答：
 
-1. 参考实现用 LangGraph 的 `tools_condition` 控制循环；你的 `run_agent` 用什么条件？
-2. 参考实现有没有把工具结果标记为不可信？如果没有，风险是什么？
-3. 参考实现的工具都是无副作用的；把 `delete_order` 加进去，需要改哪几层？
+1. 原生版如何根据 assistant 的 `tool_calls` 决定继续或结束？你的 `run_agent` 用什么条件？
+2. 原生版如何转义工具内容再包装为不可信数据？为什么这仍不能替代权限检查？
+3. 原生版的天气/算术工具无副作用；接入 `delete_order` 时，审批应放在 handler 的哪一侧？
+
+### 原生参考实现怎么读
+
+先读 `react_loop.py`：`todo` 模拟模型的未完成任务，`history` 模拟观察结果。再读
+`react_agent.py`：真实调用时，模型返回的 `tool_calls` 取代 `todo`，工具结果写入
+`role="tool"` 消息，并用同一个 `tool_call_id` 对齐。没有工具调用时才把 content 当最终回答。
+最后读 `react_reliability.py`：保留单城市、双城市示例，逐条打印 messages 的追加与最终
+`step/finished` 状态；同一任务只执行一次，不为打印最终状态再次调用模型。
+
+默认三份脚本都离线。算术是真实本地计算，天气是固定教学数据，不是实时天气；
+离线模型答复由脚本给出，不代表模型能力。`react_reliability.py` 还实际演示参数出错后修正、
+工具预算耗尽。`max_steps` 限制模型请求总数（包含最终回答），`max_tool_calls` 限制工具请求
+总数（包含非法请求）；任一预算耗尽都停止，不能把“最后一次调用成功”当成任务完成。
+
+原生循环的复用入口：
+
+| API | 约定 |
+|---|---|
+| `run_loop(task, chat_fn, tools, *, max_steps, max_tool_calls, tool_schemas)` | `chat_fn(messages)` 返回 OpenAI 格式 assistant dict；`tools` 是名称到 `fn(**args)` 的映射 |
+| `ToolReply(content, error=None, waiting_approval=False)` | handler 可返回可读业务错误或待审批；普通字符串表示工具正常返回 |
+| `ScriptedChat(replies)` / `tool_message(name, args, call_id)` | 离线模型与工具请求构造器 |
+| 返回值 | `status/final/steps/tools_called/errors/messages/trace/stopped_reason`；`steps` 是模型请求数，`tools_called` 只记实际进入 handler 的调用 |
+
+JSON 解码、未知工具、签名或 schema 参数检查失败都写入 trace，错误作为工具结果回传；
+工具抛异常转为 `tool_error`。工具失败后模型可以修正，但恢复后的最终回答是否业务正确仍需评测。
+`ToolReply(..., waiting_approval=True)` 立即暂停；本章不实现持久审批续跑，见后续 SDK 练习。
+
+真实模型只在显式 `--live` 下启用，经由 `common.get_openai_client()` 与
+`common.chat_model_name()` 读取配置；缺密钥或模型不可达时打印提示、退出码 1，不打印堆栈。
+DeepSeek 默认思考模式与工具选择参数有兼容边界，本章为稳定工具调用显式传入
+`extra_body={"thinking":{"type":"disabled"}}`，不请求或展示推理正文。
+参见 [DeepSeek Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode)
+与 [OpenAI Function calling](https://platform.openai.com/docs/guides/function-calling)
+（均读取于 2026-10-31）。这里使用 Chat Completions；不是所有模型都支持同一端点，
+需选择支持该端点与工具调用的模型，不把 Responses 专用能力移植到兼容网关。
+
+## 框架对照
+
+旧的手搭图、加法/天气、连续乘法再加法演示保留在 `react_agent_langchain.py`；
+手搭 `agent↔tools` 与现成 `create_agent` 版放在一起比较。默认只提示入口，不联网；
+真实对照命令为 `python tools/run_chapter.py 4.5 react_agent_langchain.py --live`。
+这不是本章主线：先理解原生消息、预算和错误边界，再去
+[L4.16 框架素养（目录 4.15）](../4.15-framework-landscape/README.md)
+对照 `create_agent`。框架封装了循环，但工具权限、幂等与结果可信度仍由应用负责。
+
 
 ## 概念地图
 

@@ -4,6 +4,7 @@
 
 - **能力**：从轨迹提取工具调用；判定期望/禁用工具、完成、步数、最少调用；汇总通过率。
 - **v2 路径**：L4.11 / 核心（Gate；Agent 轨迹评测（建议 4.10 后学））
+- **岗位任务 / 面试题型**：T3、T4 / F4、F5
 - **前置**：3.2–3.5（RAG 评测）；建议 4.10/4.11 后学。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `trajectory_eval.py`。
@@ -27,15 +28,30 @@ python chapters/part3-evals/3.9-agent-trajectory-eval/gate/gate_check.py
 
 这个 gate 用合成轨迹，验证工具选择、安全屏障、完成度和步数。
 
+## 按结果判分，而不是背诵步骤
+
+[Anthropic《Demystifying evals for AI agents》](https://www.anthropic.com/research/demystifying-evals-for-ai-agents)（读取于 2026-10-31）区分
+transcript（运行全过程）与 outcome（环境中的最终状态）。例如“已退款”的回答不是退款到账的证据，应检查退款记录；
+不同的合法工具路径可以得到相同结果，不要把某一条参考轨迹的步骤顺序硬编码成唯一正确答案。
+原 gate 的工具提取与安全断言保留，新增 `grade_run` 让结果、权限、部分完成与效率分开判。
+
+先亲自读 transcript，再写判分器：确认失败是模型没完成任务、工具故障，还是判分规则误伤。
+每次独立试验从干净的订单、审批、缓存和消息历史开始，否则上次写入可能让本次“凭空通过”。
+面向客户、要求反复可靠完成的任务，要看 **pass^k**（同一任务前 k 次独立试验全部成功），不是一次对话中 k 轮成功。
+本章的 pass@1 是每题首次试验是否满分，再对任务等权平均；不是从多次重试里挑一次成功。
+请把 [8.6 Agent 轨迹测试](../../part8-ai-quality-optional/8.6-agent-trajectory-testing/README.md) 作为本章核心阅读，补看参数、顺序与副作用验证。
+
 ## 任务
 
-实现 `gate/starter.py` 的三个函数：
+实现 `gate/starter.py` 的五个函数：
 
 | 函数 | 你要交付的行为 |
 |---|---|
 | `extract_tool_names` | 提取 ai 步的 tool_calls[].name，保持顺序 |
 | `evaluate_trajectory` | 计算 expected/forbidden/completed/steps/min_calls/keyword/passed |
 | `summarize_trajectories` | 汇总通过率/期望/禁用/完成率；空集全 0 |
+| `grade_run` | 结果不对/调用禁止工具时清零；子项按比例、超步扣0.2 |
+| `consistency_report` | 每题 pass@1、pass^k 与任务等权总体均值 |
 
 关键口径：
 
@@ -44,6 +60,9 @@ python chapters/part3-evals/3.9-agent-trajectory-eval/gate/gate_check.py
 - `step_count` 只数 ai 步；`tool_call_count` 只数有 tool_calls 的 ai 步。
 - `step_count > max_steps` 超限；`tool_call_count >= min_tool_calls` 才达标。
 - `passed` 要求五项全满足；关键词只是参考分，不参与 passed。
+- `grade_run` 沿用 ai/tool/final 轨迹，步数只数 ai；空子项列表记满分；扣分最低为0，最高为1，最后保留两位小数。
+- 违规列表先 `forbidden_tool` 后 `max_steps`；结果失败仍可报告违规。
+- `consistency_report` 返回 `tasks` 与 `overall` 两层，指标键为 `pass@1` 和 `pass^k`；空输入总体为0，不足 k 次的任务 pass^k 为0，k<1 抛 ValueError。
 
 ## 故障注入（必须亲手触发）
 
@@ -56,12 +75,17 @@ python chapters/part3-evals/3.9-agent-trajectory-eval/gate/gate_check.py
 | 5 | ai 步超过 max_steps | 超限，failed |
 | 6 | 工具调用不足 + 关键词部分命中 | min_calls=False、keyword=2/3 |
 | 7 | 汇总 good+bad | pass_rate=0.5 |
+| 8 | 结果失败 / 调禁止工具 | score=0；禁止工具标记 forbidden_tool |
+| 9 | ai 步超上限 | 扣0.2并记录 max_steps |
+| 10 | 三个子项通过两个 | score=0.67 |
+| 11 | 首次成功、第二次失败 | pass@1=1，pass^2=0；不足k次不算稳定 |
 
 ## 验收标准
 
-`gate_check.py` 的 7 项全部 PASS：
+`gate_check.py` 的 11 项全部 PASS（原 7 项 + 新 4 项）：
 
 - 工具提取、正常、禁用、缺期望、未完成/超步数、最少调用/关键词、汇总。
+- 新增：结果失败/禁止工具清零、超步扣分、部分分、pass^k 统计。
 
 通过后，在 [workbook.md](workbook.md) 写：
 
@@ -72,7 +96,7 @@ python chapters/part3-evals/3.9-agent-trajectory-eval/gate/gate_check.py
 ## 提交物
 
 - `gate/starter.py`（实现后的版本）。
-- `gate/gate_report.json`（7/7）。
+- `gate/gate_report.json`（11/11）。
 - workbook 里的失败分析与三个问题的回答。
 
 ## 通过后对照参考实现
@@ -97,6 +121,8 @@ python tools/run_chapter.py 3.9
 - **步数**：绕远路/死循环告警。
 - **最少调用**：确保真的用了工具，不是编答案。
 - **安全屏障**：禁用工具是 Agent 评测独有维度。
+- **结果优先**：最终状态正确不等于路径唯一；安全违规仍必须否决。
+- **重复稳定性**：每次干净环境，统计首次成功与前 k 次全部成功。
 
 ## 边界
 

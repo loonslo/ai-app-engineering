@@ -86,37 +86,34 @@ def main() -> int:
         expect(state["steps"] == 0 and state["observations"] == [], "初始 steps/observations 不对")
 
     def test_normal_loop():
-        result = core.build_graph().invoke(core.initial_state())
+        result = core.run_agent(core.initial_state())
         expect(result["status"] == "done", f"正常应 done：{result}")
         expect(result["observations"] == [5] and result["steps"] == 1, f"结果不对：{result}")
 
     def test_budget():
-        graph = core.build_graph(lambda _: {"action": "add", "a": 2, "b": 3}, max_steps=2)
-        result = graph.invoke(core.initial_state())
+        result = core.run_agent(core.initial_state(), lambda _: {"action": "add", "a": 2, "b": 3}, max_steps=2)
         expect(result["status"] == "failed" and "预算" in result["error"], f"应预算耗尽：{result}")
         expect(result["steps"] == 2, f"应执行 2 步：{result}")
 
     def test_unknown_tool():
-        graph = core.build_graph(lambda _: {"action": "delete", "a": 1, "b": 1})
-        result = graph.invoke(core.initial_state())
+        result = core.run_agent(core.initial_state(), lambda _: {"action": "delete", "a": 1, "b": 1})
         expect(result["status"] == "failed" and "白名单" in result["error"], f"未知工具应拦截：{result}")
 
     def test_planner_error():
         def boom(_state):
             raise ValueError("planner down")
 
-        result = core.build_graph(boom).invoke(core.initial_state())
+        result = core.run_agent(core.initial_state(), boom)
         expect(result["status"] == "failed" and "planner down" in result["error"], f"应记录 planner 错误：{result}")
 
     def test_bad_params():
-        graph = core.build_graph(lambda _: {"action": "add", "a": "x", "b": 3})
-        result = graph.invoke(core.initial_state())
+        result = core.run_agent(core.initial_state(), lambda _: {"action": "add", "a": "x", "b": 3})
         expect(result["status"] == "failed", f"参数错误应失败：{result}")
         expect(result["observations"] == [], "参数错误不应产生观测")
 
     def test_max_steps_validation():
         try:
-            core.build_graph(max_steps=0)
+            core.run_agent(core.initial_state(), max_steps=0)
         except ValueError:
             return
         raise AssertionError("max_steps<1 应抛 ValueError")
@@ -129,6 +126,58 @@ def main() -> int:
     gate.check("06 planner 异常", test_planner_error)
     gate.check("07 参数错误", test_bad_params)
     gate.check("08 max_steps 校验", test_max_steps_validation)
+
+    routes = {"default": lambda text: f"默认:{text}"}
+
+    def test_unknown_route():
+        expect(core.route("问题", lambda _: "missing", routes, "default") == ("default", "默认:问题"), "未知标签应默认")
+        try:
+            core.route("问题", lambda _: "missing", routes, "absent")
+        except ValueError:
+            return
+        raise AssertionError("不存在的 default 应 ValueError")
+
+    def boom():
+        raise RuntimeError("worker failed")
+
+    def test_classifier_error():
+        def classify(_):
+            return boom()
+        expect(core.route("问题", classify, routes, "default")[0] == "default", "分类器异常应默认")
+
+    def test_worker_failure():
+        result = core.parallel_vote([lambda: "A", boom, lambda: "B", lambda: "A"], 2)
+        expect(result["ok"] and result["answers"] == ["A", "B", "A"], f"单个失败不应中断：{result}")
+        expect(len(result["failures"]) == 1 and result["majority"] == "A", f"失败/投票不对：{result}")
+        tie = core.parallel_vote([lambda: "B", lambda: "A"], 2)
+        expect(tie["majority"] == "B", "并列应首次出现优先")
+
+    def test_insufficient_success():
+        result = core.parallel_vote([boom, lambda: "A"], 2)
+        expect(not result["ok"], f"成功不足应 ok=False：{result}")
+
+    def test_optimizer_pass():
+        result = core.evaluator_optimizer(
+            lambda feedback: "初稿" if feedback is None else feedback,
+            lambda draft: (draft == "补证据", "补证据"), max_rounds=3)
+        expect(result["passed"] and result["rounds"] == 2 and result["draft"] == "补证据", f"应第2轮通过：{result}")
+        expect(len(result["history"]) == 2, "应记录两轮")
+
+    def test_optimizer_limit():
+        result = core.evaluator_optimizer(lambda _: "草稿", lambda _: (False, "修改"), max_rounds=2)
+        expect(not result["passed"] and result["rounds"] == 2, f"应最大轮数停止：{result}")
+        try:
+            core.evaluator_optimizer(lambda _: "", lambda _: (True, ""), max_rounds=0)
+        except ValueError:
+            return
+        raise AssertionError("max_rounds<1 应 ValueError")
+
+    gate.check("09 未知标签默认路由", test_unknown_route)
+    gate.check("10 分类器异常默认路由", test_classifier_error)
+    gate.check("11 并行单个失败不影响整体", test_worker_failure)
+    gate.check("12 成功数不足", test_insufficient_success)
+    gate.check("13 优化第2轮通过", test_optimizer_pass)
+    gate.check("14 优化最大轮数停止", test_optimizer_limit)
     return gate.report(module_path)
 
 

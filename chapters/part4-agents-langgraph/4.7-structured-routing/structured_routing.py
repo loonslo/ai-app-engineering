@@ -1,189 +1,137 @@
-"""
-章节 4.7 · 结构化输出路由：分支该走哪条，让 LLM 可靠地拍板
-==========================================================
-常见的写法是让模型输出自由文本，再用关键词匹配决定路由：看 last.content 里有没有 "RESEARCH"、"WRITING"…
-问题：模型是自由文本，多说一句"我建议先 RESEARCH 再 WRITING"，你的 `in` 就同时命中，
-路由乱套。生产里这种"用字符串匹配猜模型意图"是脆弱来源 top1。
+"""4.7：把 submit_decision 当输出通道，枚举校验后再进入业务分支。"""
+from __future__ import annotations
 
-正解：**结构化输出**。用 PydanticOutputParser 注入格式指令 + 后解析，逼模型只返回
-一个受约束的值（枚举 / JSON），代码拿到的是确定字段，而不是要去解析的自由文本。
-注意：DeepSeek 不支持 with_structured_output 的 json_schema 模式，
-Parser 方案兼容任意模型，是更普适的做法。
+import argparse
+import json
+from collections.abc import Callable
 
-本节两层：
-【一】枚举路由：定义一个"下一步只能是这几个值"的 schema，模型必须从里面选一个。
-    路由函数直接读字段，不再 in 关键字——稳定、可测、可断言。
-【二】意图分类分流：先把用户问题分类（知识问答 / 数据查询 / 闲聊），再分派到不同处理节点。
-    这就是 章节 4.13 Text2SQL、RAG、闲聊怎么"按问题类型选工具"的通用做法。
-
-对比：关键词路由=省 token 但脆；结构化路由=多一次约束但稳。生产选稳。
-
-衔接：章节 4.6 让节点稳；这里让"选哪条路"稳；章节 4.8 规划、章节 4.14 多 Agent 都靠它路由。
-==========================================================
-"""
-
-import os
-from typing import Literal, TypedDict
-from pydantic import BaseModel, Field
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.output_parsers import PydanticOutputParser
-from langgraph.graph import StateGraph, START, END
-from dotenv import load_dotenv
-
-load_dotenv()
+ROUTES = {"research", "writing", "review", "finish"}
+INTENTS = {"knowledge", "data_query", "chitchat"}
 
 
-def get_llm(temperature: float = 0.0, model: str = "deepseek-chat", **kwargs):
-    """DeepSeek 对话模型（OpenAI 兼容）。temperature=0 → 输出可复现。"""
-    from langchain_openai import ChatOpenAI
-    return ChatOpenAI(
-        model=model,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
-        temperature=temperature,
-        **kwargs,
-    )
+def parse_field(text: str, field: str, allowed: set[str]) -> str:
+    if not isinstance(text, str):
+        raise ValueError("输出必须是 JSON 字符串")
+    try:
+        data = json.loads(text)
+    except ValueError as exc:
+        raise ValueError("输出不是合法 JSON") from exc
+    value = data.get(field) if isinstance(data, dict) else None
+    if not isinstance(value, str) or value not in allowed:
+        raise ValueError(f"{field} 必须属于 {sorted(allowed)}")
+    return value
 
 
-# ============================================================
-# 【一】枚举路由：模型只能从固定选项里选一个（对比关键词匹配）
-# ============================================================
-class RouteDecision(BaseModel):
-    """强约束：next 只能是这四个值之一，模型没法自由发挥。"""
-    next: Literal["research", "writing", "review", "finish"] = Field(
-        description="根据当前进度，决定下一步交给哪个专家；任务完成则 finish"
-    )
-    reason: str = Field(description="一句话说明为什么这样路由（便于观测/复盘）")
+def parse_route(text: str, allowed: set[str]) -> str:
+    return parse_field(text, "next", allowed)
 
 
-class FlowState(TypedDict):
-    task: str
-    step_log: list
-    done: bool
-    _next: str  # supervisor 决策结果，route() 依赖此字段分流
+def route_next(state: dict) -> str:
+    if state.get("done"):
+        return "end"
+    value = state.get("_next")
+    if not isinstance(value, str) or value not in {"research", "writing", "review"}:
+        raise ValueError("非法路由")
+    return value
 
 
-def supervisor(state: FlowState) -> dict:
-    """用 PydanticOutputParser 让模型返回结构化决策，而不是自由文本。
-    注意：DeepSeek 不支持 with_structured_output（json_schema 模式），
-    改用 parser 注入格式指令 + 后解析，兼容任意模型。"""
-    parser = PydanticOutputParser(pydantic_object=RouteDecision)
-    llm = get_llm(temperature=0)
-    sys = SystemMessage(content=(
-        "你是工作流主管。已完成步骤见下。请决定下一步：research/writing/review/finish。"
-        f"\n已完成：{state['step_log']}"
-        f"\n\n{parser.get_format_instructions()}"
-    ))
-    raw = llm.invoke([sys, HumanMessage(content=state["task"])])
-    decision: RouteDecision = parser.parse(raw.content)
-    print(f"  [supervisor] 决策 next={decision.next}  理由={decision.reason}")
-    return {"step_log": state["step_log"] + [f"supervisor→{decision.next}"],
-            "done": decision.next == "finish",
-            # 把结构化结果暂存，供路由函数读取（确定字段，无需解析文本）
-            "_next": decision.next}
+def parse_intent(text: str) -> str:
+    return parse_field(text, "category", INTENTS)
 
 
-def route(state: FlowState) -> str:
-    """路由函数直接读结构化字段——对比 'if "RESEARCH" in text' 这种关键词匹配，这里零歧义。"""
-    return END if state.get("done") else state["_next"]
+def choose_enum(prompt: str, field: str, allowed: set[str], chat_fn: Callable) -> str:
+    """工具不执行业务；参数就是输出。即使有 enum，应用侧仍须校验。"""
+    schema = {"type": "function", "function": {
+        "name": "submit_decision", "description": "提交一个路由选择，不执行任何业务操作",
+        "parameters": {"type": "object", "properties": {
+            field: {"type": "string", "enum": sorted(allowed)},
+        }, "required": [field], "additionalProperties": False},
+    }}
+    response = chat_fn([
+        {"role": "system", "content": "只调用 submit_decision 提交分类，不输出自由文本。"},
+        {"role": "user", "content": prompt},
+    ], schema)
+    calls = response.get("tool_calls") or []
+    if len(calls) != 1 or calls[0].get("function", {}).get("name") != "submit_decision":
+        raise ValueError("必须且只能提交一次 submit_decision")
+    return parse_field(calls[0]["function"].get("arguments"), field, allowed)
 
 
-def make_expert(name: str):
-    def expert(state: FlowState) -> dict:
-        print(f"  [{name}] 处理中…")
-        return {"step_log": state["step_log"] + [f"{name} 完成"]}
-    return expert
+def make_live_chat() -> Callable:
+    from common import LLM_PROVIDER, chat_model_name, get_openai_client
+
+    client = get_openai_client(timeout=20, max_retries=0)
+    model = chat_model_name()
+    extra = {"extra_body": {"thinking": {"type": "disabled"}}} if LLM_PROVIDER == "deepseek" else {}
+
+    def chat(messages: list[dict], schema: dict) -> dict:
+        response = client.chat.completions.create(
+            model=model, messages=messages, tools=[schema],
+            tool_choice={"type": "function", "function": {"name": "submit_decision"}},
+            temperature=0, **extra,
+        )
+        return response.choices[0].message.model_dump(exclude_none=True)
+
+    return chat
 
 
-def build_structured_supervisor():
-    g = StateGraph(FlowState)
-    g.add_node("supervisor", supervisor)
-    for n in ["research", "writing", "review"]:
-        g.add_node(n, make_expert(n))
-    g.add_edge(START, "supervisor")
-    g.add_conditional_edges("supervisor", route, {
-        "research": "research", "writing": "writing", "review": "review", END: END,
-    })
-    for n in ["research", "writing", "review"]:
-        g.add_edge(n, "supervisor")   # 专家干完回主管，主管再结构化决策下一步
-    return g.compile()
+class ScriptedRouting:
+    """离线也走工具参数解析，而非绕过 choose_enum。"""
+
+    def __init__(self, decisions: list[str]) -> None:
+        self.decisions = iter(decisions)
+
+    def __call__(self, messages: list[dict], schema: dict) -> dict:
+        field = schema["function"]["parameters"]["required"][0]
+        return {"tool_calls": [{"function": {
+            "name": "submit_decision", "arguments": json.dumps({field: next(self.decisions)}),
+        }}]}
 
 
-# ============================================================
-# 【二】意图分类分流：按问题类型选处理路径（RAG/SQL/闲聊 通用骨架）
-# ============================================================
-class Intent(BaseModel):
-    """把用户问题分到确定的类别，代码据此分派。"""
-    category: Literal["knowledge", "data_query", "chitchat"] = Field(
-        description="knowledge=查文档知识, data_query=查结构化数据/数字, chitchat=闲聊"
-    )
+def run_supervisor(task: str, chat_fn: Callable, *, max_steps: int = 8) -> dict:
+    if max_steps < 1:
+        raise ValueError("max_steps 必须 >= 1")
+    state = {"task": task, "step_log": [], "done": False, "_next": ""}
+    for _ in range(max_steps):
+        selected = choose_enum(f"任务：{task}；已完成：{state['step_log']}", "next", ROUTES, chat_fn)
+        state.update(_next=selected, done=selected == "finish")
+        state["step_log"].append(f"supervisor→{selected}")
+        print("  [supervisor]", selected)
+        if route_next(state) == "end":
+            return state
+        # 本章只演示分流，专家节点不生成真实文章。
+        state["step_log"].append(f"{selected} 完成（路由教学节点）")
+    raise ValueError("主管超过 max_steps，未提交 finish")
 
 
-class ChatState(TypedDict):
-    question: str
-    category: str
-    answer: str
+def run_intent_router(question: str, chat_fn: Callable) -> dict:
+    category = choose_enum(question, "category", INTENTS, chat_fn)
+    branches = {"knowledge": "[RAG 路由教学节点] ",
+                "data_query": "[Text2SQL 路由教学节点] ", "chitchat": "[普通对话教学节点] "}
+    return {"question": question, "category": category, "answer": branches[category] + question}
 
 
-def classify(state: ChatState) -> dict:
-    parser = PydanticOutputParser(pydantic_object=Intent)
-    llm = get_llm(temperature=0)
-    intent: Intent = parser.parse(llm.invoke([
-        SystemMessage(content="判断用户问题类型，只输出类别。\n" + parser.get_format_instructions()),
-        HumanMessage(content=state["question"]),
-    ]).content)
-    print(f"  [classify] 「{state['question']}」→ {intent.category}")
-    return {"category": intent.category}
-
-
-def route_intent(state: ChatState) -> str:
-    return state["category"]
-
-
-def build_intent_router():
-    g = StateGraph(ChatState)
-    g.add_node("classify", classify)
-    # 三个处理分支（真实项目里分别接 RAG / Text2SQL(章节 4.13) / 普通对话）
-    g.add_node("knowledge", lambda s: {"answer": "[走 RAG 检索文档] " + s["question"]})
-    g.add_node("data_query", lambda s: {"answer": "[走 Text2SQL 查库] " + s["question"]})
-    g.add_node("chitchat", lambda s: {"answer": "[普通对话] 你好呀～"})
-    g.add_edge(START, "classify")
-    g.add_conditional_edges("classify", route_intent, {
-        "knowledge": "knowledge", "data_query": "data_query", "chitchat": "chitchat",
-    })
-    for n in ["knowledge", "data_query", "chitchat"]:
-        g.add_edge(n, END)
-    return g.compile()
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--live", action="store_true")
+    args = parser.parse_args()
+    try:
+        live = make_live_chat() if args.live else None
+        print("[live] 真实模型选择路由，专家为教学节点" if args.live else "[offline] 脚本化工具输出")
+        print("===== 一：枚举主管 research→writing→review→finish =====")
+        state = run_supervisor("写一篇 Python 装饰器短文", live or ScriptedRouting([
+            "research", "writing", "review", "finish",
+        ]))
+        print("流程轨迹：", state["step_log"])
+        print("\n===== 二：知识 / 数据 / 闲聊意图分流 =====")
+        chat = live or ScriptedRouting(["knowledge", "data_query", "chitchat"])
+        for question in ["RAG 的原理是什么？", "示例科技 2025Q2 利润多少？", "在吗，聊聊天"]:
+            print(run_intent_router(question, chat))
+    except Exception as exc:
+        print(f"路由失败：{type(exc).__name__}；请检查输出枚举、common 配置或服务连接。")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    if not os.getenv("DEEPSEEK_API_KEY"):
-        print("未配置 DEEPSEEK_API_KEY，本文件需真实 LLM 演示结构化输出，跳过运行。")
-        raise SystemExit(0)
-
-    print("===== 【一】结构化路由的 Supervisor（对比关键词路由）=====")
-    app = build_structured_supervisor()
-    out = app.invoke({"task": "写一篇 Python 装饰器短文", "step_log": [], "done": False, "_next": ""},
-                     {"recursion_limit": 12})
-    print("  流程轨迹：", out["step_log"])
-
-    print("\n===== 【二】意图分类分流（RAG/SQL/闲聊 通用骨架）=====")
-    router = build_intent_router()
-    for q in ["RAG 的原理是什么？", "示例科技 2025Q2 利润多少？", "在吗，聊聊天"]:
-        r = router.invoke({"question": q, "category": "", "answer": ""})
-        print("  →", r["answer"])
-
-
-# ----------------------------------------------------------
-# 小结：
-# - 路由不要用"字符串 in 自由文本"猜意图（脆弱）；用结构化输出
-#   把模型输出约束成枚举/JSON，代码读到的是确定字段。
-# - PydanticOutputParser 兼容任意模型（DeepSeek 等不支持 with_structured_output 的模型），
-#   通过 format_instructions 注入到 prompt + parse() 后解析，效果等价。
-# - Literal 枚举 = 最省事的强约束：模型只能从给定选项里选，路由函数零歧义、可断言。
-# - 意图分类分流是通用骨架：一个 classify 节点决定走 RAG / Text2SQL / 闲聊。
-# - 代价：多一次 LLM 调用/约束。换来的是可测、可复现、不跑偏——生产值这个价。
-#
-# 动手练习：学完 4.14 后回来，把它的 supervisor_node（固定流水线）换成本章的 RouteDecision 结构化版，
-#          再写个 pytest：喂固定 state，断言路由到预期节点（呼应 5.8 回归测试）。
-# ----------------------------------------------------------
+    raise SystemExit(main())

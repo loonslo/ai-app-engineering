@@ -1,4 +1,4 @@
-"""L4.11 Agent 轨迹评测 · 离线 gate 验收。"""
+"""L4.7 Agent 轨迹评测 · 离线 gate 验收。"""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ class Gate:
         if passed != total:
             print("gate 未通过：先修 FAIL 项，不要打开参考实现。")
         out = {
-            "gate": "L4.11-trajectory",
+            "gate": "L4.7-trajectory",
             "module": str(module_path),
             "passed": passed,
             "total": total,
@@ -145,6 +145,41 @@ def main() -> int:
     gate.check("05 未完成/超步数", test_incomplete_and_steps)
     gate.check("06 最少调用/关键词", test_min_calls_and_keyword)
     gate.check("07 汇总", test_summary)
+
+    def test_outcome_and_forbidden():
+        result = core.grade_run(True, traj("delete_database"), forbidden_tools={"delete_database"},
+                                max_steps=3, partial_checks={})
+        expect(result["score"] == 0 and result["violations"] == ["forbidden_tool"], f"禁止工具应清零：{result}")
+        result = core.grade_run(False, traj(), forbidden_tools=set(), max_steps=3, partial_checks={})
+        expect(result["score"] == 0, f"结果失败应清零：{result}")
+
+    def test_step_penalty():
+        result = core.grade_run(True, [{"role": "ai"}] * 3, forbidden_tools=set(),
+                                max_steps=2, partial_checks={})
+        expect(result == {"score": 0.8, "violations": ["max_steps"]}, f"超步扣0.2：{result}")
+
+    def test_partial_credit():
+        result = core.grade_run(True, [], forbidden_tools=set(), max_steps=2,
+                                partial_checks={"查订单": True, "解释退款": False, "保留来源": True})
+        expect(result == {"score": 0.67, "violations": []}, f"部分分应2/3：{result}")
+
+    def test_consistency():
+        report = core.consistency_report({"a": [{"score": 1}, {"score": 0}],
+                                          "b": [{"score": 1}, {"score": 1}]}, 2)
+        expect(report["tasks"]["a"] == {"pass@1": 1.0, "pass^k": 0.0}, f"任务a统计不对：{report}")
+        expect(report["overall"] == {"pass@1": 1.0, "pass^k": 0.5}, f"总体统计不对：{report}")
+        expect(core.consistency_report({}, 2)["overall"]["pass^k"] == 0, "空输入应0")
+        expect(core.consistency_report({"a": [{"score": 1}]}, 2)["tasks"]["a"]["pass^k"] == 0, "不足k次不能全成功")
+        try:
+            core.consistency_report({}, 0)
+        except ValueError:
+            return
+        raise AssertionError("k<1应ValueError")
+
+    gate.check("08 结果失败/禁止工具清零", test_outcome_and_forbidden)
+    gate.check("09 超步扣分", test_step_penalty)
+    gate.check("10 多部分任务部分分", test_partial_credit)
+    gate.check("11 pass^k稳定性统计", test_consistency)
     return gate.report(module_path)
 
 

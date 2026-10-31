@@ -28,26 +28,12 @@ from typing import Annotated, TypedDict
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.checkpoint.memory import InMemorySaver
 from langchain_core.messages import SystemMessage, HumanMessage
-import os
-from dotenv import load_dotenv
+from langchain_core.tools import tool
+from langchain_core.messages import ToolMessage
+from common import get_llm
 
-load_dotenv()   # 读 .env 里的 DEEPSEEK_API_KEY
-
-
-# —— 内联 LLM 工厂：本文件自包含，不依赖 common.py，方便单独阅读 ——
-def get_llm(temperature: float = 0.0, model: str = "deepseek-chat", **kwargs):
-    """DeepSeek 对话模型（OpenAI 兼容）。temperature=0 → 输出可复现。"""
-    from langchain_openai import ChatOpenAI
-    return ChatOpenAI(
-        model=model,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
-        temperature=temperature,
-        **kwargs,
-    )
-
-
-llm = get_llm(temperature=0)
+# 保留图版演示；只在 main 的 --live 分支初始化模型。
+llm = None
 
 
 # ============================================================
@@ -188,8 +174,6 @@ def build_fanout():
 #     核心差别不是"分工"，是"省 context"：子 Agent 独立上下文，
 #     只收一段任务描述、只回一段结果摘要，主 Agent 看不到它的中间过程。
 # ============================================================
-from langchain_core.tools import tool
-from langchain_core.messages import ToolMessage
 
 
 def _sub_agent(role_prompt: str, task: str) -> str:
@@ -242,26 +226,39 @@ def run_delegating_agent(user_task: str, max_steps: int = 6):
     return "达到 max_steps 护栏，未收敛。"
 
 
+def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="历史 LangGraph 对照；学完 L4.9 后阅读")
+    parser.add_argument("--live", action="store_true")
+    args = parser.parse_args()
+    if not args.live:
+        print("LangGraph 历史对照版需要 --live；离线主教材请运行 supervisor_native.py。")
+        return 0
+    global llm
+    try:
+        llm = get_llm(temperature=0, timeout=15, max_retries=0,
+                      extra_body={"thinking": {"type": "disabled"}})
+        print("[live] 一、Supervisor 固定流水线")
+        sup = build_supervisor()
+        cfg = {"configurable": {"thread_id": "sup-1"}, "recursion_limit": 12}
+        result = sup.invoke(
+            {"messages": [HumanMessage(content="请帮我写一篇关于 Python 装饰器的简短介绍文章")]}, cfg)
+        for message in result["messages"][-4:]:
+            print(f"  [{type(message).__name__}] {str(message.content)[:80]}")
+        print("二、Fan-out/Fan-in")
+        out = build_fanout().invoke({"topic": "LangGraph", "angles": [], "summary": ""})
+        print("汇聚后的总结：", out["summary"])
+        print("三、agent-as-tool 动态委派")
+        print(run_delegating_agent("请帮我写一篇关于 Python 装饰器的简短介绍文章"))
+    except Exception as exc:
+        print(f"对照版运行失败：{type(exc).__name__}；请检查模型配置、连接与步数预算。")
+        return 1
+    return 0
+
+
 if __name__ == "__main__":
-    print("===== 【一】Supervisor 多 Agent（固定流水线演示）=====")
-    sup = build_supervisor()
-    # recursion_limit 写在 config 里，不是第三个位置参数（invoke 只接受 input + config）
-    cfg = {"configurable": {"thread_id": "sup-1"}, "recursion_limit": 12}
-    result = sup.invoke(
-        {"messages": [HumanMessage(content="请帮我写一篇关于 Python 装饰器的简短介绍文章")]},
-        cfg,
-    )
-    print("=== 多 Agent 协作完成，最后几条消息 ===")
-    for m in result["messages"][-4:]:
-        print(f"  [{type(m).__name__}] {str(m.content)[:80]}")
-
-    print("\n===== 【二】Fan-out 并行 + Fan-in 汇聚 =====")
-    fan = build_fanout()
-    out = fan.invoke({"topic": "LangGraph", "angles": [], "summary": ""})
-    print("汇聚后的总结：", out["summary"])
-
-    print("\n===== 【三】agent-as-tool 动态委派（对比图版本）=====")
-    print(run_delegating_agent("请帮我写一篇关于 Python 装饰器的简短介绍文章"))
+    raise SystemExit(main())
 
 
 # ----------------------------------------------------------

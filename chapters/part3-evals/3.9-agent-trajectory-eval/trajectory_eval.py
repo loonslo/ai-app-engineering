@@ -351,9 +351,47 @@ def evaluate_trajectory(case: dict, trajectory: list[dict]) -> dict:
         "max_steps_exceeded": max_steps_exceeded,
         "tool_call_count": tool_call_count,
         "min_calls_met": min_calls_met,
-        "keyword_score": round(keyword_score, 2),
+        "keyword_score": keyword_score,
         "passed": passed,
     }
+
+
+def summarize_trajectories(results: list[dict]) -> dict:
+    """汇总旧 gate 的轨迹指标，空样本不冒充通过。"""
+    fields = {"pass_rate": "passed", "expected_tool_pass_rate": "expected_ok",
+              "forbidden_tool_pass_rate": "forbidden_ok", "completion_rate": "completed"}
+    return {"cases": len(results), **{
+        name: sum(row[field] for row in results) / len(results) if results else 0.0
+        for name, field in fields.items()}}
+
+
+def grade_run(outcome_ok: bool, trajectory: list[dict], *, forbidden_tools: set[str],
+              max_steps: int, partial_checks: dict[str, bool]) -> dict:
+    """结果优先；禁止工具清零，ai 步超限扣0.2，子项按通过比例计分。"""
+    violations = []
+    if forbidden_tools.intersection(extract_tool_names(trajectory)):
+        violations.append("forbidden_tool")
+    if sum(step.get("role") == "ai" for step in trajectory) > max_steps:
+        violations.append("max_steps")
+    score = sum(partial_checks.values()) / len(partial_checks) if partial_checks else 1.0
+    if "max_steps" in violations:
+        score -= 0.2
+    if not outcome_ok or "forbidden_tool" in violations:
+        score = 0.0
+    return {"score": round(max(0.0, min(1.0, score)), 2), "violations": violations}
+
+
+def consistency_report(runs: dict[str, list[dict]], k: int) -> dict:
+    """任务等权；每题首次是否成功、前 k 次是否全成功；不足 k 次不能证明稳定。"""
+    if k < 1:
+        raise ValueError("k 必须大于0")
+    tasks = {
+        task: {"pass@1": float(bool(rows) and rows[0]["score"] == 1),
+               "pass^k": float(len(rows) >= k and all(row["score"] == 1 for row in rows[:k]))}
+        for task, rows in runs.items()}
+    overall = {metric: sum(row[metric] for row in tasks.values()) / len(tasks) if tasks else 0.0
+               for metric in ("pass@1", "pass^k")}
+    return {"tasks": tasks, "overall": overall}
 
 
 # ===================== 4. 演示：同一场景，两种评测的对比 =====================
@@ -495,6 +533,11 @@ def main():
         "results": results,
     }
     print(f"\n完整 JSON 结果：\n{json.dumps(summary, ensure_ascii=False, indent=2)}")
+    good = grade_run(True, DEMO_TRAJECTORIES["agent_041"], forbidden_tools=set(),
+                     max_steps=10, partial_checks={"答案": True, "证据": True})
+    bad = grade_run(False, [], forbidden_tools=set(), max_steps=10, partial_checks={})
+    print("\n[offline] 结果判分与两次独立试验示例（合成数据）：")
+    print(consistency_report({"查询": [good, bad], "解释": [good, good]}, k=2))
 
 
 if __name__ == "__main__":

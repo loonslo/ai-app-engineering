@@ -4,6 +4,7 @@
 
 - **能力**：把模型路由输出限制在枚举集合内；解析失败/非法值有明确出口。
 - **v2 路径**：L4.5 / 核心（Gate；结构化路由）
+- **岗位任务 / 面试题型**：T3 / F3、F4。
 - **前置**：4.6（节点可靠性）、1.3（结构化输出）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `structured_routing.py`。
@@ -78,13 +79,41 @@ python chapters/part4-agents-langgraph/4.7-structured-routing/gate/gate_check.py
 
 ```bash
 python tools/run_chapter.py 4.7
+python tools/run_chapter.py 4.7 --live
 ```
 
 对照时只回答：
 
-1. 参考实现用 `PydanticOutputParser`，你的 gate 用 JSON；两者约束力差在哪？
-2. 参考实现的 `route` 为什么能“零歧义”？
-3. 参考实现没有解析失败兜底；上生产要先补什么？
+1. 参考实现以工具参数输出枚举，你的 gate 从 JSON 文本解析枚举；两者分别在哪一侧约束、在哪一侧校验？
+2. 参考实现的路由为什么能直接按确定字段分支？枚举合法能否证明语义分类正确？
+3. 模型没有调用输出工具、调用两次或返回非法值时，参考实现怎样停止？业务需要重试还是转人工？
+
+### 从 JSON gate 到“工具即输出”
+
+“工具即输出”指把 `submit_decision` 注册为一个函数工具，但不执行外部业务：
+模型的工具参数本身就是分类结果。schema 的 `enum` 列出合法值，真实调用强制选择
+`submit_decision`；代码仍检查只能有一次该调用、参数必须是 JSON 对象、字段必须属于枚举。
+约束能减少格式歧义，不能保证模型把问题分对。
+
+参考实现保留两组完整演示：
+
+1. 主管按 `research/writing/review/finish` 选择专家，专家完成后再次决策；`max_steps`
+   限制主管调用数，没有 `finish` 就明确失败，不能无限循环。
+2. 把知识、数据查询、闲聊问题分别分到 `knowledge/data_query/chitchat`。分支只是教学节点，
+   不会真的检索、执行 SQL 或查到利润数据。
+
+默认使用脚本化工具调用，仍经过同一套解析和枚举校验。`--live` 才创建
+`common.get_openai_client()` 客户端，模型名来自 `common.chat_model_name()`；
+缺密钥、服务不可达或非法输出均给可读提示并以 1 退出，不打印堆栈。解析失败不会默认去某条分支，
+本章也不添加自动重试。
+
+DeepSeek 默认思考模式不适合本例的强制工具选择，因此显式关闭思考：
+`extra_body={"thinking":{"type":"disabled"}}`。本例不使用严格 JSON Schema 响应格式；
+Chat Completions 的函数工具也必须在本地复核参数。
+参见 [DeepSeek Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode)、
+[OpenAI Function calling](https://platform.openai.com/docs/guides/function-calling)
+（均读取于 2026-10-31）。真实兼容性与分类准确率未由离线 gate 证明。
+
 
 ## 概念地图
 
@@ -98,4 +127,4 @@ python tools/run_chapter.py 4.7
 
 - gate 用固定文本，不调用真实模型。
 - 通过 gate 只证明解析/校验结构正确，不证明模型分类准确。
-- 真实 PydanticOutputParser、Supervisor 图见参考实现。
+- 原生工具即输出、主管循环与意图分支见参考实现；没有实现真实 RAG / SQL 专家。

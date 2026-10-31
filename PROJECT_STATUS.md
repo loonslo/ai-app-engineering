@@ -3,8 +3,8 @@ project_id: ai-app-engineering
 updated: 2026-10-31
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "2026-10-31 live 补查：3.3 平均 5.00/5，3.7 候选版本通过率 10% 触发回归告警，3.8 一致率 83.3%/100% 且无降级；单次运行。2026-10-31 后续补查：修复 3.8 写入函数可绕过 CLI 覆盖证据的缺口，新增 8 个离线测试；完整回归 116 passed，ruff 通过、368 个 Markdown 0 断链；模拟在线成功与降级只使用假客户端及临时目录，仍待 Claude 复核。以下为此前整改记录：V3-0、V3-1、V3-2 审核均已通过并合入 master。V3-3（L3 质量闭环：3.3、3.6、3.7、3.8、3.10）在 2026-10-31 复核退回后完成第二轮整改：3.8 默认不再写仓库根证据，只有 --live --update-evidence 才更新；live 裁判复用 3.3 的 run_native_judge_eval，失败条目标记 degraded 并排除出一致率；κ 只有一类标签时记为不可计算；补 2 条人工不合格用例；3.6 检索 span 改 CLIENT，消息正文按 JSON schema 记录；3.3、3.7 复用 2.6 的检索与 RAG 链，3.3 live 读取 eval_set_full.json 并汇总平均分；span 不再记录 stacktrace；3.6 README 补 Agent/工具调用属性与 Stack Overflow 出处；验证记录、TASKS、PROJECT_STATUS 按实际改正。离线复跑：4 个 gate 骨架 0 通过、参考解与本章实现全过；pytest 74 + 34 = 108 passed；368 篇 Markdown 0 断链；ruff 通过；part3 无 LangChain 泄漏；v2 标签 111 unchanged；离线运行全部 exit 0；--live 缺密钥与模型不可达均 exit 1 无堆栈；3.8 默认运行未改根报告 mtime。未调用真实模型。reports/prompt_ab_judge_agreement.json 原件仍丢失，内容不可作为证据，已从 capstone 证据中移除。等待审核者复核。记录见 docs/v3/reviews/V3-3.md 与 docs/gate-v3-3-validation.md。"
-next: "审核者按 docs/v3/reviews/V3-3.md 复核 N1、B1-r、M1-r、M9、M6-r、M8-r 与 5 个次要问题；通过后快进合入 master，删除 V3-3 临时参考解，再启动 V3-4（L4 Agent 架构）。3.3、3.7、3.8 的 DeepSeek live 成功路径已于 2026-10-31 各跑一次且退出 0（单次、未写根 reports/，见 docs/gate-v3-3-validation.md 第 8 节）。用户已决定不再恢复 LangSmith 原报告。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、重排模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
+progress: "V3-0–V3-3 已通过并合入 master。2026-10-31 完成 V3-4 的 L4.1–L4.8 课件实施，待审核：9 个离线 gate 骨架均 0 通过，临时解 106/106 且两次输出一致；工具与章节回归 91 passed，限定范围 ruff 通过、断链 0；v2 111 unchanged，新三章 v3 unchanged；13 个入口离线 exit 0；18 次适用的 live 缺钥/不可达检查均 exit 1 无堆栈。7 个主要入口 DeepSeek live 各单次 exit 0，不写根 reports/；4.16 批准后已登记 1 条，但模型仍说待审批，该语义不算通过。历史 V3-3 记录仍保留于正文及原证据，未把单次运行当成学习完成或真实系统验收。"
+next: "审核 V3-4 的完整内容、gate 和证据；保留 9 个临时参考解，审核后再安排 V3-5。真实学习者按 workbook 闭卷练习；真实模型话术须与业务状态分别判分。真实支付、审批 UI、并发恢复、持久引擎、远端追踪与部署仍未验证。V3-3 的原 LangSmith 报告按用户决定不再恢复。"
 evidence:
   - README.md
   - TASKS.md
@@ -45,6 +45,7 @@ evidence:
   - docs/v3/reviews/V3-2.md
   - docs/gate-v3-3-validation.md
   - docs/v3/reviews/V3-3.md
+  - docs/gate-v3-4-validation.md
 ---
 
 # AI 应用工程实战 · 项目概览与进度
@@ -246,3 +247,5 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 2026-10-31 继续 V3-3 交付前自检：先复跑原有 108 项测试，再以 3 个失败测试复现报告写入函数的证据保护缺口。最小修复后，新增 8 个场景的完整回归 116 passed；ruff 通过，368 个 Markdown 0 断链。真实模型成功路径、远端 OTLP 和原报告恢复仍未验证；Claude 审核状态不变，未合并、未启动 V3-4。具体命令与边界见 `docs/gate-v3-3-validation.md` 的后续补查一节。
 
 2026-10-31 DeepSeek live 补查：`deepseek-flash` 实跑 3.3/3.7/3.8 `--live`，均退出 0；3.3 平均正确性与忠实度 5.00/5，3.7 候选版本通过率 10%（基线 100%）触发回归告警，3.8 Strict/Helpful 一致率 83.3%/100%、无降级。单次运行，未加 `--update-evidence`；远端 OTLP、DeepEval、原报告恢复仍未验证。
+
+2026-10-31 完成 V3-4（L4.1–L4.8）教程实施：原生五种 workflow、有界循环、工具契约、枚举路由与 JSON 计划恢复、Pydantic AI 依赖/历史/审批/用量、并行上下文隔离、结果评分、原生与 SDK 同场景比较。9 个骨架 0 通过、临时解 106/106 且重复输出一致，工具与章节测试 91 passed，ruff/断链与标签检查结果见 `docs/gate-v3-4-validation.md`。7 个主要入口真实模型各只跑一次；4.16 首次 live 批准后记录数为1而话术仍称待审批，复核时加校验规则并复跑 live 修复该话术冲突（仅挡已知冲突，不证明整体语义）。没有调用支付，没有写根 reports/；仍待审核和真实学习/试教，不能据课件存在或离线通过宣称个人掌握。前面的历史“等待 V3-3 复核”描述保留为当时记录，以当前摘要及其通过记录为准。

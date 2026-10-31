@@ -2,11 +2,12 @@
 
 [全书目录](../../README.md) · [上一章 4.13](../4.13-text2sql-agent/README.md) · [下一章 4.15](../4.15-framework-landscape/README.md)
 
-- **能力**：用固定流水线推进 Supervisor；对 fan-out 分支结果做去重保序的 fan-in。
+- **能力**：用原生代码拆分任务、隔离子 Agent 上下文、并行执行并保留来源；先用纯函数 gate 自检阶段推进与合并。
 - **v2 路径**：L4.10 / 核心（Gate；Supervisor/Fan-out（可跳））
+- **岗位任务 / 面试题型**：T3 / F3、F4
 - **前置**：4.4（reducer）、4.5、4.8。
-- **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
-- **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `langgraph_supervisor.py`。
+- **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。
+- **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `supervisor_native.py` 或 `langgraph_supervisor.py`。
 - **验收命令**：
 
 ```bash
@@ -26,6 +27,19 @@ python chapters/part4-agents-langgraph/4.14-supervisor-fanout/gate/gate_check.py
 - 没有去重，汇总内容重复。
 
 这个 gate 把“阶段推进”和“结果合并”抽成纯函数，验证边界和保序。
+
+## 什么时候分成多个 Agent
+
+有价值的分工是**上下文隔离**与**独立任务并行**：一个子 Agent 只看功能资料，另一个只看测试资料，主管只接收摘要与来源。
+把整份对话复制给每个角色，只换一个角色提示，不会自动获得隔离。原生实现用 `Assignment` 明确分支资料与独立 `request_limit`，
+`ThreadPoolExecutor` 真正并行，但按分派顺序汇总，避免线程完成先后改变报告顺序。
+
+多 Agent 也会增加协调成本、错误叠加和 token 用量：一个主管的错误拆分会影响多个执行者，合并时还可能丢来源。先证明单 Agent 不够，再比较收益。
+[Datadog 2026 报告 Fact 7](https://www.datadoghq.com/state-of-ai-engineering/#7)（读取于 2026-10-31）中，59% 的 agentic application 请求只有一次**服务调用**；
+这不是“一次模型调用”的占比，也不是全行业统计。
+[Thoughtworks 技术雷达 Vol.34 的 coding agent swarms](https://www.thoughtworks.com/radar/techniques/coding-agent-swarms)（读取于 2026-10-31）列为 Caution：
+大规模蜂群仍昂贵、未成熟，成功实验常有清晰规格与充分测试，不宜把条件直接推广到普通产品开发。
+本章只是两个小分支，不把蜂群当成默认架构。
 
 ## 任务
 
@@ -77,14 +91,22 @@ python chapters/part4-agents-langgraph/4.14-supervisor-fanout/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 4.14
+python tools/run_chapter.py 4.14 supervisor_native.py
 ```
 
 对照时只回答：
 
-1. 参考实现的 `supervisor_node` 和你的 `next_stage` 是否一致？
-2. 参考实现的 fan-out 用了什么 reducer？
-3. agent-as-tool 和图上节点，上下文隔离差别在哪？
+1. `run_supervisor` 怎样保留 research → writing → review？每一步收到全量历史还是上一步摘要？
+2. `run_fanout` 怎样做到真实并行、结果顺序可复现？一个分支耗尽预算会改变另一个分支吗？
+3. `run_delegating_agent` 交给 writer 的资料保留了哪些来源？子 Agent 的内部消息是否泄漏给主管？
+
+三个演示仍分别是固定流水线、并行汇聚、agent-as-tool；默认都用脚本化假模型，不联网。
+要观察真实模型，显式加 `--live`。真实模型来自 `common` 配置；本章关闭 DeepSeek 思考，避免不必要的工具/结构化输出兼容差异。
+
+## 框架对照
+
+`langgraph_supervisor.py` 保留图节点、条件边、reducer 与共享 MessagesState 的历史演示。**学完 L4.9（目录 4.2）后再读**，不要把图 API 当作本章前置。
+离线运行只给提示；`python tools/run_chapter.py 4.14 langgraph_supervisor.py --live` 才调用真实模型。
 
 ## 概念地图
 
@@ -98,4 +120,4 @@ python tools/run_chapter.py 4.14
 
 - gate 只测纯函数，不跑 LangGraph 多 Agent/真实模型。
 - 通过 gate 只证明阶段推进/合并结构正确。
-- 真实并行时序、reducer、委派见参考实现与 4.4。
+- 原生演示验证线程分派与摘要隔离，不模拟完整任务存储；图版的 reducer 与恢复机制留给后续章节。

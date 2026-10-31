@@ -1609,3 +1609,155 @@ def test_v3_5_actual_in_process_mcp_server_and_client():
     assert {"add", "order_status"}.issubset(set(report["tools"]))
     assert [call["content"] for call in report["calls"][:2]] == ["5", "已发货"]
     assert report["calls"][2]["content"].startswith("拒绝：")
+
+
+# ---------------------------------------------------------------- V3-6 ----
+def test_v3_6_retry_honors_retry_after_and_skips_permanent_errors():
+    import httpx
+    import openai
+
+    mod = _load_v3_3_mod("part5-production/5.2-reliability-retry/reliability.py", "v3_6_reliability")
+    request = httpx.Request("POST", "http://fake/v1")
+
+    def error(cls, status, headers=None):
+        return cls("x", response=httpx.Response(status, request=request, headers=headers or {}), body=None)
+
+    waits: list[float] = []
+    attempts = iter([error(openai.RateLimitError, 429, {"retry-after": "3"}), error(openai.InternalServerError, 500), "ok"])
+
+    def flaky():
+        step = next(attempts)
+        if isinstance(step, Exception):
+            raise step
+        return step
+
+    assert mod.call_with_retry(flaky, sleep=waits.append, log=lambda _m: None) == "ok"
+    assert waits[0] == 3.0 and 0 <= waits[1] <= 2.0  # 429 听 Retry-After；500 用退避上限内的抖动
+
+    calls = []
+
+    def bad_request():
+        calls.append(1)
+        raise error(openai.BadRequestError, 400)
+
+    with pytest.raises(openai.BadRequestError):
+        mod.call_with_retry(bad_request, sleep=waits.append)
+    assert calls == [1]  # 参数错不重试
+
+    def always_503():
+        raise error(openai.InternalServerError, 503)
+
+    with pytest.raises(openai.InternalServerError):
+        mod.call_with_retry(always_503, max_retries=2, sleep=waits.append, log=lambda _m: None)
+
+
+def test_v3_6_cache_cost_and_offpeak_schedule():
+    mod = _load_v3_3_mod("part5-production/5.3-cost-cache-routing/cost_cache_routing.py", "v3_6_cost")
+    price = {"input": 0.30, "cached_input": 0.006, "output": 1.20}
+    assert mod.cost_with_cache(10_000, 8_000, 500, price) == pytest.approx(0.001248)
+    with pytest.raises(ValueError):
+        mod.cost_with_cache(100, 101, 0, price)
+    tasks = [{"id": "a", "urgent": True}, {"id": "b", "urgent": False}]
+    assert [t["run_at_hour"] for t in mod.schedule_batch(tasks, 20, [(22, 1)])] == [20, 22]  # 跨零点窗口的起点
+    assert [t["run_at_hour"] for t in mod.schedule_batch(tasks, 0, [(22, 1)])] == [0, 0]     # 凌晨已在窗口内
+    assert mod.cache_key("  RAG  是什么 ") == mod.cache_key("rag 是什么")
+
+
+def test_v3_6_audit_record_whitelists_fields_and_label_is_idempotent():
+    import hashlib
+
+    mod = _load_v3_3_mod("part5-production/5.7-security-guardrails/security_guardrails.py", "v3_6_guardrails")
+    event = {"ts": "t", "tenant_id": "t1", "actor_id": "alice@example.com", "action": "chat", "decision": "allow",
+             "model": "m", "prompt_version": "v1", "prompt": "手机 13812345678", "email": "alice@example.com"}
+    record = mod.audit_record(event, hash_fn=lambda v: hashlib.sha256(v.encode()).hexdigest())
+    assert set(record) == {"ts", "tenant_id", "actor_ref", "action", "decision", "model", "prompt_version"}
+    assert "13812345678" not in str(record) and "alice@example.com" not in str(record)
+    with pytest.raises(ValueError):
+        mod.audit_record({k: v for k, v in event.items() if k != "tenant_id"}, hash_fn=str)
+    policy = {"disclose": True, "label": "【AI 生成】"}
+    once = mod.label_ai_content("答案", policy)
+    assert mod.label_ai_content(once, policy) == once
+
+
+def test_v3_6_otel_error_span_has_no_message_and_traceparent_round_trip():
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    mod = _load_v3_3_mod("part5-production/5.9-otel-observability/otel_observability.py", "v3_6_otel")
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test")
+    with mod.llm_span(tracer, operation="chat", model="m", provider="custom") as span:
+        mod.record_usage(span, mod.Usage(100, 20, cached_input_tokens=60))
+        with mod.tool_span(tracer, tool_name="t", call_id="c1"):
+            pass
+    with mod.llm_span(tracer, operation="chat", model="m", provider="custom") as span:
+        mod.record_error(span, ValueError("SECRET 13812345678"))
+    spans = list(exporter.get_finished_spans())
+    assert "SECRET" not in repr([(dict(s.attributes), [dict(e.attributes) for e in s.events], s.status.description) for s in spans])
+    summary = mod.summarize_trace(spans)
+    assert (summary["llm_spans"], summary["tool_spans"], summary["tokens"]) == (2, 1, 120)
+    assert summary["error_spans"] == ["chat m"]
+    headers = mod.inject_traceparent({}, "0af7651916cd43dd8448eb211c80319c", "b7ad6b7169203331", True)
+    assert mod.extract_traceparent(headers) == ("0af7651916cd43dd8448eb211c80319c", "b7ad6b7169203331", True)
+    assert mod.extract_traceparent({"traceparent": "00-" + "0" * 32 + "-b7ad6b7169203331-01"}) is None
+
+
+def test_v3_6_control_plane_over_real_sqlite_store(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    monkeypatch.syspath_prepend(str(__import__("pathlib").Path(__file__).resolve().parent
+                                    / "part4-agents-langgraph/4.19-agent-execution-plane"))
+    mod = _load_v3_3_mod("part5-production/5.10-control-execution-plane/control_execution_plane.py", "v3_6_plane")
+    store = mod.PlaneStore(tmp_path / "tasks.sqlite")
+    jobs: list[str] = []
+
+    class Queue:
+        def put(self, task_id):
+            jobs.append(task_id)
+
+    client = TestClient(mod.create_app(store, Queue()))
+    a, b = {"X-Tenant": "a"}, {"X-Tenant": "b"}
+    first = client.post("/tasks", json={"payload": {"x": 1}}, headers={**a, "Idempotency-Key": "k"})
+    again = client.post("/tasks", json={"payload": {"x": 1}}, headers={**a, "Idempotency-Key": "k"})
+    assert first.status_code == 202 and first.json() == again.json() and len(jobs) == 1
+    task_id = first.json()["task_id"]
+    assert client.get(f"/tasks/{task_id}", headers=b).status_code == 404
+    assert client.post(f"/tasks/{task_id}/approval", json={"stage": "s", "decision": "approve"}, headers=a).status_code == 403
+    approver = {**a, "X-Role": "approver"}
+    assert client.post(f"/tasks/{task_id}/approval", json={"stage": "s", "decision": "approve"}, headers=approver).status_code == 200
+    assert store.get(task_id)["approvals"] == {"s": True} and jobs.count(task_id) == 2
+    assert client.post(f"/tasks/{task_id}/cancel", headers=a).json()["cancel_requested"] is True
+
+
+def test_v3_6_webhook_retries_5xx_but_not_4xx_and_dedups():
+    mod = _load_v3_3_mod("part5-production/5.10-control-execution-plane/control_execution_plane.py", "v3_6_plane_hook")
+    task = {"task_id": "t1", "status": "succeeded"}
+
+    def poster(statuses):
+        calls = []
+
+        def post(url, body, headers):
+            calls.append(headers["X-Signature"])
+            return statuses[min(len(calls) - 1, len(statuses) - 1)]
+
+        return post, calls
+
+    post, calls = poster([503, 200])
+    delivered: set[str] = set()
+    assert mod.send_webhook(task, "u", b"s", post, delivered) is True and len(calls) == 2
+    assert mod.send_webhook(task, "u", b"s", post, delivered) is True and len(calls) == 2  # 已投递，不再发送
+    post, calls = poster([400, 200])
+    assert mod.send_webhook(task, "u", b"s", post, set()) is False and len(calls) == 1
+
+
+def test_v3_6_capacity_math_survives_float_rounding():
+    mod = _load_v3_3_mod("part5-production/5.12-capacity-slo-recovery/capacity_slo.py", "v3_6_capacity")
+    assert mod.percentile(list(range(10, 110, 10)), 0.7) == 70  # 0.7 * 10 == 7.000000000000001
+    assert mod.error_budget(0.9, 10, 1)["allowed_failures"] == 1  # (1 - 0.9) * 10 == 0.9999999999999998
+    plan = mod.plan_capacity(3, 1.1, 0.1, tokens_per_req=1000, rpm_limit=100, tpm_limit=10_000_000)
+    assert plan["instances"] == 3 and plan["bottleneck"] == "rpm"
+    results = [mod.RequestResult(100, 200)] * 8 + [mod.RequestResult(100, 429), mod.RequestResult(5000, 0)]
+    assert mod.summarize_load(results, 10)["error_rate"] == 0.2  # 429 与超时都算失败

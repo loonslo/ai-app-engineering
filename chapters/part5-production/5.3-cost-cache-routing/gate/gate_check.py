@@ -117,6 +117,45 @@ def main() -> int:
     gate.check("02 TTL 缓存", test_cache)
     gate.check("03 路由", test_route)
     gate.check("04 节省估算", test_savings)
+
+    price = {"input": 0.30, "cached_input": 0.006, "output": 1.20}
+
+    def test_cost_cache():
+        no_cache = core.cost_with_cache(10_000, 0, 500, price)
+        cached = core.cost_with_cache(10_000, 8_000, 500, price)
+        expect(abs(no_cache - 0.0036) < 1e-9, f"无缓存应为 0.0036，实际 {no_cache}")
+        expect(abs(cached - 0.001248) < 1e-9, f"80% 命中应为 0.001248，实际 {cached}")
+        expect(cached < no_cache, "命中缓存应更便宜")
+
+    def test_cost_cache_error():
+        try:
+            core.cost_with_cache(100, 101, 0, price)
+        except ValueError:
+            return
+        raise AssertionError("cached > input 应抛 ValueError")
+
+    tasks = [{"id": "a", "urgent": True}, {"id": "b", "urgent": False}]
+
+    def runs(now, windows):
+        result = core.schedule_batch(tasks, now, windows)
+        expect([r["id"] for r in result] == ["a", "b"], "顺序应与输入一致")
+        return [r["run_at_hour"] for r in result]
+
+    def test_schedule_defer():
+        expect(runs(8, [(10, 18)]) == [8, 10], "非 urgent 应推迟到窗口起点，urgent 立即执行")
+
+    def test_schedule_midnight():
+        expect(runs(20, [(22, 1)]) == [20, 22], "跨零点窗口的起点是 22")
+        expect(runs(0, [(22, 1)]) == [0, 0], "凌晨 0 点已在跨零点窗口内，应立即执行")
+
+    def test_schedule_in_window():
+        expect(runs(12, [(10, 18)]) == [12, 12], "当前处于低峰应立即执行")
+
+    gate.check("05 带缓存的成本", test_cost_cache)
+    gate.check("06 cached 大于 input 报错", test_cost_cache_error)
+    gate.check("07 非 urgent 推迟到低峰", test_schedule_defer)
+    gate.check("08 跨零点窗口", test_schedule_midnight)
+    gate.check("09 当前处于低峰立即执行", test_schedule_in_window)
     return gate.report(module_path)
 
 

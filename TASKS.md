@@ -5,7 +5,7 @@
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-4 已通过并合入 master（V3-4 审核见 `docs/v3/reviews/V3-4.md`）。V3-5（L4-B：4.2/4.3/4.4/4.6/4.10/4.11/4.12/4.15 增改，新增 4.19–4.23）已实施并复跑：11 个 gate 骨架 0 通过、参考解 106 项全过，pytest 103 passed，断链 0，ruff 通过；4.3/4.6/4.12 DeepSeek live 单次退出 0。记录见 `docs/gate-v3-5-validation.md`，在 `wip-v3-5`。V3-6（L5）至 V3-10 待做；真实模型多数路径、Docker 容器隔离、真实 MCP 服务未验证。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-5 已通过并合入 master。V3-6（L5 服务化与生产：5.1/5.2/5.3/5.7 换实现或增补，新增 5.9–5.15，6.1 增补）已完成并复跑，合入 master；实施线程额度用完，由审核者亲自实施，没有实施与审核分离。5 个 gate 参考解 5.3 9/9、5.7 11/11、5.9 13/13、5.10 14/14、5.12 12/12 全过、5.2 5/5，骨架 0 通过，pytest 110 passed，断链 0，ruff 通过；5.2/5.3 DeepSeek live 单次退出 0。记录见 `docs/gate-v3-6-validation.md`、`docs/v3/reviews/V3-6.md`。V3-7（P 项目主线）、V3-8（J 就业轨道）、V3-9（capstone）、V3-10（标签与索引）待做；OTLP 发送、云部署、托管运行时、容量与恢复演练等真实环境证据未验证。
 - [ ] **V3-3 外部环境遗留** - 3.3/3.7/3.8 的 DeepSeek 单次 live 记录保留于 `docs/gate-v3-3-validation.md` 第 8 节；远端 OTLP、DeepEval 仍未验证。V3-3 已合入；用户决定不再恢复丢失的原 LangSmith 报告。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
@@ -21,6 +21,7 @@
 
 ## Done
 
+- [x] **V3-6 L5 服务化与生产（2026-10-31；已合入 master）** - 5.1/5.2/5.3 换原生 openai SDK（带抖动的重试、SSE、成本与低峰调度），5.3 gate 追加 5 项、5.7 gate 追加 4 项，新增 5.9 OpenTelemetry、5.10 控制面与执行面、5.12 容量 SLO 与恢复三个 gate，新增 5.11、5.13、5.14、5.15 四个清单章，6.1 README 增补。外部出处逐项核对并标注读取日期，未核实的写“未核实”。验证与偏离见 `docs/gate-v3-6-validation.md`；未验证：OTLP 后端、真实云部署、托管运行时实测、并发与恢复。
 - [x] **V3-4 L4-A 控制流课件实施（2026-10-31；待审核）** - 完成 L4.1–L4.8：原生五种 workflow、有界工具循环、工具设计、枚举路由、JSON 计划恢复、Pydantic AI 审批与历史、多 Agent 上下文隔离、结果评分及两实现同场景 Gate。新增 4.16/4.17/4.18 并登记，依赖供 CI 离线使用。9 个骨架均 0 通过；临时解 106/106，连跑输出一致；工具与章节回归 91 passed（1 Chroma 弃用提示），限定范围 ruff 通过、断链 0、v2 111 unchanged，新三章 v3 unchanged；13 个入口离线 exit 0；9 个支持 live 的入口各验证缺钥/不可达，18 次均 exit 1 无堆栈。7 个主要入口 DeepSeek live 各单次 exit 0，不写根 reports/；4.16 首次 live 话术冲突已加校验规则修复并复跑 live（仅挡已知冲突）。未验证真实支付/审批 UI、并发恢复、远端追踪、部署、对照版真实成功路径。完整命令、偏离与临时解见 `docs/gate-v3-4-validation.md`。
 - [x] **V3-3 报告写入边界补查（2026-10-31；仍待 Claude 复核）** - 新增测试复现直接调用 `write_ab_report` 可绕过 CLI 覆盖证据；将 live 模式、模型 ID 和两版可用裁判结果的校验下沉到写入函数，校验失败前不写文件。新增 8 个离线测试覆盖直接写入拒绝、CLI 离线保护、模拟在线成功和全部/部分裁判降级；完整回归 116 passed、ruff 通过、368 个 Markdown 0 断链。模拟在线测试只写临时目录，不代表真实模型验收。证据见 `docs/gate-v3-3-validation.md` 的“后续补查”。未合并、未启动 V3-4；真实模型、远端 OTLP、原报告恢复仍未验证。
 - [x] **V3-3 复核退回整改（2026-10-31；等待审核者复核）** - 针对 `docs/v3/reviews/V3-3.md` 复核一节修复 N1、B1-r、M1-r、M9、M6-r、M8-r 与 b2-r、m2-r、m5-r、m7、m8：

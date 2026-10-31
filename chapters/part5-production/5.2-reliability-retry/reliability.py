@@ -1,161 +1,235 @@
 """
-章节 5.2 · 可靠性：超时、重试、成本统计
+章节 5.2 · 可靠性：超时、带抖动的退避重试、成本统计（原生 openai SDK）
 ==========================================================
-LLM 调用会超时、会被限流、会偶发失败。上线前必须加防护，还要能算清
-"每次调用花了多少 token / 多少钱"。这节把这些工程基本功补上。
+LLM 调用会超时、会被限流（429）、会偶发 5xx。上线前必须加防护，还要能算清
+"每次调用花了多少 token / 多少钱"。
 
 知识点：
-1. 请求超时 timeout：别让一次卡住的调用拖垮整个服务
-2. 指数退避重试：失败后等 1s、2s、4s 再试（先手写理解原理，再看生产做法）
-3. token / 成本统计：用返回结果的 usage_metadata
+1. 请求超时：在客户端上设置，别让一次卡住的调用拖垮整个服务
+2. 指数退避 + 抖动（jitter）：只重试瞬时错误；等待有上限；多个客户端不要同一时刻一起重试
+3. 429 / Retry-After：服务端说了该等多久就按它说的等
+4. 降级：主模型重试耗尽后换备用模型（思路同 1.7）
+5. token / 成本统计：用响应里的 usage
 
-本文件是教学材料，不是平行造一套"demo 版生产代码"：
-- 手写重试：理解原理，仅此而已，不要在真实项目里用
-- 生产版重试 + fallback：已经实现在 common.py 的 get_reliable_llm() 里，
-  并且真的接进了 capstone/knowledge_base.py（chain()）和
-  capstone/permissions.py（permission_chain()）——这两个是项目里
-  用户会真实提问的链路。本文件只 import 它、演示怎么用。
-- 缓存：只演示 + 说明适用边界，不接入生产问答链路（原因见下方注释）。
+和 gate 的关系：下面的 backoff_delays / is_retryable / estimate_cost 与 gate 任务书
+的三个函数同名同口径；先自己通过 gate，再来对照。
 
-前置：2.6、1.1；DEEPSEEK_API_KEY
-运行：python tools/run_chapter.py 5.2（调用真实模型，会产生少量费用；缓存演示会在本章目录写 .llm_cache.db）
-输出：手写重试版、生产版、tenacity 版各一次回答，缓存命中的耗时对比，以及 token 用量与粗算成本
+前置：1.1、1.7；DEEPSEEK_API_KEY（仅 --live 需要）
+运行：python tools/run_chapter.py 5.2            （离线演示：脚本化的假客户端，不联网）
+      python tools/run_chapter.py 5.2 --live     （调用真实模型，会产生少量费用）
 ==========================================================
 """
 
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import random
+import sys
 import time
-from langchain_core.messages import HumanMessage
-from common import get_llm, get_reliable_llm
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
 
-# 裸模型：无超时保护、无重试。评测/回归这类"结果要确定、失败就该报错"的
-# 场景才用它（对照组，用来演示手写重试和暴露"不加防护会怎样"）。
-llm = get_llm(temperature=0, timeout=20, max_retries=0)
-
-
-# ========== 第 1 层：手写重试（只为理解原理，生产别用这个） ==========
-def invoke_with_retry(messages, max_retries=3):
-    """指数退避重试：第 1 次失败等 1s，第 2 次等 2s，第 3 次等 4s……
-
-    为什么用指数退避：失败常因为限流/瞬时网络抖动，越往后等越久，
-    给对方喘息空间，也避免你疯狂重试把自己也拖死。
-
-    这版有两个生产不能接受的坑：
-    ① 无差别重试——连"参数错误""鉴权失败"这种重试也没用的错误也照样等了重试
-    ② 没有随机抖动 jitter——大量客户端同时失败、同时退避，会"同步重试风暴"再打爆一次服务
-    往下看 get_reliable_llm 是怎么解决这两个问题的。
-    """
-    for attempt in range(max_retries):
-        try:
-            return llm.invoke(messages)
-        except Exception as e:
-            wait = 2 ** attempt           # 1, 2, 4, ...
-            print(f"第 {attempt + 1} 次失败：{e}；{wait}s 后重试")
-            time.sleep(wait)
-    raise RuntimeError(f"重试 {max_retries} 次仍失败")
+import httpx
+import openai
 
 
-# ========== 第 2 层：生产做法 ==========
-# 真正上线用的实现在 common.py::get_reliable_llm()（全项目共用一处，改一处生效）：
-#   - timeout：单次请求最多等 20s
-#   - llm.with_retry(stop_after_attempt=4, wait_exponential_jitter=True)
-#     LangChain 内置指数退避 + jitter，一行搞定，不用手写循环
-#   - 可选 backup_model：主模型重试耗尽仍失败 → 自动切备用模型（with_fallbacks）
-# capstone/knowledge_base.py 的 chain() 和 capstone/permissions.py 的
-# permission_chain() 已经从 C.get_llm() 换成了 C.get_reliable_llm()。
-reliable_llm = get_reliable_llm(temperature=0)
+# ---------- 与 gate 同口径的三个纯函数 ----------
+def backoff_delays(max_retries: int, base: float = 1.0, max_delay: float = 20.0) -> list[float]:
+    """base, 2*base, 4*base...，每项不超过 max_delay。"""
+    if max_retries < 0 or base <= 0 or max_delay <= 0:
+        raise ValueError("max_retries 不能为负，base 与 max_delay 必须为正")
+    return [min(base * 2**i, max_delay) for i in range(max_retries)]
 
 
-# ---- 进阶：如果 with_retry 的重试条件不够用（比如想区分"限流"和"5xx"
-# 用不同等待策略、或者想在重试时打自己的日志/埋点），才需要上 tenacity 手写。
-# 日常够用就别加这层复杂度——多一个依赖就多一处要维护的东西。
-def build_tenacity_llm():
-    from tenacity import retry, stop_after_attempt, wait_exponential_jitter, retry_if_exception_type
+def is_retryable(exc: BaseException) -> bool:
+    """瞬时错误才重试：超时、连接错误、429、5xx。参数错、权限错重试也没用。"""
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
+    if isinstance(exc, (openai.APITimeoutError, openai.APIConnectionError, openai.RateLimitError)):
+        return True
+    return isinstance(exc, openai.APIStatusError) and exc.status_code >= 500
+
+
+def estimate_cost(usage: dict | None, price_per_1k: float) -> float:
+    """total_tokens / 1000 * 单价；usage 缺失按 0 处理。"""
+    if price_per_1k < 0:
+        raise ValueError("单价不能为负")
+    if not usage or "total_tokens" not in usage:
+        return 0.0
+    return usage["total_tokens"] / 1000 * price_per_1k
+
+
+# ---------- 带抖动的重试 ----------
+def retry_after_seconds(exc: BaseException) -> float | None:
+    """429 / 503 常带 Retry-After 头（秒数）；有就按服务端说的等。"""
+    response = getattr(exc, "response", None)
+    value = response.headers.get("retry-after") if response is not None else None
     try:
-        from openai import APITimeoutError, RateLimitError, InternalServerError
-        RETRYABLE = (APITimeoutError, RateLimitError, InternalServerError)
-    except ImportError:
-        RETRYABLE = (Exception,)   # 没装 openai SDK 就兜底，实际按你用的 SDK 异常类型填
-
-    @retry(
-        stop=stop_after_attempt(4),
-        wait=wait_exponential_jitter(initial=1, max=20),
-        retry=retry_if_exception_type(RETRYABLE),   # 只重试瞬时故障，参数错/鉴权错不重试
-        reraise=True,                               # 重试耗尽后抛原始异常，别吞掉
-    )
-    def _invoke(messages):
-        return llm.invoke(messages)
-    return _invoke
+        return float(value) if value is not None else None
+    except ValueError:
+        return None
 
 
-# ---- 缓存：能省 token + 降延迟，但不是无脑接的东西 ----
-# 原理：LangChain 的 SQLiteCache/InMemoryCache 是"精确匹配"缓存，key 是完整
-# prompt 文本 + 模型参数。没有 TTL、没有淘汰策略，只增不减，文件会一直长大。
-#
-# 适用边界：
-#   - 用：本地开发反复调试、evals/run_eval_platform.py 反复跑同一批固定 eval 题
-#     （问题集合有限、可枚举，几百到几千条封顶，文件几十 MB 顶天）
-#   - 不用：对外问答接口的无版本通用精确缓存——用户问题几乎不重复，命中率低，
-#     而且知识库文档更新（connector.py 增量同步）后，旧缓存答案不会失效，
-#     等于让用户看到过时内容，这是正确性问题，不只是磁盘占用问题
-#   - 真要在生产做缓存：换 RedisCache（可设 TTL）或语义缓存（相似度匹配、
-#     不要求一字不差），并且要在文档更新时主动使旧缓存失效
-def enable_eval_cache():
-    """只在评测/开发脚本里调用，不要接入面向用户的问答链路。"""
-    from langchain_core.globals import set_llm_cache
-    from langchain_community.cache import SQLiteCache
-    set_llm_cache(SQLiteCache(database_path=".llm_cache.db"))
+def call_with_retry(
+    fn: Callable[[], Any],
+    *,
+    max_retries: int = 3,
+    base: float = 1.0,
+    max_delay: float = 20.0,
+    sleep: Callable[[float], None] = time.sleep,
+    rng: random.Random | None = None,
+    log: Callable[[str], None] = print,
+) -> Any:
+    """调用 fn；瞬时错误按"指数退避 + 全抖动"重试，最多 max_retries 次重试。
+
+    全抖动 = 在 [0, 退避上限] 里随机取一个等待值，让一批客户端的重试错开，
+    不会在同一时刻再次打满服务。不可重试的错误立刻抛出，不吞异常。
+    """
+    rng = rng or random.Random()
+    delays = backoff_delays(max_retries, base, max_delay)
+    for attempt in range(max_retries + 1):
+        try:
+            return fn()
+        except Exception as exc:
+            if attempt == max_retries or not is_retryable(exc):
+                raise
+            wait = retry_after_seconds(exc)
+            if wait is None:
+                wait = rng.uniform(0, delays[attempt])
+            log(f"  第 {attempt + 1} 次失败（{type(exc).__name__}），{wait:.2f}s 后重试")
+            sleep(wait)
+    raise AssertionError("不可达")
+
+
+def chat_with_fallback(
+    clients_and_models: list[tuple[Any, str]], messages: list[dict], **retry_kwargs: Any
+) -> tuple[Any, str]:
+    """按顺序尝试 (client, model)；某个模型重试耗尽仍失败就换下一个。返回 (响应, 实际用的模型)。"""
+    last: Exception | None = None
+    for client, model in clients_and_models:
+        try:
+            resp = call_with_retry(
+                lambda c=client, m=model: c.chat.completions.create(model=m, messages=messages),
+                **retry_kwargs,
+            )
+            return resp, model
+        except Exception as exc:
+            last = exc
+            if not is_retryable(exc):
+                raise
+    raise RuntimeError("所有模型都失败") from last
+
+
+# ---------- 缓存：只给评测/开发用 ----------
+# 精确匹配缓存：key = (模型, 消息) 的哈希。没有过期、没有淘汰，只增不减；
+# 用户问题几乎不重复，知识库更新后旧答案也不会失效，所以不要接到对外问答链路。
+# 适合反复跑同一批固定评测题。
+class EvalCache:
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.data: dict[str, str] = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
+
+    @staticmethod
+    def key(model: str, messages: list[dict]) -> str:
+        return hashlib.sha256(json.dumps([model, messages], ensure_ascii=False).encode()).hexdigest()
+
+    def get_or_call(self, model: str, messages: list[dict], call: Callable[[], str]) -> str:
+        k = self.key(model, messages)
+        if k not in self.data:
+            self.data[k] = call()
+            self.path.write_text(json.dumps(self.data, ensure_ascii=False), encoding="utf-8")
+        return self.data[k]
+
+
+# ---------- 离线演示用的脚本化客户端 ----------
+def _error(cls: type[openai.APIStatusError], status: int, headers: dict | None = None) -> openai.APIStatusError:
+    request = httpx.Request("POST", "http://fake.local/v1/chat/completions")
+    return cls("scripted", response=httpx.Response(status, request=request, headers=headers or {}), body=None)
+
+
+class ScriptedClient:
+    """按脚本依次返回错误或成功文本；不联网。"""
+
+    def __init__(self, script: list[Exception | str]) -> None:
+        self.script = list(script)
+        self.chat = self
+        self.completions = self
+
+    def create(self, *, model: str, messages: list[dict]) -> Any:
+        step = self.script.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        usage = type("U", (), {"total_tokens": 120})()
+        message = type("M", (), {"content": step})()
+        return type("R", (), {"choices": [type("C", (), {"message": message})()], "usage": usage})()
+
+
+def run_offline() -> int:
+    print("[离线演示] 脚本化客户端，等待时间用假 sleep，不会真的等\n")
+    waits: list[float] = []
+    rng = random.Random(7)  # 固定种子，演示输出可复现
+
+    print("1) 先 429（带 Retry-After: 3）再 500，最后成功：")
+    client = ScriptedClient([_error(openai.RateLimitError, 429, {"retry-after": "3"}),
+                             _error(openai.InternalServerError, 500), "RAG 是检索增强生成。"])
+    resp = call_with_retry(lambda: client.chat.completions.create(model="m", messages=[]),
+                           sleep=waits.append, rng=rng)
+    print("  回答：", resp.choices[0].message.content, "| 等待序列：", [round(w, 2) for w in waits])
+
+    print("\n2) 400 参数错：不重试，直接抛出：")
+    client = ScriptedClient([_error(openai.BadRequestError, 400), "不会走到这里"])
+    try:
+        call_with_retry(lambda: client.chat.completions.create(model="m", messages=[]), sleep=waits.append)
+    except openai.BadRequestError:
+        print("  已抛出 BadRequestError，脚本里还剩", len(client.script), "步没有被消费")
+
+    print("\n3) 主模型一直 503，重试耗尽后降级到备用模型：")
+    primary = ScriptedClient([_error(openai.InternalServerError, 503)] * 3)
+    backup = ScriptedClient(["（备用模型的回答）"])
+    resp, used = chat_with_fallback([(primary, "main"), (backup, "backup")], [],
+                                    max_retries=2, sleep=waits.append, rng=rng)
+    print("  实际使用：", used, "→", resp.choices[0].message.content)
+
+    print("\n4) 成本估算（单价 0.001 元/1K token 仅为占位，请换成真实价格）：",
+          estimate_cost({"total_tokens": 120}, 0.001), "元")
+    return 0
+
+
+def run_live() -> int:
+    import common
+
+    try:
+        # max_retries=0：关掉 SDK 自带重试，重试只由上面这一层负责，避免两层重试叠加成重试风暴
+        client = common.get_openai_client(timeout=20.0, max_retries=0)
+        model = common.chat_model_name()
+        messages = [{"role": "user", "content": "用一句话解释 RAG"}]
+        resp = call_with_retry(lambda: client.chat.completions.create(model=model, messages=messages))
+    except Exception as exc:  # 只给类型和提示，SDK 异常正文可能含 URL
+        print(f"运行失败（{type(exc).__name__}）：检查模型配置、密钥与网络；未生成成功结果。", file=sys.stderr)
+        return 1
+    print(f"[live 真实模型 {model}]", resp.choices[0].message.content)
+    usage = resp.usage.model_dump() if resp.usage else None
+    print("token 用量：", usage)
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="5.2 可靠性：超时、退避、成本")
+    parser.add_argument("--live", action="store_true", help="调用真实模型")
+    args = parser.parse_args()
+    return run_live() if args.live else run_offline()
 
 
 if __name__ == "__main__":
-    msgs = [HumanMessage("用一句话解释 RAG")]
-
-    # 手写版（理解原理，能看到失败时的重试日志）
-    resp = invoke_with_retry(msgs)
-    print("手写重试版：", resp.content)
-
-    # 生产版：直接用 common.get_reliable_llm()，capstone 里也是这么用的
-    print("生产版（get_reliable_llm）：", reliable_llm.invoke(msgs).content)
-
-    # 进阶：tenacity 精细控制（日常不需要，仅作了解）
-    print("tenacity 版：", build_tenacity_llm()(msgs).content)
-
-    # 缓存效果对比（仅评测/开发场景适用，见上方边界说明）
-    enable_eval_cache()
-    t0 = time.perf_counter()
-    llm.invoke(msgs)
-    t1 = time.perf_counter()
-    llm.invoke(msgs)
-    t2 = time.perf_counter()
-    print(f"缓存效果：首次 {t1 - t0:.2f}s，命中 {t2 - t1:.2f}s")
-
-    # ---------- token / 成本统计 ----------
-    # usage_metadata 里有 input_tokens / output_tokens / total_tokens
-    usage = resp.usage_metadata
-    print("\ntoken 用量：", usage)
-
-    # 粗算成本：按你模型的实际单价填（这里用占位单价示范）
-    PRICE_PER_1K = 0.001   # 元 / 1K token（换成你的真实价）
-    if usage:
-        cost = usage["total_tokens"] / 1000 * PRICE_PER_1K
-        print(f"本次约花费：{cost:.5f} 元")
-
+    raise SystemExit(main())
 
 # ----------------------------------------------------------
 # 小结：
-# - timeout + 重试是 LLM 调用的标配，缺了线上一定出事
-# - 手写版只为理解原理；生产用 common.get_reliable_llm()（with_retry + jitter）
-# - 关键点：只重试瞬时故障，加 jitter 防同步风暴，reraise 别吞异常——
-#   这些 LangChain 的 with_retry 已经处理好，不用自己再造一遍
-# - get_reliable_llm 已经接进 capstone 的两条真实问答链路，不是孤立 demo
-# - 缓存有明确适用边界：评测/开发用，别接生产对外问答（精确匹配命中率低 +
-#   知识库更新后旧缓存不会失效，是正确性风险，不只是磁盘占用）
-# - usage_metadata 让你能监控 token 和成本，是做成本告警/优化的数据来源
-#
-# 生产选型速记：
-# - 就想加重试/主备切换 → common.get_reliable_llm()（本项目直接用这个）
-# - 要精细控制"哪些错误重试" → tenacity（进阶，日常不需要）
-# - 要省钱/提速的评测场景 → enable_eval_cache()
-# - 还没做的进阶：model routing（简单问题路由到便宜模型）——属成本优化，用到再做
-#
-# 动手练习：把 get_reliable_llm() 接到 章节 2.11 的 /chat 接口里，让服务更抗抖动
-# ----------------------------------------------------------
+# - 超时 + 重试是 LLM 调用的标配；限流（429）是生产里最常见的错误来源之一
+# - 只重试瞬时错误；退避要有上限；要加抖动；服务端给了 Retry-After 就听它的
+# - SDK 自带重试和你自己的重试只留一层，否则次数相乘
+# - 降级要有序：先重试主模型，耗尽再换备用，并记录实际用了谁
+# - 缓存只给评测/开发用，别接面向用户的问答链路

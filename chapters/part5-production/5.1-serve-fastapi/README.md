@@ -118,10 +118,16 @@ python tools/run_chapter.py 5.1 run_server.py
 
 对照时只回答：
 
-1. 参考实现把 `build_answer_fn(retriever, llm)` 做成工厂函数；这样做对测试有什么好处？
+1. 参考实现把 `build_answer_fn(retriever, client, model)` 做成工厂函数；这样做对测试有什么好处？
 2. 参考实现的 `/chat` 用 `def` 而不是 `async def`；为什么？
 3. 参考实现的 `lifespan` 在建库失败时仍让服务启动；你的 `create_app` 怎么处理“依赖没准备好”？
+4. `/chat/stream` 为什么只能在"还没输出任何内容"之前重试？流中途失败时，状态码已经是 200，前端靠什么知道出错了？
 
+## 流式（SSE）与限流
+
+参考实现新增了 `/chat/stream`：用原生 `stream=True` 逐段转发，每帧是 `event:` + `data:` + 空行；第一帧 `meta` 带 `trace_id`（响应头 `X-Trace-Id` 同值），最后一帧 `done` 带来源与耗时，失败时发 `error` 帧。它不在 gate 内，用来对照"流式时失败处理为什么更难"。
+
+限流（429）是生产里最常见的 LLM 调用错误来源之一：Datadog《State of AI Engineering 2026》（读取于 2026-10-31）统计，2026 年 2 月报错的 LLM 调用中 60% 由限流引起（3 月报错占比降到 2%，限流仍近三分之一；样本来自其客户遥测，只说明量级）。重试策略见 [5.2](../5.2-reliability-retry/README.md)。
 ## 概念地图
 
 - **服务边界**：请求校验、超时、重试、降级、错误码、trace，都在这一层收口。
@@ -134,4 +140,5 @@ python tools/run_chapter.py 5.1 run_server.py
 
 - gate 用假 `answer_fn`/假 store，不调用真实模型，也不验证持久化实现；5.4 再讲 SQLite/Postgres。
 - 认证、限流、多租户不在本章 gate 内；见 L5.4。
+- 参考实现的超时在客户端上设、重试只在 `call_with_retry` 一层做（客户端 `max_retries=0`）；SSE 路径只在建立连接时重试。参考实现已用假检索器/假客户端和真实 DeepSeek 各跑过一次，没有做并发与断线测试。
 - 通过 gate 不等于已经部署；真实上线、压测、恢复演练见 L5.7/L5.8。

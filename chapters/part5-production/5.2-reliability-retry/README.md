@@ -27,6 +27,12 @@ python chapters/part5-production/5.2-reliability-retry/gate/gate_check.py
 
 这个 gate 用纯函数验证退避、可重试和成本公式，不调用模型。
 
+## 限流是最常见的错误来源
+
+限流（HTTP 429）是生产里最常见的 LLM 调用错误来源之一。Datadog《State of AI Engineering 2026》（2026-04-21 发布，读取于 2026-10-31）的数据：2026 年 2 月，5% 的 LLM 调用 span 报错，其中 60% 由超出速率限制引起；3 月报错 span 降到 2%，限流错误仍占近三分之一。这批数据来自 Datadog 客户的遥测，样本偏向重视基础设施的团队，只能说明量级，不能当作你自己系统的比例。
+
+对重试的含义：限流不是模型坏了，而是容量到顶；盲目快速重试会放大负载。所以要退避、加抖动、尊重 `Retry-After`，并给重试设上限。
+
 ## 任务
 
 实现 `gate/starter.py` 的三个函数：
@@ -85,9 +91,9 @@ python tools/run_chapter.py 5.2
 
 对照时只回答：
 
-1. 参考实现的 `invoke_with_retry` 有两个什么坑？
-2. `get_reliable_llm` 怎么解决这两个坑？
-3. `usage_metadata` 里哪个字段用于成本？
+1. `call_with_retry` 为什么用"全抖动"而不是固定的 1/2/4 秒？
+2. 为什么 `run_live` 里要把 SDK 自带的 `max_retries` 设成 0？
+3. 响应的 `usage` 里哪个字段用于成本？
 
 ## 概念地图
 
@@ -102,3 +108,5 @@ python tools/run_chapter.py 5.2
 - gate 用纯函数，不调用真实模型/缓存。
 - 通过 gate 只证明退避/重试/成本逻辑正确。
 - 真实限流、主备切换、缓存失效见参考实现。
+- 参考实现用原生 openai SDK：默认离线演示（脚本化假客户端，不联网）；`--live` 调用真实模型，缺密钥或不可达时退出码 1。
+- 抖动用 `random`，演示固定种子；生产里还要结合队列和全局并发上限，单个客户端的重试不能解决整体容量问题。

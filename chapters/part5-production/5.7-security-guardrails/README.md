@@ -2,7 +2,7 @@
 
 [全书目录](../../README.md) · [上一章 5.6](../5.6-ollama-inference/README.md) · [下一章 5.8](../5.8-pytest-regression/README.md)
 
-- **能力**：检测提示词注入并分级；PII 脱敏可还原；日志密钥脱敏。
+- **能力**：检测提示词注入并分级；PII 脱敏可还原；日志密钥脱敏；生成不含原文的审计记录；给 AI 生成内容加标识。
 - **v2 路径**：L5.5 / 核心（Gate；安全护栏）
 - **前置**：4.12（信任边界）、5.1。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 分析）。
@@ -24,7 +24,9 @@ python chapters/part5-production/5.7-security-guardrails/gate/gate_check.py
 - 手机号规则先跑，从身份证中间咬走 10 位；
 - 脱敏不可还原，业务方绕开护栏；
 - 密钥只防代码写入，异常字符串仍从日志漏出；
-- 只返回 bool，没有命中项，无法审计/调阈值。
+- 只返回 bool，没有命中项，无法审计/调阈值；
+- 审计日志里连 prompt、邮箱、手机号原文一起存，日志本身成了泄露源；
+- 披露标识每过一道处理就追加一次，变成重复标识。
 
 这个 gate 用固定文本验证分级、脱敏和密钥清洗。
 
@@ -37,6 +39,8 @@ python chapters/part5-production/5.7-security-guardrails/gate/gate_check.py
 | `scan_input` | 归一化后匹配；明确注入 -> block，可疑词 -> flag，正常 -> pass |
 | `mask_pii` | 邮箱/身份证/银行卡/手机号；先长后短；同值复用占位符；可还原 |
 | `scrub_secrets` | sk-/bearer/api_key= 替换为 `[已脱敏密钥]` |
+| `audit_record` | 只输出 ts、tenant_id、actor_ref（`hash_fn(actor_id)` 前 12 位）、action、decision、model、prompt_version；缺字段报错；原文不进输出 |
+| `label_ai_content` | `disclose` 为真且尚无标识时在末尾追加（换行隔开）；已有则不重复；标识为空报错 |
 
 关键口径：
 
@@ -45,6 +49,8 @@ python chapters/part5-production/5.7-security-guardrails/gate/gate_check.py
 - PII 规则先长后短（身份证/银行卡先于手机号）。
 - `mask_pii` 返回 `(脱敏文本, {占位符: 原值})`。
 - 非字符串输入 -> `ValueError`。
+- 审计记录用白名单取字段，而不是“复制事件再删敏感字段”；后者遇到新字段就漏。
+- 哈希函数由调用方注入（gate 用 SHA-256）；真实系统要加盐或用 HMAC，防止对常见邮箱/手机号做彩虹表反查。
 
 ## 故障注入（必须亲手触发）
 
@@ -57,12 +63,17 @@ python chapters/part5-production/5.7-security-guardrails/gate/gate_check.py
 | 5 | 手机号+邮箱+身份证+卡号 | 全部脱敏且可还原 |
 | 6 | 同一手机号出现两次 | 复用 `[手机号_1]` |
 | 7 | 日志含 sk-/bearer/api_key | 全部抹掉 |
+| 8 | 事件含 prompt、邮箱、手机号 | 审计记录恰有 7 个字段，`actor_ref` 为哈希前 12 位 |
+| 9 | 依次去掉 7 个来源字段之一 | 每次都 `ValueError` |
+| 10 | 审计记录转成字符串 | 不含手机号、邮箱、回答里的 token 等原文 |
+| 11 | 文本已带标识再处理一次 | 不重复追加 |
 
 ## 验收标准
 
-`gate_check.py` 的 7 项全部 PASS：
+`gate_check.py` 的 11 项全部 PASS（原 7 项 + 新增 4 项）：
 
-- 拦截、告警/放行、检测类型、脱敏还原、同值复用、脱敏类型、密钥脱敏。
+- 原有：拦截、告警/放行、检测类型、脱敏还原、同值复用、脱敏类型、密钥脱敏；
+- 新增：审计记录字段齐全、缺字段报错、原文不出现在审计记录、AI 内容标识追加且不重复。
 
 通过后，在 [workbook.md](workbook.md) 写：
 
@@ -73,7 +84,7 @@ python chapters/part5-production/5.7-security-guardrails/gate/gate_check.py
 ## 提交物
 
 - `gate/starter.py`（实现后的版本）。
-- `gate/gate_report.json`（7/7）。
+- `gate/gate_report.json`（11/11）。
 - workbook 里的失败分析与三个问题的回答。
 
 ## 通过后对照参考实现
@@ -90,8 +101,17 @@ python tools/run_chapter.py 5.7
 2. 参考实现的 PII 规则顺序为什么重要？
 3. 参考实现的 `build_messages` 为什么比关键词检测更重要？
 
+## 治理：披露、保留与红队
+
+**AI 内容披露。** 欧盟 AI Act 第 50 条的大部分透明度义务自 2026-08-02 起适用；2026-07-27 生效的 AI Omnibus（Regulation (EU) 2026/1744）把高风险系统的多数义务推迟：Annex III 的独立高风险系统到 2027-12-02，Annex I 的产品安全组件到 2028-08-02，并给 2026-08-02 前已上市的生成式系统到 2026-12-02 完成水印义务。来源：White & Case《EU AI Omnibus enters into force, amending the AI Act》（2026-08-04，<https://www.whitecase.com/insight-alert/eu-ai-omnibus-enters-force-amending-ai-act>，读取于 2026-10-31）。这是律所的概述，不是法律意见；你的系统是否适用、怎样披露，以官方文本和法务意见为准。`label_ai_content` 只演示“按策略追加且不重复”的机制。
+
+**数据保留与删除。** 审计记录只留元数据，也要有保留期限和删除办法：写明保留多久、谁能读、用户要求删除时怎么找到并删掉相关记录（用 `actor_ref` 这类哈希引用定位，比扫全文可靠）。保留期限本身是业务与合规的决定，课程不给统一数字。
+
+**红队的基本做法。** 先列资产与威胁（见 L5.4 的威胁模型），再为每条威胁写几条攻击用例，固定下来作为回归集；每次改提示词、模型或工具，都重跑一遍并记录拦截率与漏检样本。本章故意保留的“同义改写漏检”就是一条这样的回归用例。更系统的安全、韧性与性能测试方法见核心阅读 [8.8](../../part8-ai-quality-optional/8.8-security-resilience-perf/README.md)。
+
 ## 概念地图
 
+- **审计与披露**：审计记录回答“谁、何时、用哪个模型和提示词、结果如何”，不保存原文；AI 内容标识是披露机制，不是内容安全。
 - **信任边界**：数据/指令分槽；检索文档也是不可信输入。
 - **分级检测**：block/flag/pass；检测是弱信号。
 - **PII 脱敏**：先长后短、可还原、还原表不进日志。
@@ -101,5 +121,6 @@ python tools/run_chapter.py 5.7
 ## 边界
 
 - gate 只测纯函数，不调用模型。
+- 审计记录与 AI 标识只验证字段与文本规则，不验证存储、访问控制、不可篡改和保留期限。
 - 通过 gate 不证明模型抗注入；结构性隔离/权限/HITL 仍是真防线。
 - 输出审核、工具审批、按人过滤见 capstone。

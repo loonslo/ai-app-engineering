@@ -38,3 +38,24 @@ def mask_pii(text: str) -> tuple[str, dict[str, str]]:
 def scrub_secrets(text: str) -> str:
     """把 sk-... / bearer ... / api_key=... 替换为 [已脱敏密钥]。"""
     raise NotImplementedError("实现密钥脱敏")
+
+
+def audit_record(event: dict, *, hash_fn) -> dict:
+    """生成审计记录，只输出这些字段：ts、tenant_id、actor_ref、action、decision、model、prompt_version。
+
+    - actor_ref = hash_fn(event["actor_id"]) 的前 12 位；
+    - event 缺少 ts、tenant_id、actor_id、action、decision、model、prompt_version 任一字段（缺失或为空）-> ValueError；
+    - event 里的 prompt、completion、email、phone 等其他字段，原文不得出现在输出中。
+    """
+    raise NotImplementedError("实现审计记录")
+
+
+def label_ai_content(text: str, policy: dict) -> str:
+    """policy = {"disclose": bool, "label": str}。
+
+    - disclose 为假 -> 原样返回 text；
+    - disclose 为真且 text 尚未包含 label -> 返回 f"{text}\\n{label}"（正文、换行、标识）；
+    - 已包含 label -> 原样返回，不重复追加；
+    - disclose 为真但 label 为空 -> ValueError。
+    """
+    raise NotImplementedError("实现 AI 内容标识")

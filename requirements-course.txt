@@ -45,3 +45,4 @@ opentelemetry-sdk==1.44.0         # v3：L3.7、L5.6
 # torch             # 6.2 LoRA 微调，需要 GPU 或较长运行时间
 # transformers
 # peft
+# 可选、未锁定：opentelemetry-exporter-otlp-proto-http，仅 5.9 要把 span 发送到 OTLP 后端时才需要；默认控制台输出不需要。

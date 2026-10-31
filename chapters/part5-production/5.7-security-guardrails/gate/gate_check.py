@@ -131,6 +131,56 @@ def main() -> int:
     gate.check("05 同值复用占位符", test_mask_same_value)
     gate.check("06 脱敏类型校验", test_mask_invalid)
     gate.check("07 密钥脱敏", test_scrub)
+
+    import hashlib
+
+    def hash_fn(value: str) -> str:
+        return hashlib.sha256(value.encode()).hexdigest()
+
+    event = {
+        "ts": "2026-10-31T10:00:00Z", "tenant_id": "t1", "actor_id": "alice@example.com",
+        "action": "chat", "decision": "allow", "model": "demo-model", "prompt_version": "v3",
+        "prompt": "我的手机号 13812345678", "completion": "答案含 secret-token-42",
+        "email": "alice@example.com", "phone": "13812345678",
+    }
+
+    def test_audit_fields():
+        record = core.audit_record(event, hash_fn=hash_fn)
+        expect(set(record) == {"ts", "tenant_id", "actor_ref", "action", "decision", "model", "prompt_version"},
+               f"字段应恰为 7 个，实际 {sorted(record)}")
+        expect(record["actor_ref"] == hash_fn("alice@example.com")[:12], "actor_ref 应是哈希前 12 位")
+        expect(record["tenant_id"] == "t1" and record["decision"] == "allow", "来源字段应原样保留")
+
+    def test_audit_missing():
+        for name in ("ts", "tenant_id", "actor_id", "action", "decision", "model", "prompt_version"):
+            broken = {k: v for k, v in event.items() if k != name}
+            try:
+                core.audit_record(broken, hash_fn=hash_fn)
+            except ValueError:
+                continue
+            raise AssertionError(f"缺少 {name} 应抛 ValueError")
+
+    def test_audit_no_raw():
+        text = str(core.audit_record(event, hash_fn=hash_fn))
+        for raw in ("13812345678", "alice@example.com", "secret-token-42", "我的手机号"):
+            expect(raw not in text, f"审计记录不得包含原文：{raw}")
+
+    def test_label():
+        policy = {"disclose": True, "label": "【AI 生成】"}
+        once = core.label_ai_content("答案。", policy)
+        expect(once == "答案。\n【AI 生成】", f"应在末尾追加标识，实际 {once!r}")
+        expect(core.label_ai_content(once, policy) == once, "已带标识不得重复追加")
+        expect(core.label_ai_content("答案。", {"disclose": False, "label": "x"}) == "答案。", "不披露时原样返回")
+        try:
+            core.label_ai_content("答案。", {"disclose": True, "label": ""})
+        except ValueError:
+            return
+        raise AssertionError("disclose 为真但 label 为空应抛 ValueError")
+
+    gate.check("08 审计记录字段齐全", test_audit_fields)
+    gate.check("09 缺少字段时报错", test_audit_missing)
+    gate.check("10 原文不出现在审计记录", test_audit_no_raw)
+    gate.check("11 AI 内容标识追加且不重复", test_label)
     return gate.report(module_path)
 
 

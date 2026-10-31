@@ -2,7 +2,7 @@
 
 [全书目录](../../README.md) · [上一章 5.2](../5.2-reliability-retry/README.md) · [下一章 5.4](../5.4-sqlite-persistence/README.md)
 
-- **能力**：归一化缓存键；带 TTL 的缓存；按难度路由；估算路由节省比例。
+- **能力**：归一化缓存键；带 TTL 的缓存；按难度路由；估算路由节省比例；计算带缓存命中的成本；把非紧急任务调度到低峰。
 - **v2 路径**：L5.2 / 核心（Gate；缓存/路由/成本）
 - **前置**：5.2（可靠性/成本）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
@@ -23,7 +23,9 @@ python chapters/part5-production/5.3-cost-cache-routing/gate/gate_check.py
 - 缓存永不过期，知识库更新后仍返回旧答案；
 - 路由只看长度，长问候被送强模型、短复杂问题被送弱模型；
 - 节省比例算成 `simple_ratio * (1 - strong/cheap)`，方向错；
-- 价格/比例不校验，负成本。
+- 价格/比例不校验，负成本；
+- 带缓存的输入按全价计费，高估成本；
+- 低峰窗口跨零点（如 22 点到次日 1 点）时，比较写成 `start <= h < end` 而漏掉这种情况。
 
 这个 gate 用假时钟和纯函数验证缓存、路由和成本公式。
 
@@ -37,6 +39,8 @@ python chapters/part5-production/5.3-cost-cache-routing/gate/gate_check.py
 | `TTLCache` | `get(key, now)` 过期返回 None；`set` 记录时间；ttl<=0 报错 |
 | `is_simple`/`route` | 短或问候 -> cheap，否则 strong；空问题报错 |
 | `savings` | `simple_ratio*(1-cheap/strong)`；参数校验 |
+| `cost_with_cache` | 总输入拆成“未命中 + 命中”两段，分别用 `input` 与 `cached_input` 单价，加输出；`cached > input` 报错 |
+| `schedule_batch` | urgent 立即执行；非 urgent 推迟到下一个低峰窗口起点；已在低峰则立即；窗口可跨零点 |
 
 关键口径：
 
@@ -44,6 +48,8 @@ python chapters/part5-production/5.3-cost-cache-routing/gate/gate_check.py
 - TTL 过期项要删除，不能留在内存。
 - 价格必须 >0，cheap<=strong。
 - 比例必须在 [0,1]。
+- 单价单位是每百万 token；`cost_with_cache(10_000, 8_000, 500, {"input": 0.30, "cached_input": 0.006, "output": 1.20})` 应为 `0.001248`。
+- 低峰窗口是 `[start, end)`，小时为 0–23 的整数；`(22, 1)` 表示 22:00 到次日 01:00。
 
 ## 故障注入（必须亲手触发）
 
@@ -56,12 +62,18 @@ python chapters/part5-production/5.3-cost-cache-routing/gate/gate_check.py
 | 5 | “你好”/长复杂问题 | cheap/strong |
 | 6 | 比例 0.5、1/4 价 | 0.375 |
 | 7 | 负比例/负价/cheap>strong | `ValueError` |
+| 8 | 1 万输入、8000 命中缓存、500 输出 | 0.001248，低于无缓存的 0.0036 |
+| 9 | cached 大于 input | `ValueError` |
+| 10 | 08 点提交非 urgent，窗口 (10, 18) | 10 点执行；urgent 仍是 8 点 |
+| 11 | 20 点提交，窗口 (22, 1)；0 点提交 | 22 点执行；0 点立即执行 |
+| 12 | 12 点提交，窗口 (10, 18) | 立即执行 |
 
 ## 验收标准
 
-`gate_check.py` 的 4 项全部 PASS：
+`gate_check.py` 的 9 项全部 PASS（原 4 项 + 新增 5 项）：
 
-- 缓存键、TTL 缓存、路由、节省估算。
+- 原有：缓存键、TTL 缓存、路由、节省估算；
+- 新增：带缓存的成本、cached 越界报错、非 urgent 推迟到低峰、跨零点窗口、当前处于低峰立即执行。
 
 通过后，在 [workbook.md](workbook.md) 写：
 
@@ -72,7 +84,7 @@ python chapters/part5-production/5.3-cost-cache-routing/gate/gate_check.py
 ## 提交物
 
 - `gate/starter.py`（实现后的版本）。
-- `gate/gate_report.json`（4/4）。
+- `gate/gate_report.json`（9/9）。
 - workbook 里的失败分析与三个问题的回答。
 
 ## 通过后对照参考实现
@@ -80,7 +92,8 @@ python chapters/part5-production/5.3-cost-cache-routing/gate/gate_check.py
 不要提前看。通过后再运行并对照：
 
 ```bash
-python tools/run_chapter.py 5.3
+python tools/run_chapter.py 5.3          # 离线：假模型函数，不花钱
+python tools/run_chapter.py 5.3 --live   # 真实模型，会产生少量费用
 ```
 
 对照时只回答：
@@ -88,6 +101,7 @@ python tools/run_chapter.py 5.3
 1. 参考实现的缓存有没有 TTL？
 2. 参考实现的 `is_simple` 规则和你的差别？
 3. embedding 路由为什么比关键词路由稳？
+4. `ask_production` 为什么只抽检便宜模型的答案？
 
 ## 概念地图
 
@@ -102,3 +116,9 @@ python tools/run_chapter.py 5.3
 - gate 用假时钟/纯函数，不调用真实模型。
 - 通过 gate 只证明缓存/路由/公式正确。
 - 真实命中率、分类准确率见参考实现与 3.x 评测。
+
+## 计价与调度的真实例子
+
+厂商的计价会随时间和时段变化，下面只是一个例子，不是长期事实：DeepSeek 官方定价页（<https://api-docs.deepseek.com/quick_start/pricing>，读取于 2026-10-31）对 `deepseek-flash` 列出了“命中缓存的输入 / 未命中的输入 / 输出”三档价格，并区分高峰与低峰：低峰价是高峰价的一半，高峰时段为周一至周五（不含中国法定节假日）的 UTC 01:00–04:00 与 06:00–10:00，其余时间包括周末和中国法定节假日全天为低峰。价格会变，请以你使用时的官方页面为准；本章代码里的单价只是占位。
+
+这类时段计价只对**可以延后**的任务有意义：夜间批量评测、离线标注、报表生成可以排到低峰；面向用户的在线请求、需要人工审批后立即执行的任务不能等。后者在 L4.11 的执行面里表现为“非紧急任务”才可调度。

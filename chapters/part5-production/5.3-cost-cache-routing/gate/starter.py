@@ -46,3 +46,19 @@ def savings(simple_ratio: float, cheap_price: float, strong_price: float) -> flo
     - 价格 <=0 或 cheap>strong -> ValueError。
     """
     raise NotImplementedError("实现节省估算")
+
+
+def cost_with_cache(input_tokens: int, cached_tokens: int, output_tokens: int, price: dict) -> float:
+    """price = {"input", "cached_input", "output"}，单位为每百万 token；cached > input 时抛 ValueError。
+
+    input_tokens 是总输入（含命中缓存的部分）：未命中部分按 input 计价，命中部分按 cached_input 计价。
+    """
+    raise NotImplementedError("实现带缓存的成本")
+
+
+def schedule_batch(tasks: list[dict], now_utc_hour: int, offpeak_windows: list[tuple[int, int]]) -> list[dict]:
+    """task = {"id", "urgent": bool}；urgent 任务立即执行（run_at_hour = now）；
+    非 urgent 任务推迟到下一个低峰窗口的起点（窗口 [start, end) 可以跨零点，如 (22, 1)）；
+    当前已处于低峰时立即执行。返回 [{"id", "run_at_hour"}]，顺序与输入一致。
+    """
+    raise NotImplementedError("实现低峰调度")

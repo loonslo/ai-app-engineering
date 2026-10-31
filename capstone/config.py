@@ -11,12 +11,11 @@ from common import (
     EMBED_MODEL_PATH,
     LLM_PROVIDER,
     ZH_SEPARATORS,
-    get_embeddings,
-    get_llm,
-    get_reliable_llm,
     select_model,
     validate_provider_configuration,
 )
+from .embedding import get_embeddings
+from .llm import get_chat
 
 ROOT = Path(__file__).resolve().parent.parent
 HERE = Path(__file__).resolve().parent
@@ -130,6 +129,8 @@ def validate_settings(*, production: bool | None = None) -> list[str]:
         errors.append(f"上下文预算配置无效：{exc}")
     if DEFAULT_DOCUMENT_VISIBILITY not in {"public", "restricted"}:
         errors.append("CAPSTONE_DEFAULT_DOCUMENT_VISIBILITY 只能是 public/restricted")
+    if LLM_PROVIDER == "bedrock":
+        errors.append("capstone 使用原生 OpenAI 兼容客户端，不再直连 Bedrock；请经 OpenAI 兼容网关接入（LLM_PROVIDER=openai_compatible）")
     if is_production and not os.getenv("LLM_PROVIDER", "").strip():
         errors.append("生产环境必须显式配置 LLM_PROVIDER")
     return errors
@@ -172,9 +173,8 @@ __all__ = [
     "ZH_SEPARATORS",
     "ensure_runtime_directories",
     "estimate_cost",
+    "get_chat",
     "get_embeddings",
-    "get_llm",
-    "get_reliable_llm",
     "select_model",
     "tenant_chroma_dir",
     "tenant_data_dir",

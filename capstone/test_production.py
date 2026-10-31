@@ -10,7 +10,6 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from langchain_core.documents import Document
 
 from . import config as C
 from . import monitoring
@@ -22,7 +21,8 @@ from .auth import (
     issue_token,
 )
 from .cache import AnswerCache, answer_cache
-from .contracts import AssistRequest, Citation
+from .contracts import AssistRequest, Citation, Document
+from .llm import ChatReply
 from .connector import _chunks_of, _diff
 from .knowledge_base import AnswerResult, KnowledgeBase, source_version
 from .permissions import User, attach_acl, build_chroma_filter, can_see
@@ -434,13 +434,9 @@ def test_full_and_incremental_build_share_chunk_ids():
 
 
 def test_citations_are_derived_from_retrieved_documents(monkeypatch):
-    class FakeLlm:
-        def invoke(self, *args, **kwargs):
-            return SimpleNamespace(
-                content="RAG 先检索再生成。【来源：伪造.md】",
-                usage_metadata={"input_tokens": 3, "output_tokens": 4},
-                response_metadata={},
-            )
+    class FakeChat:
+        def complete(self, messages, **kwargs):
+            return ChatReply("RAG 先检索再生成。【来源：伪造.md】", 3, 4)
 
     kb = KnowledgeBase(
         tenant_id="acme",
@@ -465,7 +461,7 @@ def test_citations_are_derived_from_retrieved_documents(monkeypatch):
             )
         ],
     )
-    monkeypatch.setattr(C, "get_reliable_llm", lambda **kwargs: FakeLlm())
+    monkeypatch.setattr(C, "get_chat", lambda model=None: FakeChat())
     result = kb.answer_with_usage(
         "RAG 是什么？",
         user=user,
@@ -480,9 +476,9 @@ def test_citations_are_derived_from_retrieved_documents(monkeypatch):
 def _answer_with_fake_model(monkeypatch, content: str):
     """用假模型回答固定文本，检索结果固定为一个真实文档，只观察回答后的来源处理。"""
 
-    class FakeLlm:
-        def invoke(self, *args, **kwargs):
-            return SimpleNamespace(content=content, usage_metadata={}, response_metadata={})
+    class FakeChat:
+        def complete(self, messages, **kwargs):
+            return ChatReply(content)
 
     kb = KnowledgeBase(
         tenant_id="acme",
@@ -506,7 +502,7 @@ def _answer_with_fake_model(monkeypatch, content: str):
             )
         ],
     )
-    monkeypatch.setattr(C, "get_reliable_llm", lambda **kwargs: FakeLlm())
+    monkeypatch.setattr(C, "get_chat", lambda model=None: FakeChat())
     return kb.answer_with_usage(
         "LangChain 是哪一年发布的？",
         user=User("alice", tenant_id="acme"),
@@ -718,3 +714,280 @@ def test_approval_workflow_is_durable_tenant_scoped_and_one_time():
     finally:
         for suffix in ("", "-wal", "-shm"):
             database.with_name(database.name + suffix).unlink(missing_ok=True)
+
+
+# ---------------------------------------------------------------- V3-9：去框架后的原生实现 ----
+def test_native_splitter_respects_size_overlap_and_inherits_metadata():
+    from .text_split import split_documents, split_text
+
+    text = "第一句话。" * 20 + "\n\n" + "第二段落内容。" * 20
+    chunks = split_text(text, chunk_size=60, chunk_overlap=10, separators=C.ZH_SEPARATORS)
+    assert len(chunks) > 2 and all(len(chunk) <= 60 for chunk in chunks)
+    assert "".join(chunks).count("第一句话") >= 20  # 重叠只会多不会少
+    docs = split_documents(
+        [Document(text, {"source_id": "a.md", "tenant_id": "acme"})],
+        chunk_size=60, chunk_overlap=10, separators=C.ZH_SEPARATORS,
+    )
+    assert all(doc.metadata == {"source_id": "a.md", "tenant_id": "acme"} for doc in docs)
+    docs[0].metadata["x"] = 1
+    assert "x" not in docs[1].metadata  # 每块持有独立的 metadata 副本
+    for chunk_size, overlap in ((0, 0), (10, 10), (10, -1)):
+        with pytest.raises(ValueError):
+            split_text("abc", chunk_size=chunk_size, chunk_overlap=overlap, separators=["\n", ""])
+
+
+def _openai_error(cls, status, headers=None):
+    import httpx
+
+    request = httpx.Request("POST", "http://fake/v1/chat/completions")
+    return cls("x", response=httpx.Response(status, request=request, headers=headers or {}), body=None)
+
+
+class _ScriptedOpenAI:
+    """按脚本返回错误或文本；记录每次调用的模型 ID。"""
+
+    def __init__(self, script):
+        self.script, self.models = list(script), []
+        self.chat = self
+        self.completions = self
+
+    def create(self, *, model, messages, temperature):
+        self.models.append(model)
+        step = self.script.pop(0)
+        if isinstance(step, Exception):
+            raise step
+        usage = SimpleNamespace(prompt_tokens=7, completion_tokens=3)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=step))], usage=usage)
+
+
+def test_chat_client_retries_transient_errors_and_reports_usage():
+    import openai
+
+    from .llm import ChatClient
+
+    waits: list[float] = []
+    client = _ScriptedOpenAI([_openai_error(openai.RateLimitError, 429, {"retry-after": "2"}), _openai_error(openai.InternalServerError, 500), "好的"])
+    reply = ChatClient("main", client=client, sleep=waits.append).complete([{"role": "user", "content": "x"}])
+    assert (reply.text, reply.input_tokens, reply.output_tokens, reply.degraded) == ("好的", 7, 3, False)
+    assert client.models == ["main"] * 3 and waits[0] == 2.0  # 429 听 Retry-After
+
+
+def test_chat_client_does_not_retry_permanent_errors_and_falls_back_to_backup():
+    import openai
+
+    from .llm import ChatClient
+
+    client = _ScriptedOpenAI([_openai_error(openai.BadRequestError, 400)])
+    with pytest.raises(openai.BadRequestError):
+        ChatClient("main", backup_model="backup", client=client, sleep=lambda _s: None).complete([])
+    assert client.models == ["main"]  # 参数错既不重试也不切备用模型
+
+    client = _ScriptedOpenAI([_openai_error(openai.InternalServerError, 503)] * 4 + ["备用答案"])
+    reply = ChatClient("main", backup_model="backup", client=client, sleep=lambda _s: None).complete([])
+    assert client.models == ["main"] * 4 + ["backup"]
+    assert reply.text == "备用答案" and reply.degraded is True and reply.model == "backup"
+
+    client = _ScriptedOpenAI([_openai_error(openai.InternalServerError, 503)] * 4)
+    with pytest.raises(openai.InternalServerError):  # 没有备用模型：重试耗尽后如实抛出
+        ChatClient("main", client=client, sleep=lambda _s: None).complete([])
+
+
+class _FixedEmbedder:
+    """按首字符给出可区分的二维向量，不加载任何模型。"""
+
+    def embed_documents(self, texts):
+        return [[1.0, 0.0] if text.startswith("财") else [0.0, 1.0] for text in texts]
+
+    def embed_query(self, text):
+        return self.embed_documents([text])[0]
+
+
+def test_native_chroma_store_applies_acl_filter_before_search_and_upserts(tmp_path):
+    from .vector_store import ChromaStore
+
+    store = ChromaStore(tmp_path / "chroma", _FixedEmbedder())
+    docs = [
+        attach_acl(Document("财务预算表", {"tenant_id": "acme", "chunk_id": "c1"}), dept="finance", allow_roles=("finance",)),
+        attach_acl(Document("公开手册", {"tenant_id": "acme", "chunk_id": "c2"}), visibility="public"),
+    ]
+    store.add_documents(docs, ids=["c1", "c2"])
+    store.add_documents(docs, ids=["c1", "c2"])  # 同 id 重复写入是覆盖，不是追加
+    assert store.count() == 2
+    bob = User("bob", tenant_id="acme", dept="marketing", roles=frozenset({"employee"}))
+    alice = User("alice", tenant_id="acme", dept="finance", roles=frozenset({"finance"}))
+    assert [d.page_content for d in store.similarity_search("财务", k=5, filter=build_chroma_filter(bob))] == ["公开手册"]
+    assert {d.page_content for d in store.similarity_search("财务", k=5, filter=build_chroma_filter(alice))} == {"财务预算表", "公开手册"}
+    store.delete(where={"chunk_id": {"$eq": "c1"}})
+    assert store.count() == 1
+    store.reset()
+    assert store.count() == 0 and store.similarity_search("x", k=3) == []
+
+
+def test_pg_filter_translates_to_parameterized_sql_and_rejects_unsafe_keys():
+    from .vector_store_pg import PgVectorStore, build_pg_filter, filter_to_sql
+
+    user = User("alice", tenant_id="acme", dept="finance", roles=frozenset({"employee"}))
+    sql, params = filter_to_sql(build_pg_filter(user, topic="infra"))
+    assert sql.count("%s") == len(params) and "acme" in "".join(params) and "'acme'" not in sql  # 值都走参数
+    assert " OR " in sql and " AND " in sql
+    with pytest.raises(ValueError):
+        filter_to_sql({"tenant_id'; DROP TABLE x;--": {"$eq": "a"}})
+    with pytest.raises(ValueError):
+        filter_to_sql({"tenant_id": {"$ne": "a"}})
+    with pytest.raises(ValueError):
+        PgVectorStore(object(), "t; DROP TABLE x", _FixedEmbedder())
+
+    executed: list[tuple[str, object]] = []
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def execute(self, statement, parameters=None):
+            executed.append((statement, parameters))
+
+        def fetchall(self):
+            return [("财务预算表", {"tenant_id": "acme"})]
+
+    class Connection:
+        committed = False
+
+        def cursor(self):
+            return Cursor()
+
+        def commit(self):
+            self.committed = True
+
+    connection = Connection()
+    store = PgVectorStore(connection, "pgv_demo", _FixedEmbedder())
+    store.add_documents([Document("财务预算表", {"tenant_id": "acme"})], ids=["id-1"])
+    assert connection.committed and "ON CONFLICT (id) DO UPDATE" in executed[0][0]
+    hits = store.similarity_search("财务", k=3, filter=build_pg_filter(user))
+    assert hits[0].page_content == "财务预算表" and "<=>" in executed[1][0] and executed[1][0].rstrip().endswith("LIMIT %s")
+
+
+def _memory_tracer():
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+    from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+
+    from . import telemetry
+
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    telemetry.use_tracer_provider(provider)
+    return exporter, telemetry
+
+
+def test_answer_path_emits_spans_with_usage_and_no_content(monkeypatch):
+    exporter, telemetry = _memory_tracer()
+    try:
+        class FakeStore:
+            def similarity_search(self, query, *, k, filter):
+                return []
+
+        class FakeChat:
+            def complete(self, messages, **kwargs):
+                return ChatReply("机密回答内容", 11, 5, "m", degraded=True)
+
+        kb = KnowledgeBase(tenant_id="acme", docs_dir=Path("."), persist_dir=Path(".tmp/test-otel"), embeddings=object())
+        kb.vectorstore = FakeStore()  # type: ignore[assignment]
+        monkeypatch.setattr(kb, "_authorized_bm25", lambda _: None)
+        monkeypatch.setattr(C, "get_chat", lambda model=None: FakeChat())
+        monkeypatch.setattr(
+            kb, "retrieve", lambda *a, **k: [Document("机密资料", {"source": "s.md", "source_id": "s.md", "chunk_id": "c1", "tenant_id": "acme", "visibility": "public"})]
+        )
+        result = kb.answer_with_usage("机密问题", user=User("alice", tenant_id="acme"), model="m", request_id="r-1")
+        assert result.degraded is True
+        spans = {span.name: span for span in exporter.get_finished_spans()}
+        chat = spans["chat m"]
+        assert chat.attributes["gen_ai.usage.input_tokens"] == 11 and chat.attributes["gen_ai.usage.output_tokens"] == 5
+        assert chat.attributes["gen_ai.operation.name"] == "chat" and chat.attributes["app.degraded"] is True
+        kb2 = KnowledgeBase(tenant_id="acme", docs_dir=Path("."), persist_dir=Path(".tmp/test-otel"), embeddings=object())
+        kb2.vectorstore = FakeStore()  # type: ignore[assignment]
+        monkeypatch.setattr(kb2, "_authorized_bm25", lambda _: None)
+        kb2.retrieve("预算", user=User("alice", tenant_id="acme"))
+        names = [span.name for span in exporter.get_finished_spans()]
+        assert "retrieval capstone-kb" in names
+        dump = repr([(dict(span.attributes), [dict(e.attributes) for e in span.events]) for span in exporter.get_finished_spans()])
+        assert "机密" not in dump  # prompt、资料与回答都不进 span
+    finally:
+        telemetry.use_tracer_provider(None)
+
+
+def test_failed_model_call_records_error_type_only(monkeypatch):
+    exporter, telemetry = _memory_tracer()
+    try:
+        class BrokenChat:
+            def complete(self, messages, **kwargs):
+                raise TimeoutError("prompt=机密问题 13812345678")
+
+        kb = KnowledgeBase(tenant_id="acme", docs_dir=Path("."), persist_dir=Path(".tmp/test-otel2"), embeddings=object())
+        monkeypatch.setattr(C, "get_chat", lambda model=None: BrokenChat())
+        monkeypatch.setattr(kb, "retrieve", lambda *a, **k: [])
+        with pytest.raises(TimeoutError):
+            kb.answer_with_usage("机密问题", user=User("alice", tenant_id="acme"), model="m", request_id="r-2")
+        (span,) = [s for s in exporter.get_finished_spans() if s.name == "chat m"]
+        assert span.attributes["error.type"] == "TimeoutError" and span.status.status_code.name == "ERROR"
+        assert "13812345678" not in repr(([dict(e.attributes) for e in span.events], span.status.description))
+    finally:
+        telemetry.use_tracer_provider(None)
+
+
+def test_tool_calls_get_spans_and_degraded_answers_are_not_cached(monkeypatch):
+    from .service import AssistantService
+
+    exporter, telemetry = _memory_tracer()
+    try:
+        class Tool:
+            def execute(self, query_id, identity):
+                return [("a", 1)]
+
+        service = AssistantService(
+            registry=SimpleNamespace(get=lambda _tenant: SimpleNamespace(version="v1")),
+            safety=SimpleNamespace(check_input=lambda *a, **k: None, check_output=lambda *a, **k: None),
+            query_tool=Tool(),
+        )
+        service.assist(AssistRequest("列出", "request-tool-1", mode="data_query", query_id="q1"), User("alice", tenant_id="acme"))
+        assert any(span.name == "execute_tool catalog_query" for span in exporter.get_finished_spans())
+
+        class KB:
+            version = "v1"
+
+            def answer_with_usage(self, *args, **kwargs):
+                return AnswerResult("降级答案", 1, 1, (), True)
+
+        cache = AnswerCache(max_entries=10, ttl_seconds=60)
+        degraded_service = AssistantService(
+            registry=SimpleNamespace(get=lambda _tenant: KB()),
+            safety=SimpleNamespace(check_input=lambda *a, **k: None, check_output=lambda *a, **k: None),
+            cache=cache,
+        )
+        user = User("alice", tenant_id="acme")
+        first = degraded_service.assist(AssistRequest("问题一二三", "request-deg-1"), user)
+        second = degraded_service.assist(AssistRequest("问题一二三", "request-deg-2"), user)
+        assert first.degraded is True and second.cache_hit is False  # 降级答案不进缓存
+    finally:
+        telemetry.use_tracer_provider(None)
+
+
+def test_feedback_endpoint_records_without_raw_content_and_static_ui_is_served(monkeypatch, tmp_path):
+    monkeypatch.setenv("JWT_SECRET", "x" * 48)
+    monkeypatch.setattr(C, "validate_settings", lambda: [])
+    monkeypatch.setattr(C, "DATA_DIR", tmp_path)
+    headers = {"Authorization": f"Bearer {issue_token('alice', 'acme', ['employee'])}"}
+    with TestClient(app) as client:
+        assert client.post("/v1/feedback", json={"request_id": "request-1234", "rating": 1}).status_code == 401
+        assert client.post("/v1/feedback", headers=headers, json={"request_id": "x", "rating": 1}).status_code == 422
+        assert client.post("/v1/feedback", headers=headers, json={"request_id": "request-1234", "rating": 5}).status_code == 422
+        ok = client.post("/v1/feedback", headers=headers, json={"request_id": "request-1234", "rating": -1, "comment": "电话 13812345678 打不通"})
+        assert ok.status_code == 200
+        page = client.get("/ui/")
+        assert page.status_code == 200 and "app.js" in page.text
+        assert client.get("/ui/app.js").status_code == 200
+    line = (tmp_path / "feedback.jsonl").read_text(encoding="utf-8").strip()
+    assert "13812345678" not in line and '"rating": -1' in line and "alice" not in line  # 评论脱敏，用户只存指纹

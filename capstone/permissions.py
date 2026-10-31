@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from langchain_core.documents import Document
+from .contracts import Document
 
 _PRINCIPAL = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
 
@@ -119,9 +119,12 @@ class PermissionRetriever:
 
 
 def permission_chain(kb: Any, user: User):
-    from langchain_core.runnables import RunnableLambda
+    """返回 ask(question) -> 回答文本 的普通函数：以 user 的身份问知识库。"""
 
-    return RunnableLambda(lambda question: kb.answer(question, user=user))
+    def ask(question: str) -> str:
+        return kb.answer(question, user=user)
+
+    return ask
 
 
 if __name__ == "__main__":

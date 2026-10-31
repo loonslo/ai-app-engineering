@@ -7,8 +7,7 @@ import math
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from langchain_core.documents import Document
-
+from .contracts import Document
 from .permissions import User, can_see
 
 UnitCounter = Callable[[str], int]

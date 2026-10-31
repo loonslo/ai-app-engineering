@@ -1,3 +1,4 @@
 -r requirements.txt
+# 仅供 common.get_llm() 的旧 Bedrock 路径（章节练习）使用；capstone 已改用原生 OpenAI 兼容客户端，不再依赖它。
 
 langchain-aws==1.6.4

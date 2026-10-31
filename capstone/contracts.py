@@ -3,10 +3,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 AssistMode = Literal["auto", "knowledge", "data_query", "action", "memory"]
 ResolvedMode = Literal["knowledge", "data_query", "action", "memory"]
+
+
+@dataclass
+class Document:
+    """一段文本和它的 metadata；检索、ACL、上下文规划都围绕它。
+
+    只保留 page_content 与 metadata 两个字段，不引入任何框架类型。
+    """
+
+    page_content: str
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -41,6 +52,7 @@ class AssistResult:
     output_tokens: int = 0
     approval_id: str | None = None
     status: Literal["completed", "pending_approval"] = "completed"
+    degraded: bool = False  # 主模型失败、由备用模型回答
 
 
 class CapabilityUnavailable(RuntimeError):

@@ -6,10 +6,11 @@ import argparse
 from dataclasses import asdict
 
 from common import (
-    get_llm,
     provider_capabilities,
     validate_provider_configuration,
 )
+
+from .llm import get_chat
 
 
 def parse_args() -> argparse.Namespace:
@@ -39,9 +40,8 @@ def main() -> int:
         print("未调用模型；加 --invoke 才会产生真实网络请求和可能的费用。")
         return 0
 
-    response = get_llm(temperature=0, timeout=20, max_retries=0).invoke(args.prompt)
-    content = response.content
-    if not isinstance(content, str) or not content.strip():
+    content = get_chat().complete([{"role": "user", "content": args.prompt}]).text
+    if not content.strip():
         raise RuntimeError("provider 返回了空或非文本响应")
     print(f"真实调用：PASS（{content.strip()[:120]}）")
     return 0

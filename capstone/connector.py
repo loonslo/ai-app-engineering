@@ -9,9 +9,6 @@ import os
 import time
 from pathlib import Path
 
-from langchain_chroma import Chroma
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
 from . import config as C
 from .knowledge_base import (
     SUPPORTED_SUFFIXES,
@@ -19,6 +16,8 @@ from .knowledge_base import (
     make_chunk_id,
     source_version,
 )
+from .text_split import split_documents
+from .vector_store import ChromaStore
 
 
 def _file_hash(path: Path) -> str:
@@ -114,12 +113,12 @@ def _chunks_of(
         docs_root=docs_dir,
         tenant_id=tenant_id,
     )
-    splitter = RecursiveCharacterTextSplitter(
+    chunks = split_documents(
+        documents,
         chunk_size=C.CHUNK_SIZE,
         chunk_overlap=C.CHUNK_OVERLAP,
         separators=C.ZH_SEPARATORS,
     )
-    chunks = splitter.split_documents(documents)
     ids: list[str] = []
     page_indexes: dict[int, int] = {}
     for chunk in chunks:
@@ -165,10 +164,7 @@ def sync(
         new = _scan_source(source_dir)
         added, updated, deleted = _diff(old, new)
         vector_dir.parent.mkdir(parents=True, exist_ok=True)
-        store = Chroma(
-            persist_directory=str(vector_dir),
-            embedding_function=C.get_embeddings(),
-        )
+        store = ChromaStore(vector_dir, C.get_embeddings())
 
         for source_id in added + updated:
             chunks, ids = _chunks_of(

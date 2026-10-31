@@ -16,6 +16,7 @@ from .contracts import (
 )
 from .permissions import User
 from .security import redact, validate_question
+from .telemetry import tool_span
 
 
 class KnowledgeRegistry(Protocol):
@@ -113,7 +114,8 @@ class AssistantService:
         if mode == "data_query":
             if self.query_tool is None or not request.query_id:
                 raise CapabilityUnavailable("当前部署未启用该受控查询")
-            rows = self.query_tool.execute(request.query_id, identity)
+            with tool_span("catalog_query", request.request_id):
+                rows = self.query_tool.execute(request.query_id, identity)
             answer = json.dumps(
                 {"query_id": request.query_id, "rows": rows},
                 ensure_ascii=False,
@@ -126,13 +128,14 @@ class AssistantService:
         if mode == "action":
             if self.approval_tool is None or not request.action:
                 raise CapabilityUnavailable("当前部署未启用高风险动作工作流")
-            approval_id, draft = self.approval_tool.start(
-                action=request.action,
-                question=question,
-                identity=identity,
-                request_id=request.request_id,
-                thread_id=request.thread_id,
-            )
+            with tool_span("approval_workflow", request.request_id):
+                approval_id, draft = self.approval_tool.start(
+                    action=request.action,
+                    question=question,
+                    identity=identity,
+                    request_id=request.request_id,
+                    thread_id=request.thread_id,
+                )
             self.safety.check_output(draft, request_id=request.request_id)
             return AssistResult(
                 redact(draft),
@@ -182,7 +185,8 @@ class AssistantService:
         )
         self.safety.check_output(result.text, request_id=request.request_id)
         answer = redact(result.text)
-        self.cache.set(cache_key, CachedAnswer(answer, result.citations))
+        if not result.degraded:  # 备用模型的回答不进缓存，免得后来的用户在不知情时拿到降级答案
+            self.cache.set(cache_key, CachedAnswer(answer, result.citations))
         return AssistResult(
             answer,
             "knowledge",
@@ -193,4 +197,5 @@ class AssistantService:
             citations=result.citations,
             input_tokens=result.input_tokens,
             output_tokens=result.output_tokens,
+            degraded=result.degraded,
         )

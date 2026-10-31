@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
@@ -10,8 +11,10 @@ from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from threading import RLock
+from typing import Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import config as C
@@ -36,8 +39,9 @@ from .memory import PreferenceMemory
 from .permissions import User
 from .query_catalog import CatalogQueryTool
 from .readiness import check as readiness_errors
-from .security import SecurityViolation, fingerprint, validate_question
+from .security import SecurityViolation, fingerprint, redact, validate_question
 from .service import AssistantService
+from .telemetry import configure_tracing
 
 LOG = logging.getLogger(__name__)
 REQUEST_ID: ContextVar[str] = ContextVar("request_id", default="")
@@ -150,6 +154,7 @@ async def lifespan(_: FastAPI):
     if errors:
         raise RuntimeError("启动配置不安全：" + "；".join(errors))
     C.ensure_runtime_directories()
+    configure_tracing()  # 默认关闭；CAPSTONE_OTEL=console 或设置 OTLP 端点时才导出 span
     yield
 
 
@@ -217,6 +222,7 @@ class ChatResponse(BaseModel):
     citations: list[CitationResponse] = Field(default_factory=list)
     approval_id: str | None = None
     status: str = "completed"
+    degraded: bool = False  # 主模型失败、由备用模型回答；页面据此提示
 
 
 @app.post("/v1/dev-login", include_in_schema=ENABLE_DEV_LOGIN)
@@ -313,7 +319,35 @@ def chat(payload: ChatRequest, identity: User = Depends(guard)):
         ],
         approval_id=result.approval_id,
         status=result.status,
+        degraded=result.degraded,
     )
+
+
+class FeedbackRequest(BaseModel):
+    request_id: str = Field(pattern=f"^{_REQUEST_ID.pattern}$")
+    rating: Literal[1, -1]
+    comment: str | None = Field(default=None, max_length=500)
+
+
+_FEEDBACK_LOCK = RLock()
+
+
+@app.post("/v1/feedback")
+def feedback(payload: FeedbackRequest, identity: User = Depends(guard)):
+    """收集“有用 / 没用”。只存请求 ID、评分、脱敏后的短评与用户指纹，不存问题和回答原文。"""
+    record = {
+        "ts": time.time(),
+        "tenant": identity.tenant_id,
+        "user": fingerprint(identity.user_id),
+        "request_id": payload.request_id,
+        "rating": payload.rating,
+        "comment": redact(payload.comment) if payload.comment else None,
+    }
+    with _FEEDBACK_LOCK:
+        C.ensure_runtime_directories()
+        with (C.DATA_DIR / "feedback.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return {"status": "recorded"}
 
 
 @app.post("/v1/admin/reload")
@@ -379,3 +413,8 @@ def ready():
 def health():
     """部署平台兼容端点；仅表示进程存活，不触发模型调用。"""
     return {"status": "ok"}
+
+
+# 零依赖的演示前端（静态 HTML + 原生 JS），用于公开演示；开发调试界面见 app_streamlit.py。
+# 页面本身不需要鉴权，它调用的 /v1/* 接口仍然要带 token。放在所有 API 路由之后。
+app.mount("/ui", StaticFiles(directory=Path(__file__).parent / "static", html=True), name="ui")

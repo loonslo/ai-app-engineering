@@ -32,7 +32,9 @@
 | 模块 | 文件 | 当前学习对应 |
 |------|------|--------|
 | 稳定业务契约 + 唯一服务入口 | `contracts.py` / `service.py` | 里程碑 7.4 / step1、7.7 / step6 |
-| 文档处理 + 混合检索 + 溯源 | `knowledge_base.py` | 章节 2.6–2.11 |
+| 文档处理 + 混合检索 + 溯源 | `knowledge_base.py`（切分 `text_split.py`、向量库 `vector_store.py`、嵌入 `embedding.py`） | 章节 2.6–2.11 |
+| 原生模型调用（超时、重试、可选备用模型） | `llm.py` | 章节 5.2（L5.1） |
+| OpenTelemetry 打点（默认不导出、不采集正文） | `telemetry.py` | 章节 5.9（L5.6） |
 | 真实数据接入 + 增量同步 | `connector.py` | 里程碑 7.4 / step4 |
 | 查询前 ACL + 缺省拒绝 | `permissions.py` / `knowledge_base.py` | capstone 扩展；章节 9.5 学习租户权限 |
 | 上下文预算 + 不可信资料封装 | `context.py` | 章节 4.10、里程碑 7.5 / step1 |
@@ -51,7 +53,8 @@
 | 输入边界 + PII 脱敏 | `security.py` | 章节 5.7、里程碑 7.5 / step1 |
 | 权限与知识版本感知缓存 | `cache.py` | 章节 5.3 |
 | pytest 回归 | `test_regression.py` | 章节 5.8 |
-| Web 界面（演示） | `app_streamlit.py` | — |
+| Web 界面：开发调试（Streamlit） | `app_streamlit.py` | — |
+| Web 界面：公开演示（零依赖静态页，`/ui`） | `static/index.html` / `static/app.js` | 章节 11.5（P5） |
 | CLI 入口 | `main.py` | — |
 
 ## 架构与依赖方向
@@ -95,8 +98,15 @@ pytest capstone/test_regression.py -v
 
 # 6) 本地演示；登录演示需要显式设置 CAPSTONE_ENABLE_DEV_LOGIN=true
 uvicorn capstone.api_enterprise:app --reload
-streamlit run capstone/app_streamlit.py
+streamlit run capstone/app_streamlit.py      # 开发调试界面
+# 公开演示用的静态页由 API 服务提供：启动 uvicorn 后访问 http://127.0.0.1:8000/ui/
 ```
+
+两个界面的分工：`app_streamlit.py` 面向开发调试（直接调用本地代码）；`static/` 是零依赖的静态 HTML + 原生 JS，通过 HTTP 调用 `/v1/chat` 与 `/v1/feedback`，用于公开演示，展示引用、降级（`degraded`）、需要人工审批（`status=pending_approval`）、缓存命中，提供“有用 / 没用”反馈与可读的错误提示。
+
+可观测：设置 `CAPSTONE_OTEL=console` 把 span 打印到控制台；设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 发送到 OTLP 后端（需另装 `opentelemetry-exporter-otlp-proto-http`）；默认不导出。span 只记 usage、模型 ID、request_id 与错误类型，**不记录问题、资料与回答的正文**。
+
+可靠性：模型调用只走 OpenAI 兼容接口；配置 `CAPSTONE_BACKUP_MODEL`（同一 provider 的另一个模型 ID）后，主模型重试耗尽会改用它，响应里 `degraded=true`，且该回答不进缓存。
 
 PyCharm 中把运行模块设为 `capstone.main`，测试目录设为 `capstone`。
 
@@ -135,8 +145,8 @@ python -m capstone.provider_contract
 python -m capstone.vector_store_pg migration
 python -m pip install -r requirements-pgvector.txt
 
-# Bedrock provider 需要可选适配包
-python -m pip install -r requirements-bedrock.txt
+# Bedrock：capstone 已改用原生 OpenAI 兼容客户端，不再直连 Bedrock；
+# 需要时请经 OpenAI 兼容网关接入（LLM_PROVIDER=openai_compatible）。
 
 # 不调用 DeepSeek 的本地压测；real 模式从 LOADTEST_BEARER_TOKEN 读 token
 python -m capstone.load_test --fake --users 10 --time 30s
@@ -150,7 +160,7 @@ python -m capstone.load_test --fake --users 10 --time 30s
 - **评测回归**：评测集就是回归用例库；用拒答正确率量化防幻觉；失败用例库归档错因（检索没召回，还是召回了生成错）。
 - **安全**：租户物理分库、Chroma 查询前 ACL、缺 ACL 默认拒绝；输入边界和响应脱敏不替代授权。
 - **认证**：开发使用短期本地 token；生产强制外部 JWT 密钥与 Redis 限流，建议接 IdP/JWKS。
-- **可观测**：request_id 进入 LangChain metadata；指标仅保存问题指纹，不保存明文问题。
+- **可观测**：request_id 进入 OTel span 属性 `app.request.id`（默认不导出）；指标仅保存问题指纹，不保存明文问题。
 - **可复现**：被测链 `temperature=0`，回归断言用“含关键词 / 是否拒答”的宽松匹配，避开随机性。
 
 ## 边界

@@ -5,7 +5,7 @@
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-9 已通过并合入 master，V3-10 已完成（见下）。V3-9（capstone：去 LangChain、接入 OpenTelemetry、静态演示前端、文档对齐）已完成并复跑：`capstone/` 内无 langchain/langgraph 导入，生产边界测试 34 → 43 项全过，里程碑与证据审计通过，ruff 通过，真实模型回归 6/6、评测 拒答 2/2·关键词 4/4·引用 4/4；原生切分器与 LangChain 在 165 例上逐块一致；前端对真实服务冒烟通过。实施线程额度用完，由审核者亲自实施，没有实施与审核分离。记录见 `docs/gate-v3-9-validation.md`。V3-10 见 Done。未验证：真实 Postgres + pgvector、OTLP 后端、旧索引升级演练；`load_test --fake` 在 Windows 上以 PermissionError 退出（master 上同样存在，未处理）。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-9 已通过并合入 master，V3-10 已完成（见下）。V3-9（capstone：去 LangChain、接入 OpenTelemetry、静态演示前端、文档对齐）已完成并复跑：`capstone/` 内无 langchain/langgraph 导入，生产边界测试 34 → 43 项全过，里程碑与证据审计通过，ruff 通过，真实模型回归 6/6、评测 拒答 2/2·关键词 4/4·引用 4/4；原生切分器与 LangChain 在 165 例上逐块一致；前端对真实服务冒烟通过。实施线程额度用完，由审核者亲自实施，没有实施与审核分离。记录见 `docs/gate-v3-9-validation.md`。V3-10 见 Done。未验证：真实 Postgres + pgvector、OTLP 后端、旧索引升级演练；`load_test --fake` 在 Windows 上临时目录清理的 PermissionError 已修复（`ignore_cleanup_errors=True`，2026-10-31 复跑：1204 请求、0 失败、SLO PASS、无堆栈）。
 - [ ] **V3-3 外部环境遗留** - 3.3/3.7/3.8 的 DeepSeek 单次 live 记录保留于 `docs/gate-v3-3-validation.md` 第 8 节；远端 OTLP、DeepEval 仍未验证。V3-3 已合入；用户决定不再恢复丢失的原 LangSmith 报告。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收

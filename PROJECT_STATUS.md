@@ -267,6 +267,6 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 
 2026-10-31 V3-7、V3-8 完成：见 `docs/gate-v3-7-validation.md`、`docs/gate-v3-8-validation.md`。实施与复核都由审核者完成。未验证：没有真实学习者完成演练与任务书，模板未被填写，11.5 页面未对接真实服务，面试与市场信息有时效。下一步 V3-9（capstone：去 LCEL、接入 OTel、最小前端、简历措辞与代码对齐）、V3-10（v3 标签与章节索引）。
 
-2026-10-31 V3-9 完成：见 `docs/gate-v3-9-validation.md`。未验证：真实 Postgres + pgvector、OTLP 后端、旧索引升级演练、备用模型的真实故障触发；`load_test --fake` 在 Windows 上以 PermissionError 退出（master 同样存在）。下一步 V3-10（v3 标签、导航链接、章节总地图、根 README）。
+2026-10-31 V3-9 完成：见 `docs/gate-v3-9-validation.md`。未验证：真实 Postgres + pgvector、OTLP 后端、旧索引升级演练、备用模型的真实故障触发；`load_test --fake` 的 Windows 临时目录清理 PermissionError 已修复并复跑通过。下一步 V3-10（v3 标签、导航链接、章节总地图、根 README）。
 
 2026-10-31 V3-10 完成：见 `docs/gate-v3-10-validation.md`。未验证：真实学习者按新导航学习；各篇表格里“运行环境”列未逐章重核。

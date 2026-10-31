@@ -400,7 +400,9 @@ def main() -> int:
     server: subprocess.Popen[bytes] | None = None
     temporary_data: tempfile.TemporaryDirectory[str] | None = None
     if args.fake:
-        temporary_data = tempfile.TemporaryDirectory(prefix="capstone-loadtest-")
+        temporary_data = tempfile.TemporaryDirectory(
+            prefix="capstone-loadtest-", ignore_cleanup_errors=True
+        )
         host = f"http://127.0.0.1:{args.port}"
         secret = secrets.token_urlsafe(48)
         tenant = f"loadtest-{int(time.time())}-{os.getpid()}"

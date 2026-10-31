@@ -1,6 +1,6 @@
 # 2.14 记忆与上下文压缩 · Gate
 
-[全书目录](../../README.md) · [上一章 2.13 静态上下文与 Skills](../2.13-static-context-skills/README.md) · [下一章 2.15 真实资料知识库 v1](../2.15-real-corpus-kb-gate/README.md)
+[全书目录](../../README.md) · [上一章 L2.9](../2.13-static-context-skills/README.md) · [下一章 L2.11](../2.4-eval-seed/README.md)
 
 - **能力**：在预算内压缩长会话而不丢失关键事实；保证静态前缀稳定以最大化 Prompt Caching 命中；实现受写入策略与租户隔离约束的长期记忆库。
 - **v3 路径**：L2.10 / 核心（Gate；记忆与压缩）

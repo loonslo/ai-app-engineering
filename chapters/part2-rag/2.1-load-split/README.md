@@ -1,9 +1,10 @@
 # L2.1 文档加载与切分 · Gate（原 2.1）
 
-[全书目录](../../README.md) · [上一章 1.8](../../part1-foundations/1.8-cli-chatbot/README.md) · [下一章 2.2](../2.2-embed-retrieve/README.md)
+[全书目录](../../README.md) · [上一章 L2.1](../2.12-context-engineering/README.md) · [下一章 L2.2（2.6）](../2.6-pdf-sources/README.md)
 
 - **能力**：把 UTF-8 文件读成可追溯文档；按大小/重叠切成非空片段，保留 source。
 - **v2 路径**：L2.1 / 核心（Gate；加载与切分）
+- **v3 路径**：L2.2 / 核心（Gate；加载与切分）
 - **前置**：无（会读文件即可）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 边界分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `load_split.py` / `load_split_formats.py`。

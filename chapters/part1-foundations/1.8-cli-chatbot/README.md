@@ -1,9 +1,10 @@
 # L1.7 CLI 助手 · Gate（原 1.8）
 
-[全书目录](../../README.md) · [上一章 1.7](../1.7-llm-internals/README.md) · [下一章 2.1](../../part2-rag/2.1-load-split/README.md)
+[全书目录](../../README.md) · [上一章 L1.8](../../part2-rag/2.5-raw-sdk-rag-agent-loop/README.md) · [下一章 L1.10](../1.10-embedded-llm-feature/README.md)
 
 - **能力**：把多轮历史、工具调用、命令解析和错误出口拼成一个可测试的 CLI 循环。
 - **v2 路径**：L1.7 / 核心（Gate；CLI 助手）
+- **v3 路径**：L1.9 / 核心（Gate；CLI 助手）
 - **前置**：1.1、1.4、1.5。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `chatbot_project.py`。

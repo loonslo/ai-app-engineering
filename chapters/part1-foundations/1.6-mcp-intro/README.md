@@ -4,6 +4,7 @@
 
 - **目标**：用真实的 MCP 协议连通一个本机工具，分清客户端、服务端和模型三者的职责。
 - **v2 路径**：L4.9 / 选做（清单验收）
+- **v3 路径**：选修 / 选修（被 L4.14 取代）
 - **前置**：1.5。
 - **环境**：最小示例离线运行，不需要模型和密钥，需要 `mcp` 包（见 `requirements-course.txt`）；完整示例 `mcp_agent.py` 另需 `langchain` 包（`create_agent`）和模型密钥。
 - **命令**：`python tools/run_chapter.py 1.6 minimal_client.py`

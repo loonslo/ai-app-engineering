@@ -1,6 +1,6 @@
 # J7 投递与漏斗 · 就业章
 
-[全书目录](../../README.md) · [上一章 J6](../12.6-behavioral-stories/README.md) · [篇首](../README.md) · [回到项目主线 P6](../../part11-project-sprint/11.6-project-narrative/README.md)
+[全书目录](../../README.md) · [上一章 J6](../12.6-behavioral-stories/README.md) · [篇首](../README.md)
 
 - **目标**：建立目标公司清单、投递漏斗与每周复盘，把投递变成可以度量和改进的过程；每次面试后写复盘；用统一维度比较 offer。
 - **v3 路径**：J7 / 就业（清单验收）

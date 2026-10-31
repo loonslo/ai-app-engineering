@@ -1,9 +1,10 @@
 # L3.6 扩展：失败诊断 · Gate（原 3.10）
 
-[全书目录](../../README.md) · [上一章 3.9](../3.9-agent-trajectory-eval/README.md) · [下一章 4.1](../../part4-agents-langgraph/4.1-agent-patterns/README.md)
+[全书目录](../../README.md) · [上一章 L3.6（3.8）](../3.8-prompt-ab-judge/README.md) · [下一章 L3.7](../3.6-langsmith-eval/README.md)
 
 - **能力**：加载失败库、推断 live/offline、按硬指标分组、统计层分布。
 - **v2 路径**：L3.6 / 核心（Gate；失败诊断）
+- **v3 路径**：L3.6 / 核心（Gate；失败诊断）
 - **前置**：3.7（可选，用来生成真实失败库）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `failure_diagnosis.py`。

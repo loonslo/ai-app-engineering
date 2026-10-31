@@ -1,6 +1,6 @@
 # L5.7 控制面与执行面集成 · Gate
 
-[全书目录](../../README.md) · [上一章 L5.6](../5.9-otel-observability/README.md) · [下一章 L5.8](../5.5-docker-packaging/README.md)
+[全书目录](../../README.md) · [上一章 L5.6](../5.9-otel-observability/README.md) · [下一章 L5.8（5.5）](../5.5-docker-packaging/README.md)
 
 - **能力**：用 FastAPI 提供任务提交、查询、取消、审批接口，接入 L4.11 的执行面；用签名、带重试与去重的 webhook 回调结果。
 - **v3 路径**：L5.7 / 核心（Gate；控制面与执行面）

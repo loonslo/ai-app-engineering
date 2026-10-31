@@ -1,6 +1,6 @@
 # 2.12 上下文工程总论 · Gate
 
-[全书目录](../../README.md) · [上一章 1.10 嵌入式功能与评测](../../part1-foundations/1.10-embedded-llm-feature/README.md) · [下一章 2.1 文档加载与切分](../2.1-load-split/README.md)
+[全书目录](../../README.md) · [上一章 L1.10](../../part1-foundations/1.10-embedded-llm-feature/README.md) · [下一章 L2.2（2.1）](../2.1-load-split/README.md)
 
 - **能力**：按 Token 预算确定性组装上下文段落；保证静态前缀稳定以最大化 Prompt Caching 命中；识别破坏缓存的时间戳与单段体积超限；掌握上下文工程的六大失败模式与防御策略。
 - **v3 路径**：L2.1 / 核心（Gate；上下文工程）

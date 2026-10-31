@@ -1,9 +1,10 @@
 # 3.6 追踪与评测平台：OpenTelemetry 与现代 AI 可观测性
 
-[全书目录](../../README.md) · [上一章 3.5](../3.5-eval-dataset-ragas/README.md) · [下一章 3.7](../3.7-eval-regression-curve/README.md)
+[全书目录](../../README.md) · [上一章 L3.6（3.10）](../3.10-eval-report-failures/README.md) · [下一章 L4.1](../../part4-agents-langgraph/4.1-agent-patterns/README.md)
 
 - **目标**：理解现代 AI 应用可观测性体系，使用 OpenTelemetry GenAI 语义约定为 RAG 调用链打上标准化追踪（Trace 与 Span），了解主流评测后端定位与隐私防线。
 - **v2 路径**：L3.6 / 核心（清单验收；LangSmith 外部服务）
+- **v3 路径**：L3.7 / 核心（清单验收）
 - **岗位任务 / 面试题型**：T4、T5 / F5
 - **验收方式**：使用 [清单](gate/CHECKLIST.md) 与 [workbook](workbook.md) 核对；运行本地 `otel_tracing_eval.py` 观察 Span 属性；不提供离线 `gate_check.py`（L5.6 将用自动化 Gate 深入练习）。
 - **前置**：2.6；3.4、3.5。

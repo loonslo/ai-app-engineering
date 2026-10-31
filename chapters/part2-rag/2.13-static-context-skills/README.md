@@ -1,6 +1,6 @@
 # 2.13 静态上下文与技能挂载 · Gate
 
-[全书目录](../../README.md) · [上一章 2.10](../2.10-chroma-persist/README.md) · [下一章 2.14](../2.14-memory-compaction/README.md)
+[全书目录](../../README.md) · [上一章 L2.8](../2.10-chroma-persist/README.md) · [下一章 L2.10](../2.14-memory-compaction/README.md)
 
 - **能力**：读懂并编写 `AGENTS.md` 与 `SKILL.md`；实现渐进披露的 Skill 加载；发现说明文件里的指令膨胀与疑似硬编码密钥。
 - **v3 路径**：L2.9 / 核心（Gate；静态上下文与 Skills）

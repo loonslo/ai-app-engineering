@@ -1,9 +1,10 @@
 # L2.2 向量化与召回 · Gate（原 2.2）
 
-[全书目录](../../README.md) · [上一章 2.1](../2.1-load-split/README.md) · [下一章 2.3](../2.3-minimal-rag/README.md)
+[全书目录](../../README.md) · [上一章 L2.2（2.6）](../2.6-pdf-sources/README.md) · [下一章 L2.4](../2.3-minimal-rag/README.md)
 
 - **能力**：把文本向量化、校验维度、建内存索引、按余弦相似度召回 top-k。
 - **v2 路径**：L2.2 / 核心（Gate；向量化与召回）
+- **v3 路径**：L2.3 / 核心（Gate；向量化与召回）
 - **前置**：2.1（加载与切分）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 失败分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `embed_retrieve.py`。

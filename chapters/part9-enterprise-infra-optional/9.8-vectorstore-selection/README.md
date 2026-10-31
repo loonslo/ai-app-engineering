@@ -4,6 +4,7 @@
 
 - **能力**：按事务/租户/独立服务/K8s/规模选择 pgvector/Qdrant/Milvus；生成租户过滤。
 - **v2 路径**：L9 / 选做（Gate；向量库选型）
+- **v3 路径**：选修 / 选修（企业数据与推理设施）
 - **前置**：2.2（向量库）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/vector_store.py`。

@@ -1,9 +1,10 @@
 # L3.6 扩展：Prompt A/B 指标 · Gate（原 3.8）
 
-[全书目录](../../README.md) · [上一章 3.7](../3.7-eval-regression-curve/README.md) · [下一章 3.9](../3.9-agent-trajectory-eval/README.md)
+[全书目录](../../README.md) · [上一章 L3.6（3.7）](../3.7-eval-regression-curve/README.md) · [下一章 L3.6（3.10）](../3.10-eval-report-failures/README.md)
 
 - **能力**：归一化答案；判拒答；关键词/引用命中率；拒答一致性。
 - **v2 路径**：L3.6 / 核心（Gate；Prompt A/B 指标）
+- **v3 路径**：L3.6 / 核心（Gate；Prompt A/B）
 - **前置**：3.2（指标）。
 - **时间盒**：4 小时。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `prompt_ab_judge.py`。

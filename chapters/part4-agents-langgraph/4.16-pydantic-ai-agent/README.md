@@ -1,6 +1,6 @@
 # L4.5 用 Pydantic AI 写 Agent · Gate
 
-[全书目录](../../README.md) · [上一章 L4.4](../4.8-plan-and-execute/README.md) · [下一章 L4.6](../4.14-supervisor-fanout/README.md)
+[全书目录](../../README.md) · [上一章 L4.4（4.8）](../4.8-plan-and-execute/README.md) · [下一章 L4.6](../4.14-supervisor-fanout/README.md)
 
 - **能力**：实现带依赖注入、输出校验、人工审批、用量边界和历史恢复的订单客服 Agent。
 - **v3 路径**：L4.5 / 核心（Gate；Pydantic AI）

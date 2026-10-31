@@ -1,9 +1,10 @@
 # L2.3 扩展：PDF 与来源溯源 · Gate（原 2.6）
 
-[全书目录](../../README.md) · [上一章 2.5](../2.5-raw-sdk-rag-agent-loop/README.md) · [下一章 2.7](../2.7-chunk-strategy/README.md)
+[全书目录](../../README.md) · [上一章 L2.2（2.1）](../2.1-load-split/README.md) · [下一章 L2.3](../2.2-embed-retrieve/README.md)
 
 - **能力**：按页加载 PDF 文本；把 source/page 带进上下文；核对答案引用是否真实存在。
 - **v2 路径**：L2.3 / 核心（Gate；PDF 与来源（L2.3 扩展））
+- **v3 路径**：L2.2 / 核心（Gate；PDF 与来源）
 - **前置**：2.3（最小 RAG）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `pdf_sources.py`。

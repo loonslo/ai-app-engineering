@@ -1,6 +1,6 @@
 # J1 定位与三版简历 · 就业章
 
-[全书目录](../../README.md) · [篇首](../README.md) · [下一章 J2](../12.2-public-portfolio-cadence/README.md)
+[全书目录](../../README.md) · [上一章 P6](../../part11-project-sprint/11.6-project-narrative/README.md) · [篇首](../README.md) · [下一章 J2](../12.2-public-portfolio-cadence/README.md)
 
 - **目标**：写好定位句，针对三类目标岗位各写一版简历，每条数字都能回到证据。
 - **v3 路径**：J1 / 就业（清单验收）

@@ -1,9 +1,10 @@
 # L2.4 切分策略 · Gate（原 2.7）
 
-[全书目录](../../README.md) · [上一章 2.6](../2.6-pdf-sources/README.md) · [下一章 2.8](../2.8-hybrid-search/README.md)
+[全书目录](../../README.md) · [上一章 L2.4](../2.3-minimal-rag/README.md) · [下一章 L2.6（2.8）](../2.8-hybrid-search/README.md)
 
 - **能力**：按段落/句子边界切分；超长才硬切；统计块数、平均/最大长度、空块。
 - **v2 路径**：L2.4 / 核心（Gate；切分策略）
+- **v3 路径**：L2.5 / 核心（Gate；切分策略）
 - **前置**：2.1（基础切分）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 对比分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `chunk_strategy.py`。

@@ -1,9 +1,10 @@
 # L4.10 流式与人工介入 · Gate（原 4.11）
 
-[全书目录](../../README.md) · [上一章 4.10](../4.10-checkpoint-context/README.md) · [下一章 4.12](../4.12-tool-safety-search/README.md)
+[全书目录](../../README.md) · [上一章 L4.10（4.10）](../4.10-checkpoint-context/README.md) · [下一章 L4.11](../4.19-agent-execution-plane/README.md)
 
 - **能力**：判断哪些动作必须人工审批；把审批输入归一化为 approved/cancelled。
 - **v2 路径**：L4.7 / 核心（Gate；流式与 HITL）
+- **v3 路径**：L4.10 / 核心（Gate；流式与 HITL）
 - **前置**：4.10（检查点）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `streaming_hitl.py`。

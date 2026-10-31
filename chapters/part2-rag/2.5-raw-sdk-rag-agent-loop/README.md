@@ -1,9 +1,10 @@
 # L1.6 手写 Harness · Gate（原 2.5）
 
-[全书目录](../../README.md) · [上一章 2.4](../2.4-eval-seed/README.md) · [下一章 2.6](../2.6-pdf-sources/README.md)
+[全书目录](../../README.md) · [上一章 L1.7](../../part1-foundations/1.9-provider-cost/README.md) · [下一章 L1.9](../../part1-foundations/1.8-cli-chatbot/README.md)
 
 - **能力**：不用框架实现切分、检索、带引用的回答和最小 ReAct 循环；能解释框架封装了哪一层。
 - **v2 路径**：L1.6 / 核心（Gate；手写 Harness）
+- **v3 路径**：L1.8 / 核心（Gate；手写 Harness）
 - **前置**：L1.6（工具调用协议）。本章检索使用基于字符与词频的简化评分，不依赖第 2 篇。
 - **时间盒**：7 小时（2h 读 + 4h 实现 + 1h 故障与记录）。
 - **闭卷规则**：只读本页、`gate/starter.py` 和 Python 标准库文档；**通过 gate 之前不要打开** `raw_sdk_rag_agent_loop.py`，也不要搜索完整实现。

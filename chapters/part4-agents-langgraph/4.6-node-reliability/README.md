@@ -1,9 +1,10 @@
 # L4.3 扩展：节点可靠性 · Gate（原 4.6）
 
-[全书目录](../../README.md) · [上一章 4.5](../4.5-react-agent/README.md) · [下一章 4.7](../4.7-structured-routing/README.md)
+[全书目录](../../README.md) · [上一章 L4.9（4.4）](../4.4-state-reducer/README.md) · [下一章 L4.10（4.10）](../4.10-checkpoint-context/README.md)
 
 - **能力**：节点失败降级；区分可重试/不可重试错误；给慢调用设真实超时。
 - **v2 路径**：L4.3 / 核心（Gate；节点可靠性）
+- **v3 路径**：L4.9 / 核心（Gate；节点可靠性）
 - **前置**：4.5（ReAct 工具循环）。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `node_reliability.py`。

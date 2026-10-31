@@ -1,9 +1,10 @@
 # L2.7 向量库持久化 · Gate（原 2.10）
 
-[全书目录](../../README.md) · [上一章 2.9](../2.9-query-rewrite/README.md) · [下一章 2.11](../2.11-multimodal-rerank/README.md)
+[全书目录](../../README.md) · [上一章 L2.7](../2.9-query-rewrite/README.md) · [下一章 L2.9](../2.13-static-context-skills/README.md)
 
 - **能力**：把向量记录写入 JSON、落盘、重新加载；校验重复 ID/维度/坏文件。
 - **v2 路径**：L2.7 / 核心（Gate；持久化）
+- **v3 路径**：L2.8 / 核心（Gate；持久化与增量）
 - **前置**：2.2（向量与索引）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `chroma_persist.py`。

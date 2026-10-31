@@ -1,8 +1,8 @@
-# AI 应用工程实战 · 测试工程师转 AI 应用开发
+# AI 应用与 Agent 开发学习手册
 
-从模型调用、RAG、评测和 Agent 基础，走到一个生产导向的企业客服 Copilot，再按目标岗位选学质量工程、企业基础设施与多 Agent 协作。
+面向测试 / 质量工程师转向 AI 应用开发的中文教程与练习。路线分三条线：技术主线 L0–L5（模型 API 原语、上下文工程与检索、质量闭环、Agent、服务化与生产），项目主线 P（把产出持续并入同一个公开项目）与就业轨道 J（面试形式与求职材料），再按目标岗位选学质量工程、企业基础设施与多 Agent 协作。
 
-**从 [章节总地图](chapters/README.md) 开始。** 每章先读 README，再运行和阅读代码；目录存在、离线测试通过和真实环境验收是三件事，要分别记录。
+**从 [章节总地图](chapters/README.md) 开始**，先看其中的“v3 路线速查”。 每章先读 README，再运行和阅读代码；目录存在、离线测试通过和真实环境验收是三件事，要分别记录。
 
 ## 准备环境
 
@@ -45,32 +45,34 @@ print(snapshot_download('BAAI/bge-small-zh-v1.5'))   # 打印模型所在的本�
 
 默认路径是 `~/.cache/modelscope/hub/models/BAAI/bge-small-zh-v1___5`（ModelScope 把点号换成了三个下划线）。模型在别处时，在 `.env` 里设置 `EMBED_MODEL_PATH=模型目录`。2.11 的 reranker 同理：下载 `BAAI/bge-reranker-base`，用 `RERANKER_MODEL_PATH` 指定。
 
-> 本仓库基于 langchain 1.x / langgraph 1.x。langchain-community 已停止维护，FAISS 等集成仍从 `langchain_community` 导入；部分检索器已迁到 `langchain_classic`（2.8、2.9、2.11 已使用新路径）。
+> **技术路线**：默认使用原生 SDK + Pydantic；LangGraph 用于状态图、检查点与人工介入（第 4 篇相关章节）；LangChain 只作为框架对照（如 4.15）与选修章节、冻结的历史快照中的实现。Pydantic AI 用于 4.16 等章（版本锁在 `requirements-course.txt`，含 2.31.1 的已知限制说明）；OpenTelemetry 用于 3.6、5.9 与 capstone（`opentelemetry-sdk` 已锁定，向 OTLP 后端发送另需 `opentelemetry-exporter-otlp-proto-http`，未锁定、可选）。
 
 ## 课程结构
 
-| 篇 | 内容 | 入口 | 定位 |
-|---|---|---|---|
-| 0 | 启程准备 | [环境与学习方法](chapters/part0-setup/README.md) | 必修 |
-| 1 | 模型调用与上下文基础 | [第 1 篇](chapters/part1-foundations/README.md) | 必修 |
-| 2 | 检索增强生成 RAG | [第 2 篇](chapters/part2-rag/README.md) | 必修 |
-| 3 | 评测方法论 | [第 3 篇](chapters/part3-evals/README.md) | 必修 |
-| 4 | Agent 与 LangGraph | [第 4 篇](chapters/part4-agents-langgraph/README.md) | 必修 |
-| 5 | 服务化与工程可靠性 | [第 5 篇](chapters/part5-production/README.md) | 必修 |
-| 6 | 模型方案取舍 | [第 6 篇](chapters/part6-model-tradeoffs/README.md) | 必修，LoRA 实操选做 |
-| 7 | 企业客服 Copilot · 8 个里程碑 | [项目教程](flagship-project/README.md) · [整合实现 capstone](capstone/README.md) | 必修综合项目；项目教程已于 2026-10-27 冻结为历史快照，后续以 capstone 为准 |
-| 8 | AI 质量工程专项 | [第 8 篇](chapters/part8-ai-quality-optional/README.md) | 选修 |
-| 9 | 企业数据与推理设施专项 | [第 9 篇](chapters/part9-enterprise-infra-optional/README.md) | 选修 |
-| 10 | MCP 鉴权与 A2A | [第 10 篇](chapters/part10-mcp-a2a-optional/README.md) | 选修 |
+v3 路线（大纲、章节总表、就业出口标准 E1–E4 与 16 周排期见 [docs/v3/outline.md](docs/v3/outline.md)；逐章速查见 [章节总地图](chapters/README.md)）：
 
-> 岗位对标、核心/选修取舍与 12 周路径提案见 [docs/curriculum-v2.md](docs/curriculum-v2.md)；每章标题下的 `v2 路径` 写明阶段与必做/选做，速查见 [章节总地图](chapters/README.md#v2-路径速查)。
+| 线 | 内容 | 入口 | 定位 |
+|---|---|---|---|
+| L0 | 定位与工具链：环境、证据式学习法、编码 Agent 工作流、Python 工程底座、岗位地图 | [第 0 篇](chapters/part0-setup/README.md) | 必修 |
+| L1 | 模型 API 原语与嵌入式功能 | [第 1 篇](chapters/part1-foundations/README.md) | 必修 |
+| L2 | 上下文工程与检索（含真实资料知识库 v1） | [第 2 篇](chapters/part2-rag/README.md) | 必修 |
+| L3 | 质量闭环：评测集、Judge、回归、追踪 | [第 3 篇](chapters/part3-evals/README.md) | 必修 |
+| L4 | Agent：控制流、状态图、执行面、沙箱、安全、MCP | [第 4 篇](chapters/part4-agents-langgraph/README.md) | 必修 |
+| L5 | 服务化与生产：可靠性、成本、护栏、OTel、控制面与执行面、容量与恢复、云部署 | [第 5 篇](chapters/part5-production/README.md) · [第 6 篇](chapters/part6-model-tradeoffs/README.md) | 必修；LoRA 实操选做 |
+| P | 项目主线：需求与指标 → 最小上线 → 两次迭代 → 前端 → 作品叙事 | [第 11 篇](chapters/part11-project-sprint/README.md) | 必修（指南、清单与模板） |
+| J | 就业轨道：简历、公开作品、编码与系统设计面试、take-home、行为面、投递 | [第 12 篇](chapters/part12-job-track/README.md) | 必修（指南、清单与演练） |
+| 选修 | AI 质量工程 / 企业数据与推理设施 / MCP 鉴权与 A2A | [第 8 篇](chapters/part8-ai-quality-optional/README.md) · [第 9 篇](chapters/part9-enterprise-infra-optional/README.md) · [第 10 篇](chapters/part10-mcp-a2a-optional/README.md) | 按岗位选学 |
+
+整合实现 [capstone](capstone/README.md)：主问答链路使用原生 openai SDK 与 chromadb，业务行为以它为准。**历史教学快照（已冻结）**：[企业客服 Copilot 项目教程（第 7 篇）](flagship-project/README.md)，基于 LangChain 1.x，2026-10-27 冻结，不再修改。
+
+> 旧的 v2 路线保留在 [docs/curriculum-v2.md](docs/curriculum-v2.md)（已被 v3 取代）与各章 README 的 `v2 路径` 一行；两种标签并存时以 `v3 路径` 为准。
 
 ## 目录说明
 
 ```text
-chapters/          第 0–6、8–10 篇，每章一个目录（README、脚本、workbook.md）
+chapters/          第 0–6、8–12 篇，每章一个目录（README、脚本、workbook.md 或清单与模板）
   shared-data/     多章共用的示例文档和评测集
-flagship-project/  第 7 篇：企业客服 Copilot 的 29 步教学快照
+flagship-project/  第 7 篇：企业客服 Copilot 的 29 步教学快照（已冻结的历史快照）
 capstone/          整合实现：另一套入口，与教学快照分别验收
 tools/             运行入口 run_chapter.py、还原工具 materialize.py
 common.py          共享配置：模型、embedding、资料路径
@@ -83,7 +85,7 @@ reports/           评测报告输出
 
 ## 运行独立练习
 
-第 0–6 篇的脚本统一从仓库根目录用 `run_chapter.py` 运行（参数与工作目录的约定见 [章节总地图](chapters/README.md#怎样运行)）：
+第 0–6 篇的脚本统一从仓库根目录用 `run_chapter.py` 运行；第 11、12 篇多数章节没有脚本（指南、清单与模板），有脚本的两处（12.3 演练、12.5 检查器）用法见各章 README（参数与工作目录的约定见 [章节总地图](chapters/README.md#怎样运行)）：
 
 ```bash
 python tools/run_chapter.py 1.1
@@ -91,7 +93,7 @@ python tools/run_chapter.py 2.1 load_split.py
 python tools/run_chapter.py 3.7 --no-upload
 ```
 
-> 82 章全部有验收方式：75 章 gate、7 章清单（0.1、0.2、1.6、1.7、3.6、4.15、5.6）；项目 29 步用 [flagship-project/ACCEPTANCE.md](flagship-project/ACCEPTANCE.md) 总清单。gate 先按各章 README 闭卷实现，再运行该章 `gate/gate_check.py`，全部 PASS 后再看参考实现。批次记录见 [docs/gate-b6i-validation.md](docs/gate-b6i-validation.md) 等 `docs/gate-*-validation.md`。
+> 每章都有验收方式：gate 章先按各章 README 闭卷实现，再运行该章 `gate/gate_check.py`，全部 PASS 后再看参考实现；清单章用 `gate/CHECKLIST.md`；第 11、12 篇以清单、模板与产物为主。累积项目 29 步（已冻结）用 [flagship-project/ACCEPTANCE.md](flagship-project/ACCEPTANCE.md) 总清单。批次记录见 `docs/gate-*-validation.md`（v3 批次是 `gate-v3-*-validation.md`）。**这些记录证明课件结构与离线 gate 已逐批复跑；真实学习者的使用与真实环境（云部署、真实用户、远端 CI、容量与恢复）证据尚未取得。**
 
 ## 还原累积项目
 
@@ -111,7 +113,7 @@ python tools/materialize.py enterprise 10.4-cross-agent-delegation
 ## 验证与进度
 
 ```bash
-python -m pytest tools chapters/test_new_lessons.py -q
+python -m pytest tools chapters/test_new_lessons.py chapters/test_v3_lessons.py -q
 python -m pytest -c flagship-project/m1-rag-mvp/step1/pyproject.toml flagship-project/m1-rag-mvp/step1/tests -q
 python -m pytest capstone/test_production.py -q
 python -m capstone.milestones --strict-evidence

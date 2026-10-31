@@ -4,6 +4,7 @@
 
 - **能力**：计算 recall@k、precision@k、MRR、citation coverage；处理拒答样本和 k 截断。
 - **v2 路径**：L8 / 选做（Gate；RAG 分层检索评测）
+- **v3 路径**：选修 / 选修（AI 质量工程专项，评测岗加分）
 - **前置**：3.2（指标）、2.2（检索）。
 - **时间盒**：5 小时。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/ai_testing/rag_eval.py`。

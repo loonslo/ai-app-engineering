@@ -4,6 +4,7 @@
 
 - **能力**：校验 JSON-RPC 形状；按 method 分发；错误码 -32600/-32601/-32602/-32001；成功返回 result。
 - **v2 路径**：L10 / 选做（Gate；A2A JSON-RPC 绑定）
+- **v3 路径**：选修 / 选修（MCP 鉴权深挖与 A2A）
 - **前置**：10.2（任务状态机）。
 - **时间盒**：5 小时。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/a2a_api.py`。

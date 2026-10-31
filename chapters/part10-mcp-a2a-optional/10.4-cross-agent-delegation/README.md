@@ -4,6 +4,7 @@
 
 - **能力**：订单 Agent 缺订单号追问、缺 scope 拒绝、正常读取；委托器翻译 error/input/auth/completed。
 - **v2 路径**：L10 / 选做（Gate；跨 Agent 委派）
+- **v3 路径**：选修 / 选修（MCP 鉴权深挖与 A2A）
 - **前置**：10.1（授权）、10.2（任务）。
 - **时间盒**：5 小时。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/integration.py`。

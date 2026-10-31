@@ -1,9 +1,10 @@
 # L4.2 LangGraph 基础 · Gate（原 4.2）
 
-[全书目录](../../README.md) · [上一章 4.1](../4.1-agent-patterns/README.md) · [下一章 4.3](../4.3-branch-loop/README.md)
+[全书目录](../../README.md) · [上一章 L4.8](../4.17-native-vs-sdk-gate/README.md) · [下一章 L4.9（4.3）](../4.3-branch-loop/README.md)
 
 - **能力**：用 State/Node/Edge 搭线性图；用条件边把流程接成有出口的循环。
 - **v2 路径**：L4.2 / 核心（Gate；LangGraph 基础）
+- **v3 路径**：L4.9 / 核心（Gate；图结构基础）
 - **前置**：4.1（Agent 模式）；已能用普通函数和循环传递状态。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `linear_graph.py` / `conditional_graph.py`。

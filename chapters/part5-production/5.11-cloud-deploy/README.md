@@ -1,6 +1,6 @@
 # L5.8 容器、CI 评测门禁与云部署 · 清单（5.11 云部署）
 
-[全书目录](../../README.md) · [上一章 L5.7](../5.10-control-execution-plane/README.md) · [下一章 L5.9](../5.12-capacity-slo-recovery/README.md)
+[全书目录](../../README.md) · [上一章 L5.8（5.5）](../5.5-docker-packaging/README.md) · [下一章 L5.9](../5.12-capacity-slo-recovery/README.md)
 
 - **目标**：按目标雇主选一个主流云，把容器部署到托管服务或 VPS，并完成健康检查、密钥管理、预算告警、回滚与清理；留下一份可复查的部署记录。
 - **v3 路径**：L5.8 / 核心（清单验收）

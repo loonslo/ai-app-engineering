@@ -1,9 +1,10 @@
 # L3.3 基础评测 · Gate（原 3.2）
 
-[全书目录](../../README.md) · [上一章 3.1](../3.1-error-analysis/README.md) · [下一章 3.3](../3.3-llm-judge/README.md)
+[全书目录](../../README.md) · [上一章 L3.2](../3.4-eval-dataset-build/README.md) · [下一章 L3.3（5.8）](../../part5-production/5.8-pytest-regression/README.md)
 
 - **能力**：用带分母的拒答正确率/关键词命中率评测 RAG；处理空集、无关键词、调用异常。
 - **v2 路径**：L3.3 / 核心（Gate；基础评测）
+- **v3 路径**：L3.3 / 核心（Gate；规则评测）
 - **前置**：3.1（失败分析）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `eval_basics.py`。

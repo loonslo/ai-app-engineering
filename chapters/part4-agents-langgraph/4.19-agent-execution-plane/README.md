@@ -1,6 +1,6 @@
 # L4.11 专项 Agent 执行面 · Gate
 
-[全书目录](../../README.md) · [上一章 L4.10](../4.11-streaming-hitl/README.md) · [下一章 L4.12](../4.20-sandbox-least-privilege/README.md)
+[全书目录](../../README.md) · [上一章 L4.10（4.11）](../4.11-streaming-hitl/README.md) · [下一章 L4.12](../4.20-sandbox-least-privilege/README.md)
 
 - **能力**：将调研任务做成提交即返回、分阶段落盘、可恢复、可审批、可取消的异步任务。
 - **v3 路径**：L4.11 / 核心（Gate；执行面）

@@ -4,6 +4,7 @@
 
 - **能力**：低置信/unknown 转人工；human_handoff 转人工；缺槽位追问；补齐后 ready；会话隔离。
 - **v2 路径**：L9 / 选做（Gate；意图工作流）
+- **v3 路径**：选修 / 选修（企业数据与推理设施）
 - **前置**：9.1（意图）、9.2（槽位）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/workflow.py`。

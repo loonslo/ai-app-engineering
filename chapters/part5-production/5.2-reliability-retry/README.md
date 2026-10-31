@@ -1,9 +1,10 @@
 # L5.2 可靠性 · Gate（原 5.2）
 
-[全书目录](../../README.md) · [上一章 5.1](../5.1-serve-fastapi/README.md) · [下一章 5.3](../5.3-cost-cache-routing/README.md)
+[全书目录](../../README.md) · [上一章 L5.1（5.1）](../5.1-serve-fastapi/README.md) · [下一章 L5.2](../5.3-cost-cache-routing/README.md)
 
 - **能力**：生成指数退避序列；区分可重试/不可重试错误；按 usage 估算成本。
 - **v2 路径**：L5.1 / 核心（Gate；可靠性/退避/成本）
+- **v3 路径**：L5.1 / 核心（Gate；可靠性与重试）
 - **前置**：5.1 的 gate（最小超时/重试）、1.1、2.6。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `reliability.py`。

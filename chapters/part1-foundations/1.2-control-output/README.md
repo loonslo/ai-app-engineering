@@ -1,9 +1,10 @@
 # L1.2 输出控制 · Gate（原 1.2）
 
-[全书目录](../../README.md) · [上一章 1.1](../1.1-first-call/README.md) · [下一章 1.3](../1.3-structured-output/README.md)
+[全书目录](../../README.md) · [上一章 L1.2](../1.7-llm-internals/README.md) · [下一章 L1.4](../1.3-structured-output/README.md)
 
 - **能力**：构造可验证的请求参数；收集流式片段并处理空流、坏片段、超时和中断。
 - **v2 路径**：L1.2 / 核心（Gate；输出控制）
+- **v3 路径**：L1.3 / 核心（Gate；输出控制）
 - **前置**：1.1（一次调用）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `control_output.py`。

@@ -1,9 +1,10 @@
 # L2.6 查询改写与 Agentic Retrieval · Gate（原 2.9）
 
-[全书目录](../../README.md) · [上一章 2.8](../2.8-hybrid-search/README.md) · [下一章 2.10](../2.10-chroma-persist/README.md)
+[全书目录](../../README.md) · [上一章 L2.6（2.11）](../2.11-multimodal-rerank/README.md) · [下一章 L2.8](../2.10-chroma-persist/README.md)
 
 - **能力**：构造改写 prompt；解析多行查询；异常回退；实现 Agentic Retrieval 多轮自主检索循环。
 - **v2 路径**：L2.6 / 核心（Gate；查询改写）
+- **v3 路径**：L2.7 / 核心（Gate；查询改写）
 - **前置**：2.4（切分策略）、2.2（召回）。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 评测分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `query_rewrite.py`。

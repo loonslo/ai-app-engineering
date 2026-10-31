@@ -4,6 +4,7 @@
 
 - **能力**：拼接 chat/completions URL；校验 base_url/model/api_key_env/生产 HTTPS。
 - **v2 路径**：L5.10 / 选读（Gate；兼容模型配置）
+- **v3 路径**：选修 / 选修（企业数据与推理设施）
 - **前置**：5.1（服务配置）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/providers.py`。

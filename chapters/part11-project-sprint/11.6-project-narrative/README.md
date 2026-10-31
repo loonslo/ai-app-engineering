@@ -1,6 +1,6 @@
 # P6 项目叙事与证据索引 · 项目章
 
-[全书目录](../../README.md) · [上一章 P5](../11.5-demo-web-ui/README.md) · [篇首](../README.md) · [下一篇 J](../../part12-job-track/README.md)
+[全书目录](../../README.md) · [上一章 P5](../11.5-demo-web-ui/README.md) · [篇首](../README.md) · [下一章 J1](../../part12-job-track/12.1-positioning-resume/README.md)
 
 - **目标**：把项目整理成招聘方看得懂、验证得了的作品叙事：作品 README、证据索引、决策索引、10 分钟演示稿、简历条目。
 - **v3 路径**：P6 / 项目（清单验收）

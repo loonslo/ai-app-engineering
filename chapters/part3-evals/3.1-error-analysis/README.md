@@ -1,9 +1,10 @@
 # L3.1 失败分析 · Gate（原 3.1）
 
-[全书目录](../../README.md) · [上一章 2.11](../../part2-rag/2.11-multimodal-rerank/README.md) · [下一章 3.2](../3.2-eval-basics/README.md)
+[全书目录](../../README.md) · [上一章 L2.12](../../part2-rag/2.15-real-corpus-kb-gate/README.md) · [下一章 L3.2](../3.4-eval-dataset-build/README.md)
 
 - **能力**：按“来源 → 切分 → 召回 → 重排 → 上下文 → 生成 → 引用”定位最早失败环节。
 - **v2 路径**：L3.1 / 核心（Gate；失败分析）
+- **v3 路径**：L3.1 / 核心（Gate；失败定位）
 - **前置**：2.4（切分策略）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 失败样例）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `error_analysis.py`。

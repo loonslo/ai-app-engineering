@@ -1,9 +1,10 @@
 # L1.4 上下文与记忆 · Gate（原 1.4）
 
-[全书目录](../../README.md) · [上一章 1.3](../1.3-structured-output/README.md) · [下一章 1.5](../1.5-tool-calling/README.md)
+[全书目录](../../README.md) · [上一章 L1.4](../1.3-structured-output/README.md) · [下一章 L1.6](../1.5-tool-calling/README.md)
 
 - **能力**：按会话隔离历史；在字符预算内保留最近上下文；system 消息永不被裁掉。
 - **v2 路径**：L1.4 / 核心（Gate；上下文与记忆）
+- **v3 路径**：L1.5 / 核心（Gate；上下文与记忆）
 - **前置**：1.1（一次调用）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `context_memory.py`。

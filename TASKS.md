@@ -5,7 +5,7 @@
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-8 已通过并合入 master。V3-9（capstone：去 LangChain、接入 OpenTelemetry、静态演示前端、文档对齐）已完成并复跑：`capstone/` 内无 langchain/langgraph 导入，生产边界测试 34 → 43 项全过，里程碑与证据审计通过，ruff 通过，真实模型回归 6/6、评测 拒答 2/2·关键词 4/4·引用 4/4；原生切分器与 LangChain 在 165 例上逐块一致；前端对真实服务冒烟通过。实施线程额度用完，由审核者亲自实施，没有实施与审核分离。记录见 `docs/gate-v3-9-validation.md`。V3-10（v3 标签、导航、总地图、根 README）待做。未验证：真实 Postgres + pgvector、OTLP 后端、旧索引升级演练；`load_test --fake` 在 Windows 上以 PermissionError 退出（master 上同样存在，未处理）。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-9 已通过并合入 master，V3-10 已完成（见下）。V3-9（capstone：去 LangChain、接入 OpenTelemetry、静态演示前端、文档对齐）已完成并复跑：`capstone/` 内无 langchain/langgraph 导入，生产边界测试 34 → 43 项全过，里程碑与证据审计通过，ruff 通过，真实模型回归 6/6、评测 拒答 2/2·关键词 4/4·引用 4/4；原生切分器与 LangChain 在 165 例上逐块一致；前端对真实服务冒烟通过。实施线程额度用完，由审核者亲自实施，没有实施与审核分离。记录见 `docs/gate-v3-9-validation.md`。V3-10 见 Done。未验证：真实 Postgres + pgvector、OTLP 后端、旧索引升级演练；`load_test --fake` 在 Windows 上以 PermissionError 退出（master 上同样存在，未处理）。
 - [ ] **V3-3 外部环境遗留** - 3.3/3.7/3.8 的 DeepSeek 单次 live 记录保留于 `docs/gate-v3-3-validation.md` 第 8 节；远端 OTLP、DeepEval 仍未验证。V3-3 已合入；用户决定不再恢复丢失的原 LangSmith 报告。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
@@ -21,6 +21,7 @@
 
 ## Done
 
+- [x] **V3-10 标签、导航与总地图（2026-10-31）** - 81 个旧章节补 v3 路径标签；主线 88 个章节的上一章/下一章按 v3 顺序重写（脚本验证 0.1 → 12.7 无环且互指）；`chapters/README.md` 加 v3 路线速查、补第 11、12 篇与新章节、v2 速查标为历史；根 README 改 v3 结构与技术路线说明；v3 提案标已采纳、v2 标已取代。验证与偏离见 `docs/gate-v3-10-validation.md`；未验证：真实学习者使用、“运行环境”列未逐章重核。
 - [x] **V3-9 capstone 去框架与叙事对齐（2026-10-31）** - 主链路改用原生 openai 客户端（超时、带抖动重试、可选备用模型）、chromadb 与自写切分器；pgvector 改 psycopg；新增 OTel 打点（默认不导出、不采集正文）、静态演示前端与反馈接口、ADR-002；简历与面试文档对齐代码（LangGraph、InMemorySaver、MCP 等对不上的说法已改）。验证与偏离见 `docs/gate-v3-9-validation.md`。
 - [x] **V3-7、V3-8 篇 11 项目主线与篇 12 就业轨道（2026-10-31）** - 新增 13 个章节：11.1–11.6（需求与指标、最小上线、控制面加固、执行面与真实证据、可演示前端、项目叙事）与 12.1–12.7（定位与简历、公开作品节奏、编码面试与 AI 辅助编码、系统设计模拟、take-home 模拟、行为面故事、投递与漏斗）。含 12.3 的预埋 bug 演练、12.5 的三个离线检查器、11.5 的静态前端示例。外部事实只写核对过的，没有来源的统计标“未核实”。验证与偏离见 `docs/gate-v3-7-validation.md`、`docs/gate-v3-8-validation.md`；未验证：真实学习者使用、模板填写、面试与市场信息的时效。
 - [x] **V3-6 L5 服务化与生产（2026-10-31；已合入 master）** - 5.1/5.2/5.3 换原生 openai SDK（带抖动的重试、SSE、成本与低峰调度），5.3 gate 追加 5 项、5.7 gate 追加 4 项，新增 5.9 OpenTelemetry、5.10 控制面与执行面、5.12 容量 SLO 与恢复三个 gate，新增 5.11、5.13、5.14、5.15 四个清单章，6.1 README 增补。外部出处逐项核对并标注读取日期，未核实的写“未核实”。验证与偏离见 `docs/gate-v3-6-validation.md`；未验证：OTLP 后端、真实云部署、托管运行时实测、并发与恢复。

@@ -1,6 +1,6 @@
 # 2.15 真实资料知识库 v1 · Gate
 
-[全书目录](../../README.md) · [上一章 2.14 记忆与上下文压缩](../2.14-memory-compaction/README.md) · [下一章 3.1 失败定位与归因](../../part3-evals/3.1-error-analysis/README.md)
+[全书目录](../../README.md) · [上一章 L2.11](../2.4-eval-seed/README.md) · [下一章 L3.1](../../part3-evals/3.1-error-analysis/README.md)
 
 - **能力**：用真实公开文档（含表格页与扫描页）交付可引用、可拒答、可评测的知识库流水线 v1，给出分项指标评测与消融对比表。
 - **v3 路径**：L2.12 / 核心（Gate；真实资料知识库）

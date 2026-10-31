@@ -1,9 +1,10 @@
 # L3.5 Ragas 与指标口径 · Gate（原 3.5）
 
-[全书目录](../../README.md) · [上一章 3.4](../3.4-eval-dataset-build/README.md) · [下一章 3.6](../3.6-langsmith-eval/README.md)
+[全书目录](../../README.md) · [上一章 L3.4](../3.3-llm-judge/README.md) · [下一章 L3.6（3.7）](../3.7-eval-regression-curve/README.md)
 
 - **能力**：合并基础集/补充集；校验拒答题；把非拒答样本整理成 RAGAS 四列。
 - **v2 路径**：L3.5 / 核心（Gate；Ragas 与指标口径）
+- **v3 路径**：L3.5 / 核心（Gate；指标口径）
 - **前置**：3.4（schema 与基础集）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `dataset_ragas.py`。

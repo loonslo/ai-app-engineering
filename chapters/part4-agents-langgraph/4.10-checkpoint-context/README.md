@@ -1,9 +1,10 @@
 # L4.6 扩展：检查点与上下文 · Gate（原 4.10）
 
-[全书目录](../../README.md) · [上一章 4.9](../4.9-observability/README.md) · [下一章 4.11](../4.11-streaming-hitl/README.md)
+[全书目录](../../README.md) · [上一章 L4.9（4.6）](../4.6-node-reliability/README.md) · [下一章 L4.10（4.11）](../4.11-streaming-hitl/README.md)
 
 - **能力**：按 thread_id 保存/读取状态快照；隔离会话；按条数裁剪上下文并保留 system。
 - **v2 路径**：L4.6 / 核心（Gate；检查点与上下文）
+- **v3 路径**：L4.10 / 核心（Gate；检查点与上下文）
 - **前置**：4.9（可观测性）、1.4（会话记忆）。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `checkpoint_context.py`。

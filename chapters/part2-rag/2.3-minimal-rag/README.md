@@ -1,9 +1,10 @@
 # L2.3 最小 RAG · Gate（原 2.3）
 
-[全书目录](../../README.md) · [上一章 2.2](../2.2-embed-retrieve/README.md) · [下一章 2.4](../2.4-eval-seed/README.md)
+[全书目录](../../README.md) · [上一章 L2.3](../2.2-embed-retrieve/README.md) · [下一章 L2.5](../2.7-chunk-strategy/README.md)
 
 - **能力**：检索 → 拼带来源的上下文 → 生成 → 引用/拒答；无证据不调用模型。
 - **v2 路径**：L2.3 / 核心（Gate；最小 RAG）
+- **v3 路径**：L2.4 / 核心（Gate；最小 RAG）
 - **前置**：2.2（向量化与召回）。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `minimal_rag.py`。

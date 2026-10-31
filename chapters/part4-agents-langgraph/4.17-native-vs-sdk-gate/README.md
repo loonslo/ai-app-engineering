@@ -1,6 +1,6 @@
 # L4.8 原生版与 SDK 版 · Gate
 
-[全书目录](../../README.md) · [上一章 L4.7](../../part3-evals/3.9-agent-trajectory-eval/README.md) · [下一章 L4.9](../4.2-langgraph-basics/README.md)
+[全书目录](../../README.md) · [上一章 L4.7](../../part3-evals/3.9-agent-trajectory-eval/README.md) · [下一章 L4.9（4.2）](../4.2-langgraph-basics/README.md)
 
 - **能力**：用同一套订单客服场景比较原生循环与 Pydantic AI，说清框架替你做了什么。
 - **v3 路径**：L4.8 / 核心（Gate；原生与 SDK）

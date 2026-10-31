@@ -1,6 +1,6 @@
 # L4.17 异步专项 Agent · Gate
 
-[全书目录](../../README.md) · [上一章 L4.16](../4.15-framework-landscape/README.md) · [下一阶段 L5](../../part5-production/5.1-serve-fastapi/README.md)
+[全书目录](../../README.md) · [上一章 L4.16](../4.15-framework-landscape/README.md) · [下一章 L5.1（5.1）](../../part5-production/5.1-serve-fastapi/README.md)
 
 - **能力**：组合 Agent、持久步骤表、外置策略与审批，完成一个异步调研任务，并生成离线 pass^3 报告。
 - **v3 路径**：L4.17 / 核心（Gate；异步专项 Agent）

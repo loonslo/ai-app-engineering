@@ -1,9 +1,10 @@
 # L4.10 扩展：搜索信任边界 · Gate（原 4.12）
 
-[全书目录](../../README.md) · [上一章 4.11](../4.11-streaming-hitl/README.md) · [下一章 4.13](../4.13-text2sql-agent/README.md)
+[全书目录](../../README.md) · [上一章 L4.12](../4.20-sandbox-least-privilege/README.md) · [下一章 L4.14](../4.21-mcp-practice/README.md)
 
 - **能力**：把外部搜索结果标记为不可信资料；检测常见提示词注入；防止标签提前闭合。
 - **v2 路径**：L4.8 / 核心（Gate；搜索信任边界）
+- **v3 路径**：L4.13 / 核心（Gate；Agent 安全）
 - **前置**：4.10、4.11。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `tool_safety_search.py`。

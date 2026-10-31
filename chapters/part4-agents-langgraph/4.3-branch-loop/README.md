@@ -1,9 +1,10 @@
 # L4.3 分支与循环 · Gate（原 4.3）
 
-[全书目录](../../README.md) · [上一章 4.2](../4.2-langgraph-basics/README.md) · [下一章 4.4](../4.4-state-reducer/README.md)
+[全书目录](../../README.md) · [上一章 L4.9（4.2）](../4.2-langgraph-basics/README.md) · [下一章 L4.9（4.4）](../4.4-state-reducer/README.md)
 
 - **能力**：用条件边实现分支/循环；用达标条件终止；用 `recursion_limit` 兜底。
 - **v2 路径**：L4.3 / 核心（Gate；分支与循环）
+- **v3 路径**：L4.9 / 核心（Gate；分支与循环）
 - **前置**：4.2（线性图）、1.5（工具循环）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `branch_loop.py`。

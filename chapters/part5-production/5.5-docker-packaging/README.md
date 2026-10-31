@@ -1,9 +1,10 @@
 # L5.7 容器与配置 · Gate（原 5.5）
 
-[全书目录](../../README.md) · [上一章 5.4](../5.4-sqlite-persistence/README.md) · [下一章 5.6](../5.6-ollama-inference/README.md)
+[全书目录](../../README.md) · [上一章 L5.7](../5.10-control-execution-plane/README.md) · [下一章 L5.8（5.11）](../5.11-cloud-deploy/README.md)
 
 - **能力**：生成生产可用的 Dockerfile/.dockerignore；审计缺 EXPOSE、明文密钥、ADD 远端、root 运行。
 - **v2 路径**：L5.7 / 核心（Gate；容器与配置）
+- **v3 路径**：L5.8 / 核心（Gate；Docker 打包）
 - **前置**：5.1（服务）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `docker_examples.py`。

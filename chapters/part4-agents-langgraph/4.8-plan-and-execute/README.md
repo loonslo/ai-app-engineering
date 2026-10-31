@@ -1,9 +1,10 @@
 # L4.5 扩展：规划与执行 · Gate（原 4.8）
 
-[全书目录](../../README.md) · [上一章 4.7](../4.7-structured-routing/README.md) · [下一章 4.9](../4.9-observability/README.md)
+[全书目录](../../README.md) · [上一章 L4.4（4.7）](../4.7-structured-routing/README.md) · [下一章 L4.5](../4.16-pydantic-ai-agent/README.md)
 
 - **能力**：把模型输出解析成有界计划；逐步执行；计划/执行异常有出口；超长截断。
 - **v2 路径**：L4.5 / 核心（Gate；规划与执行）
+- **v3 路径**：L4.4 / 核心（Gate；计划与执行）
 - **岗位任务 / 面试题型**：T3 / F3、F4。
 - **前置**：4.5（ReAct）、4.7（结构化路由）。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 分析）。

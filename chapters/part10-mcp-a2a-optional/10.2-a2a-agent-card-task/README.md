@@ -4,6 +4,7 @@
 
 - **能力**：按 message_id 幂等提交；按状态表迁移；终态/非法迁移拒绝；未知任务 `TaskNotFound`。
 - **v2 路径**：L10 / 选做（Gate；A2A 任务状态机）
+- **v3 路径**：选修 / 选修（MCP 鉴权深挖与 A2A）
 - **前置**：4.10（检查点/状态）。
 - **时间盒**：5 小时。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/a2a.py`。

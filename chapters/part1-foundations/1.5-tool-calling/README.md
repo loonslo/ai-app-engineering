@@ -1,9 +1,10 @@
 # L1.5 工具调用 · Gate（原 1.5）
 
-[全书目录](../../README.md) · [上一章 1.4](../1.4-context-memory/README.md) · [下一章 1.6](../1.6-mcp-intro/README.md)
+[全书目录](../../README.md) · [上一章 L1.5](../1.4-context-memory/README.md) · [下一章 L1.7](../1.9-provider-cost/README.md)
 
 - **能力**：定义工具 schema；校验参数；执行工具并把结果回灌；未知工具/异常/超步数都有出口。
 - **v2 路径**：L1.5 / 核心（Gate；工具调用）
+- **v3 路径**：L1.6 / 核心（Gate；工具调用）
 - **前置**：1.1（一次调用）。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `tool_calling.py`。

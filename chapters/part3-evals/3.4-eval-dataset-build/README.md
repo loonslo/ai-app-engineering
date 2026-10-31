@@ -1,9 +1,10 @@
 # L3.2 评测集建设 · Gate（原 3.4）
 
-[全书目录](../../README.md) · [上一章 3.3](../3.3-llm-judge/README.md) · [下一章 3.5](../3.5-eval-dataset-ragas/README.md)
+[全书目录](../../README.md) · [上一章 L3.1](../3.1-error-analysis/README.md) · [下一章 L3.3（3.2）](../3.2-eval-basics/README.md)
 
 - **能力**：校验评测集 schema、ID 唯一、题型覆盖；把错误一次收全，而不是第一条就中断。
 - **v2 路径**：L3.2 / 核心（Gate；评测集建设）
+- **v3 路径**：L3.2 / 核心（Gate；评测集建设）
 - **前置**：3.3（基础评测）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `dataset_build.py`。

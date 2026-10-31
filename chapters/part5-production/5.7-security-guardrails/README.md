@@ -1,9 +1,10 @@
 # L5.5 安全护栏 · Gate（原 5.7）
 
-[全书目录](../../README.md) · [上一章 5.6](../5.6-ollama-inference/README.md) · [下一章 5.8](../5.8-pytest-regression/README.md)
+[全书目录](../../README.md) · [上一章 L5.4](../5.15-auth-multitenancy/README.md) · [下一章 L5.6](../5.9-otel-observability/README.md)
 
 - **能力**：检测提示词注入并分级；PII 脱敏可还原；日志密钥脱敏；生成不含原文的审计记录；给 AI 生成内容加标识。
 - **v2 路径**：L5.5 / 核心（Gate；安全护栏）
+- **v3 路径**：L5.5 / 核心（Gate；安全护栏）
 - **前置**：4.12（信任边界）、5.1。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `security_guardrails.py`。

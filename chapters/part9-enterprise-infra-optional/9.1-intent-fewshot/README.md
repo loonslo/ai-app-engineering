@@ -4,6 +4,7 @@
 
 - **能力**：构造 few-shot 意图提示词；严格解析 intent/confidence，非法值不进业务分支。
 - **v2 路径**：L9 / 选做（Gate；few-shot 意图）
+- **v3 路径**：选修 / 选修（企业数据与推理设施）
 - **前置**：1.3（结构化输出）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/intent.py`。

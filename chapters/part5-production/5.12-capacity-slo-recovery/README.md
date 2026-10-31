@@ -1,6 +1,6 @@
 # L5.9 容量、SLO 与恢复 · Gate
 
-[全书目录](../../README.md) · [上一章 L5.8](../5.11-cloud-deploy/README.md) · [下一章 L5.10](../5.13-managed-runtime-tradeoffs/README.md)
+[全书目录](../../README.md) · [上一章 L5.8（5.11）](../5.11-cloud-deploy/README.md) · [下一章 L5.10](../5.13-managed-runtime-tradeoffs/README.md)
 
 - **能力**：从压测结果算出延迟分位数与错误率并对照 SLO；管理错误预算；按模型的 RPM / TPM 限额做容量规划；判定一次备份恢复演练。
 - **v3 路径**：L5.9 / 核心（Gate；容量与 SLO）

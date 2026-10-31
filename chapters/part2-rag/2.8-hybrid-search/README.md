@@ -1,9 +1,10 @@
 # L2.5 混合检索 · Gate（原 2.8）
 
-[全书目录](../../README.md) · [上一章 2.7](../2.7-chunk-strategy/README.md) · [下一章 2.9](../2.9-query-rewrite/README.md)
+[全书目录](../../README.md) · [上一章 L2.5](../2.7-chunk-strategy/README.md) · [下一章 L2.6（2.11）](../2.11-multimodal-rerank/README.md)
 
 - **能力**：用 RRF 融合向量与 BM25 两路排名；处理权重、去重、同分和空结果。
 - **v2 路径**：L2.5 / 核心（Gate；混合检索）
+- **v3 路径**：L2.6 / 核心（Gate；混合检索）
 - **前置**：2.4（切分策略）、2.2（向量召回）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 对比分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `hybrid_search.py`。

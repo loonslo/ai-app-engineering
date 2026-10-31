@@ -1,9 +1,10 @@
 # L1.3 结构化输出 · Gate（原 1.3）
 
-[全书目录](../../README.md) · [上一章 1.2](../1.2-control-output/README.md) · [下一章 1.4](../1.4-context-memory/README.md)
+[全书目录](../../README.md) · [上一章 L1.3](../1.2-control-output/README.md) · [下一章 L1.5](../1.4-context-memory/README.md)
 
 - **能力**：把模型输出解析成带字段的数据；校验类型与业务范围；失败时只修复一次。
 - **v2 路径**：L1.3 / 核心（Gate；结构化输出）
+- **v3 路径**：L1.4 / 核心（Gate；结构化输出）
 - **前置**：1.1（一次调用）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 故障分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `structured_output.py`。

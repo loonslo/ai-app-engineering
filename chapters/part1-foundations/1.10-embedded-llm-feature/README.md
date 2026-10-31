@@ -1,6 +1,6 @@
 # 1.10 嵌入式 LLM 功能与 Eval Harness · Gate
 
-[全书目录](../../README.md) · [上一章 L1.9](../1.8-cli-chatbot/README.md) · [下一章 L2.2](../../part2-rag/2.1-load-split/README.md)
+[全书目录](../../README.md) · [上一章 L1.9](../1.8-cli-chatbot/README.md) · [下一章 L2.1](../../part2-rag/2.12-context-engineering/README.md)
 
 - **能力**：在现有后端服务中嵌入 LLM 洞察能力，构建业务校验、降级熔断与离线评测 Harness；掌握二阶校验、租户身份隔离、退款 fail-closed 安全策略；对比原生实现与 Pydantic AI (2.31.1) 实现。
 - **v3 路径**：L1.10 / 核心（Gate；嵌入式功能）

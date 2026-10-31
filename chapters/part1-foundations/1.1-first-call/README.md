@@ -1,9 +1,10 @@
 # L1.1 一次调用 · Gate（原 1.1）
 
-[全书目录](../../README.md) · [上一章 0.2](../../part0-setup/0.2-learning-workflow/README.md) · [下一章 1.2](../1.2-control-output/README.md)
+[全书目录](../../README.md) · [上一章 L0.5](../../part0-setup/0.5-job-map-gap/README.md) · [下一章 L1.2](../1.7-llm-internals/README.md)
 
 - **能力**：看懂一次模型往返的请求、响应、token 和失败出口；把失败转成可读结果。
 - **v2 路径**：L1.1 / 核心（Gate；一次调用）
+- **v3 路径**：L1.1 / 核心（Gate；一次调用）
 - **前置**：0.1（自检通过，`.env` 里有 `DEEPSEEK_API_KEY`）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 失败分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `first_call.py`。

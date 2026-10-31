@@ -1,9 +1,10 @@
 # L2.8 重排与多模态 · Gate（原 2.11）
 
-[全书目录](../../README.md) · [上一章 2.10](../2.10-chroma-persist/README.md) · [下一章 3.1](../../part3-evals/3.1-error-analysis/README.md)
+[全书目录](../../README.md) · [上一章 L2.6（2.8）](../2.8-hybrid-search/README.md) · [下一章 L2.7](../2.9-query-rewrite/README.md)
 
 - **能力**：对候选按外部打分重排；处理空候选、坏分数、top-k；计算 recall@k。
 - **v2 路径**：L2.8 / 核心（Gate；重排（多模态选做））
+- **v3 路径**：L2.6 / 核心（Gate；重排）
 - **前置**：2.2（向量召回）、2.4（切分）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 对比分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `multimodal_rerank.py`。

@@ -4,6 +4,7 @@
 
 - **能力**：校验 token audience、工具 scope、高风险审批；失败统一 `McpAuthorizationError`。
 - **v2 路径**：L4.9 / 选做（Gate；MCP 授权/审批）
+- **v3 路径**：选修 / 选修（MCP 鉴权深挖与 A2A）
 - **前置**：4.11（HITL）、5.7（权限）。
 - **时间盒**：5 小时。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/mcp_auth.py`。

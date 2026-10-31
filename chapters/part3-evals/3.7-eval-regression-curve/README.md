@@ -1,9 +1,10 @@
 # 3.7 回归对比：Baseline、Candidate 与质量门禁
 
-[全书目录](../../README.md) · [上一章 3.6](../3.6-langsmith-eval/README.md) · [下一章 3.8](../3.8-prompt-ab-judge/README.md)
+[全书目录](../../README.md) · [上一章 L3.5](../3.5-eval-dataset-ragas/README.md) · [下一章 L3.6（3.8）](../3.8-prompt-ab-judge/README.md)
 
 - **目标**：在同一批问题上对比基线（Baseline）与候选（Candidate）系统，计算质量指标、P50/P99 延迟与异常率，识别质量退化告警，掌握 pass@k 与 pass^k 的场景选型，构建可用于 CI 的回归门禁。
 - **v2 路径**：L3.6 / 核心（Gate；回归对比）
+- **v3 路径**：L3.6 / 核心（Gate；回归曲线）
 - **前置**：2.6（被测检索与来源追踪）、3.2。
 - **环境**：默认完全离线运行；带 `--live` 可发起真实模型调用。
 - **命令**：`python chapters/part3-evals/3.7-eval-regression-curve/gate/gate_check.py`

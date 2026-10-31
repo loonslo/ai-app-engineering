@@ -1,6 +1,6 @@
 # L4.3 工具设计 · Gate
 
-[全书目录](../../README.md) · [上一章 L4.2](../4.5-react-agent/README.md) · [下一章 L4.4](../4.7-structured-routing/README.md)
+[全书目录](../../README.md) · [上一章 L4.2](../4.5-react-agent/README.md) · [下一章 L4.4（4.7）](../4.7-structured-routing/README.md)
 
 - **能力**：为订单客服设计有 schema、权限、幂等、分页与可读错误的工具。
 - **v3 路径**：L4.3 / 核心（Gate；工具设计）

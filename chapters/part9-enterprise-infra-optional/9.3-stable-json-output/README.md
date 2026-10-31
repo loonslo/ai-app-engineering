@@ -4,6 +4,7 @@
 
 - **能力**：解析围栏 JSON；严格字段/类型校验；多余字段策略；最多 repair 一次。
 - **v2 路径**：L9 / 选做（Gate；稳定 JSON 契约）
+- **v3 路径**：选修 / 选修（企业数据与推理设施）
 - **前置**：1.3（结构化输出）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `src/enterprise_support/structured_json.py`。

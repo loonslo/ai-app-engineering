@@ -1,9 +1,10 @@
 # L5.2 扩展：成本/缓存/路由 · Gate（原 5.3）
 
-[全书目录](../../README.md) · [上一章 5.2](../5.2-reliability-retry/README.md) · [下一章 5.4](../5.4-sqlite-persistence/README.md)
+[全书目录](../../README.md) · [上一章 L5.1（5.2）](../5.2-reliability-retry/README.md) · [下一章 L5.3](../5.4-sqlite-persistence/README.md)
 
 - **能力**：归一化缓存键；带 TTL 的缓存；按难度路由；估算路由节省比例；计算带缓存命中的成本；把非紧急任务调度到低峰。
 - **v2 路径**：L5.2 / 核心（Gate；缓存/路由/成本）
+- **v3 路径**：L5.2 / 核心（Gate；成本控制）
 - **前置**：5.2（可靠性/成本）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `cost_cache_routing.py`。

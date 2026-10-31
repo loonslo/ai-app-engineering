@@ -3,6 +3,7 @@
 httpx==0.28.1
 langgraph-checkpoint-sqlite==3.1.0
 locust==2.46.2
+mcp==1.29.1  # V3-5 进程内 MCP 离线回归；与 course 锁定一致
 opentelemetry-api==1.44.0
 opentelemetry-sdk==1.44.0
 pydantic-ai-slim[openai]==2.31.1  # V3-4 FunctionModel/TestModel 离线回归

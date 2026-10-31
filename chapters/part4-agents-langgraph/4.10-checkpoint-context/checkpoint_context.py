@@ -21,26 +21,35 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, START, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import InMemorySaver
-import os
-from dotenv import load_dotenv
+import argparse
+import sys
 
-load_dotenv()   # 读 .env 里的 DEEPSEEK_API_KEY
-
-
-# —— 内联 LLM 工厂：本文件自包含，不依赖 common.py，方便单独阅读 ——
-def get_llm(temperature: float = 0.0, model: str = "deepseek-chat", **kwargs):
-    """DeepSeek 对话模型（OpenAI 兼容）。temperature=0 → 输出可复现。"""
-    from langchain_openai import ChatOpenAI
-    return ChatOpenAI(
-        model=model,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
-        temperature=temperature,
-        **kwargs,
-    )
+LIVE = False
 
 
-llm = get_llm(temperature=0)
+def get_llm(temperature: float = 0.0, **kwargs):
+    """离线用可组合脚本模型；只有 --live 才读取公共模型配置。"""
+    if LIVE:
+        from common import get_llm as shared_llm
+        return shared_llm(temperature=temperature, **kwargs)
+    from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+
+    class OfflineModel(FakeMessagesListChatModel):
+        def bind_tools(self, tools, **kwargs):
+            return OfflineModel(responses=[
+                AIMessage(content="", tool_calls=[{"name": "get_weather", "args": {"city": "北京"}, "id": "weather-1"}]),
+                AIMessage(content="（离线脚本）北京本节晴，25℃"),
+                AIMessage(content="", tool_calls=[{"name": "get_weather", "args": {"city": "上海"}, "id": "weather-2"}]),
+                AIMessage(content="（离线脚本）上海本节晴，25℃"),
+                AIMessage(content="（离线脚本）这是新会话，缺少此前讨论的天气上下文。"),
+            ])
+
+    return OfflineModel(responses=[
+        AIMessage(content="（离线脚本）这里只演示消息裁剪/摘要接线，不验证模型是否记住事实。"),
+    ])
+
+
+llm = get_llm()  # 导入只创建离线脚本替身；main 的 --live 分支才替换为真实客户端。
 
 
 # ============ 第一部分：checkpoint 持久化 + 多轮记忆 ============
@@ -190,11 +199,30 @@ def demo_context():
     # 检验点：最后一问历史已超阈值被摘要，但摘要里保住了"小王"
 
 
-if __name__ == "__main__":
+def run_demos() -> None:
     print("===== 1) checkpoint 持久化 + 多轮记忆 =====")
     demo_memory()
     print("\n===== 2) 上下文裁剪 + 摘要 =====")
     demo_context()
+
+
+def main() -> int:
+    global LIVE, llm
+    parser = argparse.ArgumentParser(description="检查点与上下文历史演示；默认离线脚本模型")
+    parser.add_argument("--live", action="store_true", help="显式调用真实模型")
+    LIVE = parser.parse_args().live
+    print("模式：真实模型" if LIVE else "模式：离线脚本模型（不评估摘要质量）")
+    try:
+        llm = get_llm(temperature=0)
+        run_demos()
+    except Exception as exc:
+        print(f"运行失败（{type(exc).__name__}）：检查公共模型配置、依赖与网络；未生成成功结果。", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
 
 
 # ----------------------------------------------------------

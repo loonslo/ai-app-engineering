@@ -18,28 +18,34 @@
 ==========================================================
 """
 
-import os
 import random
 import time
 from typing import TypedDict
 from langchain_core.tools import tool
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
-from dotenv import load_dotenv
+import argparse
+import sys
 
-load_dotenv()
+LIVE = False
 
 
-def get_llm(temperature: float = 0.0, model: str = "deepseek-chat", **kwargs):
-    """DeepSeek 对话模型（OpenAI 兼容）。temperature=0 → 输出可复现。"""
-    from langchain_openai import ChatOpenAI
-    return ChatOpenAI(
-        model=model,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
-        temperature=temperature,
-        **kwargs,
-    )
+def get_llm(temperature: float = 0.0, **kwargs):
+    """只由 --live 使用公共模型工厂；离线脚本保留除零工具演示。"""
+    if LIVE:
+        from common import get_llm as shared_llm
+        return shared_llm(temperature=temperature, **kwargs)
+    from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+    from langchain_core.messages import AIMessage
+
+    class OfflineModel(FakeMessagesListChatModel):
+        def bind_tools(self, tools, **kwargs):
+            return self
+
+    return OfflineModel(responses=[
+        AIMessage(content="", tool_calls=[{"name": "divide", "args": {"a": 10, "b": 0}, "id": "divide-1"}]),
+        AIMessage(content="（离线脚本）工具返回除零错误，不能给出合法数值。"),
+    ])
 
 
 # ============================================================
@@ -93,15 +99,12 @@ def sometimes_fails(state: State) -> dict:
 
 
 def build_retry():
-    """add_node 时挂 retry。不同 LangGraph 版本 RetryPolicy 位置略有差异，做了兼容导入。"""
-    try:
-        from langgraph.pregel import RetryPolicy          # 较新版本
-    except ImportError:
-        from langgraph.types import RetryPolicy           # 另一些版本
+    """按锁定版本的 API 给节点配置同一重试策略。"""
+    from langgraph.types import RetryPolicy
     g = StateGraph(State)
     # 最多重试 3 次；retry_on 指定"哪些异常才重试"——只重瞬时错误
     g.add_node("work", sometimes_fails,
-               retry=RetryPolicy(max_attempts=3, retry_on=(TimeoutError, ConnectionError)))
+               retry_policy=RetryPolicy(max_attempts=3, retry_on=(TimeoutError, ConnectionError)))
     g.add_edge(START, "work")
     g.add_edge("work", END)
     return g.compile()
@@ -122,13 +125,9 @@ def build_tool_safe():
     def agent(state: MessagesState) -> dict:
         try:
             return {"messages": [llm.invoke(state["messages"])]}
-        except Exception as e:
-            # LLM 调用失败（限流/鉴权/网络），回一个文本消息告知用户，不崩图
-            from langchain_core.messages import AIMessage
-            # 注意：不要 {e} 打印原始异常，避免暴露 API Key 等敏感信息
-            print(f"  [agent] LLM 调用失败：{type(e).__name__}，详情见监控/日志平台")
-            fallback = AIMessage(content="（LLM 暂时不可用，请检查 API Key 或网络后重试）")
-            return {"messages": [fallback]}
+        except Exception as exc:
+            # 工具错误仍回灌；模型不可用不能伪装成演示成功。
+            raise RuntimeError(f"模型调用失败（{type(exc).__name__}），请检查公共配置或网络") from None
 
     g = StateGraph(MessagesState)
     g.add_node("agent", agent)
@@ -154,7 +153,7 @@ def with_timeout(fn, seconds: float, on_timeout):
     return result
 
 
-if __name__ == "__main__":
+def run_demos() -> None:
     random.seed(0)   # 固定随机，输出可复现
 
     print("===== 【一】try/except + fallback：失败降级不崩 =====")
@@ -168,12 +167,9 @@ if __name__ == "__main__":
     print("  最终 →", out["result"])
 
     print("\n===== 【三】ToolNode handle_tool_errors：除零不崩，回喂模型自救 =====")
-    if os.getenv("DEEPSEEK_API_KEY"):
-        app = build_tool_safe()
-        res = app.invoke({"messages": [("user", "帮我算 10 除以 0")]})
-        print("  最终答复 →", res["messages"][-1].content)
-    else:
-        print("  （未配置 DEEPSEEK_API_KEY，跳过真实 LLM 调用；逻辑同上）")
+    app = build_tool_safe()
+    res = app.invoke({"messages": [("user", "帮我算 10 除以 0")]})
+    print("  最终答复 →", res["messages"][-1].content)
 
     print("\n===== 【四】超时护栏：快调用拿到真实结果，慢调用触发降级 =====")
     # 模拟快速服务：0.2s 返回
@@ -191,6 +187,24 @@ if __name__ == "__main__":
         on_timeout="（降级）请求超时，返回缓存数据"
     )
     print(f"  慢速调用 → {slow_result}")
+
+
+def main() -> int:
+    global LIVE
+    parser = argparse.ArgumentParser(description="节点可靠性历史演示；默认离线脚本模型")
+    parser.add_argument("--live", action="store_true", help="显式调用真实模型")
+    LIVE = parser.parse_args().live
+    print("模式：真实模型" if LIVE else "模式：离线脚本模型")
+    try:
+        run_demos()
+    except Exception as exc:
+        print(f"运行失败（{type(exc).__name__}）：检查公共模型配置、依赖与网络；未生成成功结果。", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
 
 
 # ----------------------------------------------------------

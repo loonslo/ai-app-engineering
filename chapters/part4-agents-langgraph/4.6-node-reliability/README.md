@@ -17,14 +17,9 @@ python chapters/part4-agents-langgraph/4.6-node-reliability/gate/gate_check.py
 
 ## 为什么做这个 gate
 
-默认情况下，节点一抛异常整张图就崩，用户拿到 500。生产必须区分：
+本章只新增失败契约：瞬时错误才重试，确定性错误快速失败；降级必须明确标注，不能把缓存或模拟结果伪装成实时数据。超时要限制等待，不是调用结束后再比较耗时。即使停止等待，后台工作仍可能继续，写操作还需要目的端幂等。
 
-- 哪些错误值得重试（超时/连接断开）；
-- 哪些错误重试也没用（参数错/权限错）；
-- 慢调用怎么真正限时，而不是“跑完再看耗时”；
-- 降级结果怎么让用户知道，而不是伪装成真实数据。
-
-这个 gate 用假函数/真 sleep，验证降级、可重试判断和真实超时。
+这个历史 gate 用假函数与短暂的真实 sleep 检查降级、异常分类和限时返回；它不是假时钟测试。是否需要图及版本边界见 [4.2](../4.2-langgraph-basics/README.md#什么时候需要图)。本仓库锁定 `langgraph==1.2.8`；细则的本机历史记录是 2026-10-27 的 `1.2.10`，不等于当前安装值（读取于 2026-10-31）。
 
 ## 任务
 
@@ -80,6 +75,8 @@ python chapters/part4-agents-langgraph/4.6-node-reliability/gate/gate_check.py
 ```bash
 python tools/run_chapter.py 4.6
 ```
+
+`node_reliability.py` 默认离线：固定随机种子演示降级、重试，脚本聊天模型调用 `divide(10, 0)`，把工具异常回灌；第四段仍保留先等待完成再比较耗时的**反例**，不满足本 gate 的限时契约。需要真实模型时显式执行 `python tools/run_chapter.py 4.6 node_reliability.py --live`，经 `common.get_llm()` 读取模型配置；缺配置/调用失败退出 1，无 traceback。本次是“安全入口接线改动而非图逻辑改写”，另按已读取的锁定版本源码把同一重试策略参数名对齐为 `retry_policy`，未改变重试语义；七项 gate 未改。
 
 对照时只回答：
 

@@ -5,7 +5,7 @@
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-3 已通过并合入 master。V3-4 的 L4.1–L4.8 已实施并完成本机验证，待审核；保留 `.tmp/gate_solutions/v3/` 的 9 个参考解。审核以 `docs/v3/specs/L4A.md` 与 `docs/gate-v3-4-validation.md` 为准，通过后再安排 V3-5，不将真实模型单次 exit 0 当作语义质量通过。
+- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-4 已通过并合入 master（V3-4 审核见 `docs/v3/reviews/V3-4.md`）。V3-5（L4-B：4.2/4.3/4.4/4.6/4.10/4.11/4.12/4.15 增改，新增 4.19–4.23）已实施并复跑：11 个 gate 骨架 0 通过、参考解 106 项全过，pytest 103 passed，断链 0，ruff 通过；4.3/4.6/4.12 DeepSeek live 单次退出 0。记录见 `docs/gate-v3-5-validation.md`，在 `wip-v3-5`。V3-6（L5）至 V3-10 待做；真实模型多数路径、Docker 容器隔离、真实 MCP 服务未验证。
 - [ ] **V3-3 外部环境遗留** - 3.3/3.7/3.8 的 DeepSeek 单次 live 记录保留于 `docs/gate-v3-3-validation.md` 第 8 节；远端 OTLP、DeepEval 仍未验证。V3-3 已合入；用户决定不再恢复丢失的原 LangSmith 报告。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收

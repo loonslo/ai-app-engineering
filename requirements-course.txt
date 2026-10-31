@@ -6,8 +6,8 @@
 # 下面的包没有锁定版本，确认各章能跑通后，可把 pip freeze 的结果回写到此处。
 -r requirements-dev.txt
 
-# 第 1、4 篇：MCP
-mcp
+# 第 1、4 篇：MCP；L4.14（4.21）进程内离线 server/client 按此版本编写
+mcp==1.29.1
 langchain-mcp-adapters
 
 # 第 2–3 篇：向量检索
@@ -29,6 +29,10 @@ numpy
 # 4) 待 LangChain 锁定集允许 openai 3 后，升级 pydantic-ai-slim 到 >=2.53.0（已登记在 TASKS.md 待办中）。
 pydantic-ai-slim[openai]==2.31.1  # v3：L1.10、L4.5（4.16）、L4.8（4.17）、L4.17；dev 同步锁定供离线测试
 opentelemetry-sdk==1.44.0         # v3：L3.7、L5.6
+
+# V3-5：L4.9/L4.10 使用 requirements.txt 的 langgraph==1.2.8；
+# L4.16（4.15）create_agent 练习使用其中的 langchain==1.3.14，
+# L4.11/L4.12 的执行面与沙箱只用标准库；L4.17 阶段内复用上述 Pydantic AI，不增加服务依赖。
 
 # 以下按章节选装
 # ragas             # 3.5 Ragas 评测

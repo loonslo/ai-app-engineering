@@ -1517,3 +1517,95 @@ def test_v3_4_same_scenarios_native_and_real_sdk(monkeypatch):
     comparison = mod.compare(native, sdk)
     assert comparison["native_pass_rate"] == comparison["sdk_pass_rate"] == 1.0
     assert len(comparison["differences"]) == 8
+
+
+def test_v3_5_sqlite_resume_and_persistent_effect_receipt(tmp_path):
+    mod = _load_v3_3_mod("part4-agents-langgraph/4.19-agent-execution-plane/execution_plane.py", "v3_5_execution")
+    path = tmp_path / "tasks.sqlite"
+    store = mod.SQLiteStore(path)
+    task_id = mod.submit(store, "t1", {"topic": "报告"}, "request", mod.Budget(10, 100, 1000))
+    assert store.get(task_id).status == "queued"
+    assert mod.submit(store, "t1", {}, "request", mod.Budget(1, 1, 1)) == task_id
+    effects = mod.SQLiteEffects(store)
+    effects[f"{task_id}:publish"] = mod.StageOutput("持久回执", 0)
+    store.close()
+    store = mod.SQLiteStore(path)
+    calls = []
+    stages = [mod.Stage("publish", lambda task: calls.append(1) or mod.StageOutput("新回执", 0), side_effect=True)]
+    task = mod.run_until_blocked(store, task_id, stages, clock=lambda: 0, side_effect_log=mod.SQLiteEffects(store))
+    assert task.status == "succeeded" and task.steps[0].output == "持久回执" and calls == []
+    assert store.db.execute("SELECT count(*) FROM steps").fetchone()[0] == 1
+    store.close()
+
+
+def test_v3_5_sqlite_crash_reopen_approval_and_cancellation(tmp_path):
+    mod = _load_v3_3_mod("part4-agents-langgraph/4.19-agent-execution-plane/execution_plane.py", "v3_5_crash")
+    path = tmp_path / "tasks.sqlite"
+    store = mod.SQLiteStore(path)
+    task_id = mod.submit(store, "t1", {}, "k1", mod.Budget(10, 100, 1000))
+    calls = []
+    def crash(task):
+        raise mod.SimulatedCrash()
+    stages = [mod.Stage("gather", lambda task: calls.append("read") or mod.StageOutput("资料", 2)),
+              mod.Stage("draft", crash)]
+    with pytest.raises(mod.SimulatedCrash):
+        mod.run_until_blocked(store, task_id, stages, clock=lambda: 0, side_effect_log={})
+    store.close()
+    store = mod.SQLiteStore(path)
+    stages[1] = mod.Stage("draft", lambda task: mod.StageOutput("草稿", 2), needs_approval=True)
+    pending = mod.run_until_blocked(store, task_id, stages, clock=lambda: 0, side_effect_log={})
+    assert pending.status == "waiting_approval" and calls == ["read"]
+    mod.approve(store, task_id, "draft", True)
+    mod.cancel(store, task_id)
+    result = mod.run_until_blocked(store, task_id, stages, clock=lambda: 0, side_effect_log={})
+    assert result.status == "cancelled" and result.current_stage == 1
+    store.close()
+
+
+def test_v3_5_sandbox_paths_hosts_and_privilege():
+    mod = _load_v3_3_mod("part4-agents-langgraph/4.20-sandbox-least-privilege/sandbox_policy.py", "v3_5_sandbox")
+    allowed = frozenset({"example.com"})
+    assert mod.check_egress("https://docs.example.com/guide", allowed).allowed
+    assert not mod.check_egress("https://example.com.evil.invalid/", allowed).allowed
+    assert not mod.check_egress("https://127.0.0.1/", frozenset({"127.0.0.1"})).allowed
+    policy = mod.CommandPolicy(frozenset({"reader", "curl", "rm"}), allowed)
+    assert not mod.check_command(["reader", ".env"], policy).allowed
+    assert not mod.check_command(["rm", "-rf", "/"], policy).allowed
+    vault = [mod.Credential("read", frozenset({"read"}), 20),
+             mod.Credential("admin", frozenset({"read", "write"}), 20),
+             mod.Credential("expired", frozenset({"read"}), 10)]
+    assert [item.name for item in mod.scope_credentials(frozenset({"read"}), vault, 10)] == ["read"]
+
+
+def test_v3_5_mcp_authorization_precedes_call_and_error_normalization():
+    mod = _load_v3_3_mod("part4-agents-langgraph/4.21-mcp-practice/mcp_practice.py", "v3_5_mcp")
+    calls = []
+    class Session:
+        def call_tool(self, name, args, timeout_s):
+            calls.append(name)
+            return {"isError": True, "content": [{"type": "text", "text": "资源不存在"}]}
+    scopes = {"read_notes": {"notes:read"}}
+    denied = mod.call_with_policy(Session(), "read_notes", {}, set(), scopes, 1)
+    assert denied.startswith("拒绝：") and calls == []
+    result = mod.call_with_policy(Session(), "read_notes", {}, {"notes:read"}, scopes, 1)
+    assert result.startswith("工具错误：") and "资源不存在" in result and calls == ["read_notes"]
+
+
+def test_v3_5_async_trials_are_independent_and_tagged():
+    mod = _load_v3_3_mod("part4-agents-langgraph/4.23-async-agent-gate/async_agent.py", "v3_5_async")
+    report = mod.run_trials(mod.demo_trial, 3)
+    assert report["pass_at_1"] == report["pass_all_k"] == 1.0
+    assert [row["run"] for row in report["runs"]] == [1, 2, 3]
+    assert all(row["status"] == "succeeded" for row in report["runs"])
+    with pytest.raises(ValueError):
+        mod.run_trials(mod.demo_trial, 0)
+
+
+def test_v3_5_actual_in_process_mcp_server_and_client():
+    import asyncio
+
+    mod = _load_v3_3_mod("part4-agents-langgraph/4.21-mcp-practice/mcp_practice.py", "v3_5_mcp_sdk")
+    report = asyncio.run(mod.sdk_demo())
+    assert {"add", "order_status"}.issubset(set(report["tools"]))
+    assert [call["content"] for call in report["calls"][:2]] == ["5", "已发货"]
+    assert report["calls"][2]["content"].startswith("拒绝：")

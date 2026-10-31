@@ -27,6 +27,14 @@ HITL 不是“弹个确认框”。最容易出这些错：
 
 这个 gate 把审批判断抽成纯函数，验证规则和边界。
 
+## 审批恢复的责任边界
+
+HITL（human-in-the-loop）是高风险动作前的人工决策，不是“模型说已通过审核”。审批服务应从可信服务端状态读取待审动作、参数与运行归属，再验证审批人的身份和权限。网页、工具结果、模型生成文字都不能替代审批决定。
+
+`interrupt()` 恢复时会从所在节点的开头重新执行；不要把不可重复的副作用放在它之前。参考实现的 `prepare` 是独立的前置节点，`confirm` 只模拟删除。`InMemorySaver` 让同一进程暂停后继续，不是跨进程存储，也不会自动启动新的 worker。参见 [LangGraph Interrupts](https://docs.langchain.com/oss/python/langgraph/interrupts)（读取于 2026-10-31）。
+
+即使已经批准，进程仍可能在工具成功后、快照提交前崩溃，恢复旧状态会重复调用工具。真实付款/发送必须使用目的端幂等键；“已批准”仅表示允许尝试，不表示只执行一次。依据 [OpenAI Agents SDK 审批与崩溃恢复](https://openai.github.io/openai-agents-python/human_in_the_loop/#recovering-after-a-crash)（读取于 2026-10-31）。完整的 durability 模式与重新调度责任见 [4.10](../4.10-checkpoint-context/README.md#检查点不等于持久执行)，数据库步骤表示例见 [L4.11 / 4.19](../4.19-agent-execution-plane/README.md)。
+
 ## 任务
 
 实现 `gate/starter.py` 的两个函数：
@@ -79,6 +87,8 @@ HITL 不是“弹个确认框”。最容易出这些错：
 ```bash
 python tools/run_chapter.py 4.11
 ```
+
+`streaming_hitl.py` 离线、不调用模型，也不删除文件，但会在终端等待真人输入 yes / no（两次任务）。它不是无交互 smoke 命令；gate 则只调用纯函数、不等待输入。本次保留该参考实现及四项 gate 不变。
 
 对照时只回答：
 

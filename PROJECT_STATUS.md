@@ -3,7 +3,7 @@ project_id: ai-app-engineering
 updated: 2026-10-31
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "V3-0–V3-3 已通过并合入 master。2026-10-31 完成 V3-4 的 L4.1–L4.8 课件实施，待审核：9 个离线 gate 骨架均 0 通过，临时解 106/106 且两次输出一致；工具与章节回归 91 passed，限定范围 ruff 通过、断链 0；v2 111 unchanged，新三章 v3 unchanged；13 个入口离线 exit 0；18 次适用的 live 缺钥/不可达检查均 exit 1 无堆栈。7 个主要入口 DeepSeek live 各单次 exit 0，不写根 reports/；4.16 批准后已登记 1 条，但模型仍说待审批，该语义不算通过。历史 V3-3 记录仍保留于正文及原证据，未把单次运行当成学习完成或真实系统验收。"
+progress: "2026-10-31 V3-5（L4-B，4.2–4.12/4.15 增改与新增 4.19–4.23）已在 wip-v3-5 实施并复跑：gate 参考解 106 项全过、骨架 0 通过，pytest 103 passed，断链 0，ruff 通过；4.3/4.6/4.12 DeepSeek live 单次退出 0。V3-4 已合入 master。V3-0–V3-3 已通过并合入 master。2026-10-31 完成 V3-4 的 L4.1–L4.8 课件实施，待审核：9 个离线 gate 骨架均 0 通过，临时解 106/106 且两次输出一致；工具与章节回归 91 passed，限定范围 ruff 通过、断链 0；v2 111 unchanged，新三章 v3 unchanged；13 个入口离线 exit 0；18 次适用的 live 缺钥/不可达检查均 exit 1 无堆栈。7 个主要入口 DeepSeek live 各单次 exit 0，不写根 reports/；4.16 批准后已登记 1 条，但模型仍说待审批，该语义不算通过。历史 V3-3 记录仍保留于正文及原证据，未把单次运行当成学习完成或真实系统验收。"
 next: "审核 V3-4 的完整内容、gate 和证据；保留 9 个临时参考解，审核后再安排 V3-5。真实学习者按 workbook 闭卷练习；真实模型话术须与业务状态分别判分。真实支付、审批 UI、并发恢复、持久引擎、远端追踪与部署仍未验证。V3-3 的原 LangSmith 报告按用户决定不再恢复。"
 evidence:
   - README.md
@@ -45,6 +45,7 @@ evidence:
   - docs/v3/reviews/V3-2.md
   - docs/gate-v3-3-validation.md
   - docs/v3/reviews/V3-3.md
+  - docs/gate-v3-5-validation.md
   - docs/gate-v3-4-validation.md
 ---
 
@@ -249,3 +250,5 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 2026-10-31 DeepSeek live 补查：`deepseek-flash` 实跑 3.3/3.7/3.8 `--live`，均退出 0；3.3 平均正确性与忠实度 5.00/5，3.7 候选版本通过率 10%（基线 100%）触发回归告警，3.8 Strict/Helpful 一致率 83.3%/100%、无降级。单次运行，未加 `--update-evidence`；远端 OTLP、DeepEval、原报告恢复仍未验证。
 
 2026-10-31 完成 V3-4（L4.1–L4.8）教程实施：原生五种 workflow、有界循环、工具契约、枚举路由与 JSON 计划恢复、Pydantic AI 依赖/历史/审批/用量、并行上下文隔离、结果评分、原生与 SDK 同场景比较。9 个骨架 0 通过、临时解 106/106 且重复输出一致，工具与章节测试 91 passed，ruff/断链与标签检查结果见 `docs/gate-v3-4-validation.md`。7 个主要入口真实模型各只跑一次；4.16 首次 live 批准后记录数为1而话术仍称待审批，复核时加校验规则并复跑 live 修复该话术冲突（仅挡已知冲突，不证明整体语义）。没有调用支付，没有写根 reports/；仍待审核和真实学习/试教，不能据课件存在或离线通过宣称个人掌握。前面的历史“等待 V3-3 复核”描述保留为当时记录，以当前摘要及其通过记录为准。
+
+2026-10-31 V3-5 复跑：见 `docs/gate-v3-5-validation.md`。实施线程额度中断，由审核者补完并修复 3 处 Windows 问题（4.20 路径分隔符、4.12 SQLite 未关闭、4.19 ruff）。未验证：Docker 容器隔离实效、真实 MCP 服务、4.19–4.23 的 live 路径、4.10 的 langmem 路径。

@@ -17,15 +17,9 @@ python chapters/part4-agents-langgraph/4.3-branch-loop/gate/gate_check.py
 
 ## 为什么做这个 gate
 
-循环是图的核心，也是最容易写出死循环的地方：
+本章只新增两层退出机制：业务达标条件决定“该不该停”，`recursion_limit` 限制图执行步数，在路由或计数写错时抛 `GraphRecursionError`。它不是质量标准，也不是网络超时。
 
-- 条件边路由错，永远到不了 END；
-- 达标线写错，多跑或少跑；
-- 没有 `recursion_limit`，配置错误时无限循环；
-- 节点返回整个 state 而不是部分字段，覆盖掉别的字段；
-- 计数器不递增，退出条件永远不满足。
-
-这个 gate 用质量分自循环，验证节点、路由、循环和步数安全阀。
+是否需要图及版本边界见 [4.2](../4.2-langgraph-basics/README.md#什么时候需要图)。本仓库锁定 `langgraph==1.2.8`；细则的本机历史记录是 2026-10-27 的 `1.2.10`，不等于当前安装值（读取于 2026-10-31）。
 
 ## 任务
 
@@ -80,10 +74,12 @@ python tools/run_chapter.py 4.3 branch_loop_examples.py
 python tools/run_chapter.py 4.3 branch_loop.py
 ```
 
+两个脚本默认都离线。`branch_loop.py` 后半段用 LangChain 的脚本聊天模型生成固定工具调用，实际执行 `add`，不访问模型；要运行真实工具 Agent，显式执行 `python tools/run_chapter.py 4.3 branch_loop.py --live`。真实模型经 `common.get_llm()`，不写死模型 ID；错误可读提示、退出 1，不打印 traceback。本次属于“安全入口接线改动而非图逻辑改写”，图节点、边和历史 gate 不变；离线结果不证明模型质量。
+
 对照时只回答：
 
 1. 参考实现的 `route` 和你的返回值一致吗？
-2. 参考实现的 `recursion_limit` 例子为什么从 0 分跑到 5 分只需要 4 步？
+2. 从 0 分到 5 分要 5 轮，为什么 `recursion_limit=4` 必须报错，而不是提前判为达标？
 3. 参考实现后半段用 `tools_condition`/`ToolNode`，它们替手写循环做了什么？
 
 ## 概念地图

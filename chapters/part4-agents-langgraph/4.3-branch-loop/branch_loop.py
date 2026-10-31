@@ -20,23 +20,30 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.errors import GraphRecursionError
 from langchain_core.tools import tool
-import os
-from dotenv import load_dotenv
+import argparse
+import sys
 
-load_dotenv()   # 读 .env 里的 DEEPSEEK_API_KEY
+LIVE = False
 
 
-# —— 内联 LLM 工厂：本文件自包含，不依赖 common.py，方便单独阅读 ——
-def get_llm(temperature: float = 0.0, model: str = "deepseek-chat", **kwargs):
-    """DeepSeek 对话模型（OpenAI 兼容）。temperature=0 → 输出可复现。"""
-    from langchain_openai import ChatOpenAI
-    return ChatOpenAI(
-        model=model,
-        api_key=os.getenv("DEEPSEEK_API_KEY"),
-        base_url="https://api.deepseek.com",
-        temperature=temperature,
-        **kwargs,
-    )
+def get_llm(temperature: float = 0.0, **kwargs):
+    """离线用脚本模型；真实模型只由 --live 经公共工厂启用。"""
+    if LIVE:
+        from common import get_llm as shared_llm
+        return shared_llm(temperature=temperature, **kwargs)
+    from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+    from langchain_core.messages import AIMessage
+
+    class OfflineModel(FakeMessagesListChatModel):
+        def bind_tools(self, tools, **kwargs):
+            return self
+
+    return OfflineModel(responses=[
+        AIMessage(content="", tool_calls=[{"name": "add", "args": {"a": 18, "b": 24}, "id": "add-1"}]),
+        AIMessage(content="（离线脚本）18 + 24 = 42"),
+        AIMessage(content="", tool_calls=[{"name": "add", "args": {"a": 42, "b": 100}, "id": "add-2"}]),
+        AIMessage(content="（离线脚本）42 + 100 = 142"),
+    ])
 
 
 # ============================================================
@@ -109,7 +116,7 @@ COMPARISON = """
 """
 
 
-if __name__ == "__main__":
+def run_demos() -> None:
     print("===== 【一】分支与循环 + 防死循环 =====")
     loop = build_loop()
     print("正常循环到达标：", loop.invoke({"quality": 0, "rounds": 0}))
@@ -127,6 +134,24 @@ if __name__ == "__main__":
     r2 = app.invoke({"messages": [("user", "再加 100 呢")]}, cfg)   # 靠记忆理解"再加"
     print("第2轮（带记忆）：", r2["messages"][-1].content)
     print(COMPARISON)
+
+
+def main() -> int:
+    global LIVE
+    parser = argparse.ArgumentParser(description="状态循环与工具循环；默认离线脚本模型")
+    parser.add_argument("--live", action="store_true", help="显式调用真实模型")
+    LIVE = parser.parse_args().live
+    print("模式：真实模型" if LIVE else "模式：离线脚本模型")
+    try:
+        run_demos()
+    except Exception as exc:
+        print(f"运行失败（{type(exc).__name__}）：检查公共模型配置、依赖与网络；未生成成功结果。", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
 
 
 # ----------------------------------------------------------

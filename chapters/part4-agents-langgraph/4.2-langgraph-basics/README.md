@@ -4,7 +4,7 @@
 
 - **能力**：用 State/Node/Edge 搭线性图；用条件边把流程接成有出口的循环。
 - **v2 路径**：L4.2 / 核心（Gate；LangGraph 基础）
-- **前置**：4.1（Agent 模式）、1.1（LCEL）。
+- **前置**：4.1（Agent 模式）；已能用普通函数和循环传递状态。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。
 - **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `linear_graph.py` / `conditional_graph.py`。
 - **验收命令**：
@@ -15,16 +15,17 @@ python chapters/part4-agents-langgraph/4.2-langgraph-basics/gate/gate_check.py
 
 全部 PASS 才算通过；脚本会写 `gate/gate_report.json`。不允许改 `gate_check.py` 绕过检查。
 
+## 什么时候需要图
+
+当流程需要显式状态、复杂分支、检查点恢复或人工介入时，再考虑状态图。简单的“调用函数 → 传结果 → 返回”先用普通代码；有 `if` / `while` 不代表必须引入图。
+
+Thoughtworks 雷达 Vol.34 把 LangGraph 从 Adopt 调到 Trial：不是说图无用，而是不再把“刚性图 + 巨大全局共享状态”当成所有 Agent 的默认答案。先让简单 Agent 通过代码交换所需信息，需要时才加图，通常更容易推理、测试和调试。见 [LangGraph 雷达条目](https://www.thoughtworks.com/radar/languages-and-frameworks/langgraph)（读取于 2026-10-31）。
+
+本组四章属于 v3 L4.9，共 8h 增补阅读与练习；保留下面历史 gate 的独立时间盒与接口。仓库 [`requirements.txt`](../../../requirements.txt) 锁定 `langgraph==1.2.8`；2026-10-31 的本机包元数据核对记录也是 `1.2.8`。细则记录的 2026-10-27 本机历史值 `1.2.10` 不是当前值。锁定版本与本机版本仍可能随环境变化，复现以锁定集为准。
+
 ## 为什么做这个 gate
 
-线性图只是“用图写管道”。真正的价值在分支/循环，而循环必须有出口：
-
-- 状态字段缺失，节点一读就崩；
-- 条件边路由错，循环不终止；
-- 图之间共享可变状态，结果互相污染；
-- 从中间状态恢复时，计数不对。
-
-这个 gate 用最小图验证状态传递、分支循环和状态隔离。
+本章只建立 State（跨步骤数据）、Node（返回局部更新的函数）、Edge（下一步走向）三件套，再用最小循环检查状态传递与隔离。循环退出条件的设计留给 4.3，合并规则留给 4.4，不在这里重复框架选型背景。
 
 ## 任务
 
@@ -79,6 +80,8 @@ python tools/run_chapter.py 4.2 graph_basics.py
 python tools/run_chapter.py 4.2 linear_graph.py
 python tools/run_chapter.py 4.2 conditional_graph.py
 ```
+
+以上三个脚本都离线、不调用模型。历史参考文件里把 LCEL 写成对照对象；在 v3 主线中，把它理解为“顺序函数组合”即可，不必先学 LCEL。
 
 对照时只回答：
 

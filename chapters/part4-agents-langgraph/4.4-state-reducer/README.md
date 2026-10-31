@@ -17,15 +17,9 @@ python chapters/part4-agents-langgraph/4.4-state-reducer/gate/gate_check.py
 
 ## 为什么做这个 gate
 
-默认合并是“覆盖”。一旦要累加或 fan-out，就会出问题：
+本章只新增“字段怎样合并”：顺序写入默认覆盖；需要累积时给字段声明 reducer（旧值与增量合成新值的函数）。同一步多分支写入同一普通字段会抛 `InvalidUpdateError`，不能把它误解成“最后完成者覆盖其他分支”。稳定业务顺序应显式带序号，再在消费端排序。
 
-- 后一个节点把前一个节点的结果冲掉；
-- 多个分支同一步写同一字段，框架抛 `InvalidUpdateError`；
-- 自定义 reducer 不校验参数，窗口大小写错；
-- reducer 只保证“不丢”，却误以为“有序”；
-- 节点返回整个 state，覆盖掉别的字段。
-
-这个 gate 用最小图验证覆盖/累加/fan-out/滑动窗口。
+是否需要图及版本边界见 [4.2](../4.2-langgraph-basics/README.md#什么时候需要图)。本仓库锁定 `langgraph==1.2.8`；细则的本机历史记录是 2026-10-27 的 `1.2.10`，不等于当前安装值（读取于 2026-10-31）。
 
 ## 任务
 
@@ -83,6 +77,8 @@ python chapters/part4-agents-langgraph/4.4-state-reducer/gate/gate_check.py
 ```bash
 python tools/run_chapter.py 4.4
 ```
+
+`state_reducer.py` 全程离线。保留的历史示例中，`FanStateNoReducer` 的行内“最后写入胜出”注释不适用于同一步 fan-out，以实际的 `InvalidUpdateError` 演示为准；`keep_last_n` 示例也未校验 n，闭卷实现仍必须满足本页 n<1 报错的契约。
 
 对照时只回答：
 

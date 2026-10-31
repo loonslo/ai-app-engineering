@@ -187,7 +187,7 @@
 - **LangChain 降为一章**：L4.16 框架素养，讲 `create_agent`、middleware、Deep Agents、LangSmith，并配一个用 `create_agent` 重写工具循环的练习，保证招聘关键词有实操支撑。
 - **保留框架对照**：1.5、2.3、2.8、4.5 的旧 LangChain 版本改名为 `*_langchain.py` 保留；4.14 的 `langgraph_supervisor.py` 保留为 LangGraph 对照版。
 - **移出主线**：LCEL / Runnable 链作为主实现、`langchain_classic` 旧检索器、`langchain_community` 集成、AutoGen（已进入维护模式）、OpenAI Assistants API（已下线）。
-- **不改**：仓库目录名与 project_id `langchain-learning`（工作区状态契约依赖它）；README 标题在 V3-10 修改。
+- **仓库名**：目录名与 project_id 为 `ai-app-engineering`（工作区状态契约依赖它）；README 标题已与内容一致。
 
 ### 6.3 依赖变化
 

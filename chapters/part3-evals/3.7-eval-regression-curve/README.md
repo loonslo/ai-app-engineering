@@ -4,7 +4,7 @@
 
 - **目标**：在同一批问题上对比基线（Baseline）与候选（Candidate）系统，计算质量指标、P50/P99 延迟与异常率，识别质量退化告警，掌握 pass@k 与 pass^k 的场景选型，构建可用于 CI 的回归门禁。
 - **v2 路径**：L3.6 / 核心（Gate；回归对比）
-- **前置**：2.3、3.2。
+- **前置**：2.6（被测检索与来源追踪）、3.2。
 - **环境**：默认完全离线运行；带 `--live` 可发起真实模型调用。
 - **命令**：`python chapters/part3-evals/3.7-eval-regression-curve/gate/gate_check.py`
 
@@ -86,14 +86,14 @@ python chapters/part3-evals/3.7-eval-regression-curve/gate/gate_check.py
 1. **能力评测（Capability Evals）**：
    - **目标**：摸索模型或系统在复杂、长尾、新引入任务场景下的表现边界。
    - **特性**：初期通过率可能较低，重点在于观察迭代改进趋势。
-   - **度量**：常关注 **pass@k**——在 $k$ 次独立尝试中只要有 1 次成功即可（适合提供多样化备选答案、允许重试的场景；在编程基准测试中，开发实践通常重点关注首次通过率 pass@1）。
+   - **度量**：本章的判断是能力评测常关注 **pass@k**——在 $k$ 次独立尝试中只要有 1 次成功即可（适合提供多样化备选答案、允许重试的场景；在编程基准测试中，开发实践通常重点关注首次通过率 pass@1）。这是本章的工程判断，不是 Anthropic 原文的固定对应。
 
 2. **回归评测（Regression Evals）**：
    - **目标**：守住系统在已上线业务、核心查询和关键合规用例中的基线。
    - **特性**：预期通过率应维持在高位（如 $\ge 95\%$ 或 $100\%$）。在发布门禁中，核心指标下降即为明显的退化信号。
-   - **度量**：适合关注 **pass^k（pass-all-k）**——单次成功率为 $p$ 时连续 $k$ 次独立试验全部成功的概率（$p^k$）。对于面向客户的企业客服、交易下单等需要高稳定性的场景，单次 95% 通过率在连续独立执行 5 次时复合全通率约为 $77.4\%$（$0.95^5$），稳定交付需关注连续通过率。
+   - **度量**：本章的判断是回归与面向客户的场景更关注 **pass^k（pass-all-k）**——单次成功率为 $p$ 时连续 $k$ 次独立试验全部成功的概率（$p^k$）。对于面向客户的企业客服、交易下单等需要高稳定性的场景，单次 95% 通过率在连续独立执行 5 次时复合全通率约为 $77.4\%$（$0.95^5$），稳定交付需关注连续通过率。
 
-> **行业参考**：关于 pass@k 与 pass^k 的场景选型讨论，可参考 Anthropic 评测指南《Demystifying evals for AI agents》（[Anthropic 官网](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)，2026-01-09；读取日期：2026-10-30）。将评测套件划分为能力集与回归集属于工程落地的测试策略。
+> **行业参考**：Anthropic 评测指南《Demystifying evals for AI agents》（[Anthropic 官网](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)，2026-01-09；读取日期：2026-10-31）的选择依据是按产品需求：只要一次成功就够用时用 pass@k（编码最看重 pass@1），要求每次都可靠时用 pass^k；原文并没有把“能力评测”与“回归评测”固定对应到两个指标。上面的对应关系是本章的工程判断；将评测套件划分为能力集与回归集也属于工程落地的测试策略。
 
 ## 通过后对照参考实现
 
@@ -117,6 +117,8 @@ python tools/run_chapter.py 3.7 --write-failures
 # 指定自定义评测用例集
 python tools/run_chapter.py 3.7 --cases path/to/eval_set.json
 ```
+
+失败记录含 `mode` 字段（`offline` / `live`）。3.10 仍按有没有 `retrieval_context` 推断来源；用 3.7 离线写出的失败库时，请给 3.10 显式加 `--mode offline`，否则真实检索上下文会被误判为 live 产物。
 
 对照时思考：
 1. 原生参考实现如何脱离 LCEL 完成 Baseline 与 Candidate 的对照并统计 P50/P99 耗时？

@@ -82,7 +82,7 @@ def render_markdown(task: ProjectTask) -> str:
         "所有路径都相对于仓库根目录，所有命令都从这里运行：",
         "",
         "```powershell",
-        r"cd D:\workspace\langchain-learning",
+        r"cd D:\workspace\ai-app-engineering",
         f"python tools/materialize.py flagship {target} --diff",
         "```",
         "",

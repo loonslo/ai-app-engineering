@@ -4,7 +4,7 @@
 
 - **能力**：用 LLM 评语义正确性/忠实度，解析结构化裁决，并用人工标签校准裁判。
 - **v2 路径**：L3.4 / 核心（Gate；Judge 校准）
-- **前置**：1.3（结构化输出）、3.2（基础评测）；真实跑裁判时还需要 `DEEPSEEK_API_KEY`。
+- **前置**：1.3（结构化输出）、3.2（基础评测）、2.6（被测 RAG 与来源追踪）；真实跑裁判时还需要 `DEEPSEEK_API_KEY` 与本地 embedding 模型。
 - **时间盒**：6 小时（1h 读 + 3h 实现 + 2h 校准与失败分析）。
 - **闭卷规则**：只读本页、`gate/starter.py`；**通过 gate 之前不要打开** `llm_judge.py`。
 - **验收命令**：
@@ -94,6 +94,10 @@ python tools/run_chapter.py 3.3
 2. 为什么在两两对比中需要通过“候选位置互换（Position Swap）”来减轻裁判的位置偏见？
 3. 当人工标签与裁判判定存在系统性偶然重合时，Cohen's Kappa（κ）相比粗略一致率（Agreement）提供了什么额外价值？
 
+## 在线评测与被测系统
+
+`--live` 不再评写死的演示题：它读取 `chapters/shared-data/eval_set_full.json`（没有时读 `eval_set.json`），只保留有标准答案、非拒答的题；检索与生成复用 2.6 的 `build_retriever` / `build_rag_chain`，再分别用正确性与忠实度两个 Prompt 打分，最后输出两个维度的平均分。评测集或本地 embedding 模型缺失时给出可读提示并以 1 退出。
+
 ## 判分器分级与工程选型阶梯
 
 在质量评测体系中，判分机制通常建议遵循由轻到重的选型阶梯：
@@ -107,7 +111,7 @@ python tools/run_chapter.py 3.3
    - **手段**：利用大模型依据预设 Rubric（打分量表）评估语义正确性、忠实度、回答完整度等需要语言理解的维度。
    - **局限**：存在自相矛盾、格式脆弱、长度偏见（偏好冗长文本）与位置偏见（Position Bias）。
    - **原则**：规则难以覆盖的灵活语义理解场景采用 LLM Judge，且应结合结构化输出工具（Tool Calling）与重试边界。
-   - **DeepSeek 思考模式与工具调用**：使用 DeepSeek 模型进行工具评测时，若开启了思考模式（Thinking Mode），强制 `tool_choice` 会触发 400 错误（`Thinking mode does not support this tool_choice`）。在工程调用中，应通过 `extra_body={"thinking": {"type": "disabled"}}` 显式禁用思考模式，或平滑回退至 `tool_choice="auto"`。
+   - **DeepSeek 思考模式与工具调用**：使用 DeepSeek 模型进行工具评测时，若开启了思考模式（Thinking Mode），强制 `tool_choice` 会触发 400 错误。在工程调用中，应通过 `extra_body={"thinking": {"type": "disabled"}}` 显式禁用思考模式，或平滑回退至 `tool_choice="auto"`。思考模式开关的写法见 [DeepSeek 思考模式文档](https://api-docs.deepseek.com/zh-cn/guides/thinking_mode/)（读取于 2026-10-31）；错误原文 `Thinking mode does not support this tool_choice` 是审核复现时服务端实际返回的文本，不是文档引文。
 
 3. **人工校准（Human-in-the-loop Calibration）**：
    - **手段**：业务专家或标注员对评测样本进行抽样标注，提供金标准参照。

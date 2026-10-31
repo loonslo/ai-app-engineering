@@ -30,9 +30,9 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import re
 import sys
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +54,12 @@ except ImportError:
         chat_model_name,
         get_openai_client,
     )
+
+# 复用 2.6 的原生检索器：被测系统必须与前序章节一致，不在本章另写关键词匹配。
+PDF_SOURCES_DIR = Path(__file__).resolve().parents[2] / "part2-rag" / "2.6-pdf-sources"
+if str(PDF_SOURCES_DIR) not in sys.path:
+    sys.path.insert(0, str(PDF_SOURCES_DIR))
+from pdf_sources import build_retriever, format_context  # noqa: E402
 
 # 默认拒答关键词列表
 REFUSE_KEYWORDS = ["无法回答", "没有提到", "信息不足", "不知道", "无相关", "资料未提供"]
@@ -275,19 +281,16 @@ def split_suites(
 
 # --------------------------- 本地轻量原生检索与生成 ---------------------------
 
-def retrieve_chunks(query: str, top_k: int = 2) -> list[str]:
-    """从本地 SAMPLE_DOC 检索相关文本块。"""
-    if not SAMPLE_DOC.exists():
-        return ["RAG 是检索增强生成，先从外部知识库检索相关分块，再拼装上下文交由模型生成回答。"]
-    raw = SAMPLE_DOC.read_text(encoding="utf-8")
-    chunks = [c.strip() for c in raw.split("\n\n") if c.strip()]
-    q_words = set(re.findall(r"\w+", query.lower()))
-    scored = []
-    for c in chunks:
-        score = sum(1 for w in q_words if w in c.lower())
-        scored.append((score, c))
-    scored.sort(key=lambda x: x[0], reverse=True)
-    return [c for s, c in scored[:top_k] if s > 0] or chunks[:1]
+@lru_cache(maxsize=1)
+def get_retriever() -> Any:
+    """构建 2.6 的原生检索器；进程内只加载一次，避免每条用例重复建索引。"""
+    return build_retriever(SAMPLE_DOC, k=2)
+
+
+def retrieve_context(query: str) -> str:
+    """用 2.6 的检索器召回文档分块，并按 2.6 的来源格式拼装上下文。"""
+    docs = get_retriever().invoke(query)
+    return format_context(docs)
 
 
 def run_system_live(
@@ -298,8 +301,7 @@ def run_system_live(
 ) -> dict[str, Any]:
     """在 live 模式下发起单次系统调用并捕获可能出现的异常。"""
     q = case["question"]
-    chunks = retrieve_chunks(q)
-    context = "\n".join(chunks)
+    context = retrieve_context(q)
 
     if not is_candidate:
         # Baseline：要求严格依据上下文并标注来源
@@ -342,8 +344,7 @@ def run_system_offline(
 ) -> dict[str, Any]:
     """在离线模式下提供按题目编写的确定性输出，对比 Baseline 与 Candidate 的指标差异。"""
     q = case["question"]
-    chunks = retrieve_chunks(q)
-    context = "\n".join(chunks)
+    context = retrieve_context(q)
     should_refuse = case.get("should_refuse", False)
     case_id = case.get("id") or case.get("case_id", "")
 
@@ -432,8 +433,16 @@ def main() -> int:
         print("[离线演示] 采用确定性离线生成对比 Baseline 与 Candidate 的回归表现。")
         print("[离线演示] 延迟指标采用模拟固定时钟值，真实物理耗时见 --live 模式。\n")
 
+    try:
+        get_retriever()
+    except Exception as exc:
+        print(f"[配置错误] 无法构建 2.6 检索器：{exc}", file=sys.stderr)
+        print("3.7 的检索复用 2.6，需要本地 embedding 模型；准备方法见根目录 README。", file=sys.stderr)
+        return 1
+
     baseline_rows = []
     candidate_rows = []
+    run_mode = "live" if args.live else "offline"
 
     for idx, case in enumerate(cases, start=1):
         c_id = case.get("id") or case.get("case_id", f"case_{idx:02d}")
@@ -456,6 +465,7 @@ def main() -> int:
             "type": c_type,
             "question": q,
             "reference": ref,
+            "mode": run_mode,
             "retrieval_context": base_out.get("retrieval_context", ""),
             "answer": base_out["answer"],
             "latency_ms": base_out["latency_ms"],
@@ -481,6 +491,7 @@ def main() -> int:
             "type": c_type,
             "question": q,
             "reference": ref,
+            "mode": run_mode,
             "retrieval_context": cand_out.get("retrieval_context", ""),
             "answer": cand_out["answer"],
             "latency_ms": cand_out["latency_ms"],

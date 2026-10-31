@@ -36,6 +36,7 @@ from typing import Any, Callable
 try:
     from common import (
         SAMPLE_DOC,
+        SHARED_DATA_DIR,
         chat_model_name,
         get_openai_client,
     )
@@ -45,9 +46,16 @@ except ImportError:
         sys.path.insert(0, str(REPO_ROOT))
     from common import (
         SAMPLE_DOC,
+        SHARED_DATA_DIR,
         chat_model_name,
         get_openai_client,
     )
+
+# 复用 2.6 的原生检索与 RAG 链：被测系统必须是前序章节的真实实现，而不是本章另写一套关键词匹配。
+PDF_SOURCES_DIR = Path(__file__).resolve().parents[2] / "part2-rag" / "2.6-pdf-sources"
+if str(PDF_SOURCES_DIR) not in sys.path:
+    sys.path.insert(0, str(PDF_SOURCES_DIR))
+from pdf_sources import build_rag_chain, build_retriever, format_context  # noqa: E402
 
 
 # --------------------------- 异常与数据结构 ---------------------------
@@ -513,33 +521,43 @@ def calibrate(
     }
 
 
-# --------------------------- 本地轻量原生 RAG 生成与检索 ---------------------------
+# --------------------------- 被测 RAG：复用 2.6 的检索与生成 ---------------------------
 
-def retrieve_context_offline(question: str) -> str:
-    """从本地样本知识库读取检索上下文。"""
-    if SAMPLE_DOC.exists():
-        raw = SAMPLE_DOC.read_text(encoding="utf-8")
-        # 简单按段落检索
-        paragraphs = [p.strip() for p in raw.split("\n\n") if p.strip()]
-        q_words = set(re.findall(r"\w+", question.lower()))
-        scored = []
-        for p in paragraphs:
-            score = sum(1 for w in q_words if w in p.lower())
-            scored.append((score, p))
-        scored.sort(key=lambda x: x[0], reverse=True)
-        return scored[0][1] if scored and scored[0][0] > 0 else raw[:300]
-    return "检索增强生成（RAG）结合外部向量知识库与大语言模型，先召回相关分块再回答。"
+def build_rag_system() -> tuple[Any, Any]:
+    """构建 2.6 的原生检索器与 RAG 链（本地 embedding，不发起模型调用）。"""
+    retriever = build_retriever(SAMPLE_DOC, k=3)
+    rag_chain = build_rag_chain(retriever, temperature=0.0)
+    return retriever, rag_chain
 
 
-def generate_rag_answer_live(client: Any, model: str, question: str, context: str) -> str:
-    """在 live 模式下真实请求被测系统生成回答。"""
-    prompt = f"请严格基于以下上下文回答问题。上下文：\n{context}\n问题：{question}"
-    res = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.0,
+def retrieve_context(retriever: Any, question: str) -> str:
+    """用 2.6 的检索器召回文档分块，并按 2.6 的来源格式拼装上下文。"""
+    docs = retriever.invoke(question)
+    return format_context(docs)
+
+
+def load_eval_set() -> list[dict]:
+    """读取 3.4、3.5 生成的共享评测集，只保留有标准答案、非拒答的题。
+
+    优先 `eval_set_full.json`，其次 `eval_set.json`；两个文件都没有时给出可读错误，
+    不再退回写死的 2 道演示题。
+    """
+    for name in ("eval_set_full.json", "eval_set.json"):
+        path = SHARED_DATA_DIR / name
+        if not path.exists():
+            continue
+        data = json.loads(path.read_text(encoding="utf-8"))
+        cases = [
+            case
+            for case in data
+            if case.get("reference") and not case.get("should_refuse", False)
+        ]
+        if cases:
+            return cases
+    raise FileNotFoundError(
+        f"未找到共享评测集（{SHARED_DATA_DIR / 'eval_set_full.json'}）；"
+        "请先运行 3.4、3.5 生成评测集，或检查 chapters/shared-data/。"
     )
-    return res.choices[0].message.content or ""
 
 
 # --------------------------- 主程序 ---------------------------
@@ -560,7 +578,13 @@ def main() -> int:
 
         q = "什么是检索增强生成（RAG）？"
         ref = "RAG 是检索增强生成，先从外部知识库检索相关分块，再拼装上下文交由模型生成准确答案。"
-        ctx = retrieve_context_offline(q)
+        try:
+            retriever, _ = build_rag_system()
+        except Exception as exc:
+            print(f"[配置错误] 无法构建 2.6 RAG 检索器：{exc}", file=sys.stderr)
+            print("离线演示同样使用 2.6 的本地 embedding 检索，请先准备本地 embedding 模型。", file=sys.stderr)
+            return 1
+        ctx = retrieve_context(retriever, q)
         ans = "RAG 是检索增强生成技术。它先检索知识库中的文档片段，再利用这些片段生成回答，能显著减少幻觉。"
 
         print(f"【被测题目】: {q}")
@@ -595,7 +619,7 @@ def main() -> int:
         print(f"轮次 1 正序 [A, B] 优胜方: {swap_res['round_1_winner']}")
         print(f"轮次 2 逆序 [B, A] 优胜方: {swap_res['round_2_winner']} (映射对应候选: {swap_res['actual_round_2_preference']})")
         print(f"判定结果: consistent={swap_res['consistent']}, position_bias_detected={swap_res['position_bias_detected']}")
-        print(f"最终共识判决: {swap_res['consensus_winner']}（检测到首位偏见，有效避免误判 A 为绝对优胜）")
+        print(f"最终共识判决: {swap_res['consensus_winner']}（两轮结果不一致，判定为无法确定优劣）")
 
         # 合成示范集校准
         print("\n--- 3. 裁判校准评估报告（合成示范集）---")
@@ -622,28 +646,33 @@ def main() -> int:
         print("请检查环境变量或 .env 配置。", file=sys.stderr)
         return 1
 
-    # 读取测试样本
-    eval_cases = [
-        {
-            "question": "RAG 是什么？",
-            "reference": "RAG 是检索增强生成，先从外部知识库检索相关内容，再拼装上下文交由大模型生成回答。",
-        },
-        {
-            "question": "向量检索在 RAG 中起到什么作用？",
-            "reference": "向量检索将文本转化为高维向量，通过计算相似度在知识库中快速召回语义相关的文档分块。",
-        },
-    ]
+    # 读取 3.4、3.5 生成的共享评测集，并构建 2.6 的被测 RAG
+    try:
+        eval_cases = load_eval_set()
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"[数据错误] 无法加载共享评测集：{exc}", file=sys.stderr)
+        return 1
 
-    print(f"使用模型: {model}，正在评测 {len(eval_cases)} 条真实 RAG 用例（双维度打分）...\n")
+    try:
+        retriever, rag_chain = build_rag_system()
+    except Exception as exc:
+        print(f"[配置错误] 无法构建 2.6 RAG 检索链：{exc}", file=sys.stderr)
+        print("在线评测需要本地 embedding 模型；准备方法见根目录 README。", file=sys.stderr)
+        return 1
+
+    print(f"使用模型: {model}，正在评测 {len(eval_cases)} 条共享评测集用例（2.6 检索 + 双维度打分）...\n")
+
+    correctness_scores: list[int] = []
+    faithfulness_scores: list[int] = []
 
     for idx, c in enumerate(eval_cases, start=1):
         q = c["question"]
         ref = c["reference"]
-        ctx = retrieve_context_offline(q)
 
         try:
             print(f"--- 用例 {idx}/{len(eval_cases)}: {q} ---")
-            ans = generate_rag_answer_live(client, model, q, ctx)
+            ctx = retrieve_context(retriever, q)
+            ans = rag_chain.invoke(q)
             print(f"被测系统回答: {ans[:80]}...")
 
             # 1. 答案正确性评测
@@ -655,10 +684,19 @@ def main() -> int:
             p_faith = build_faithfulness_prompt(q, ans, ctx)
             verdict_f = run_native_judge_eval(client, model, p_faith)
             print(f"  [忠实度 Faithfulness]: {verdict_f['score']}/5 —— {verdict_f['reason']}\n")
+
+            correctness_scores.append(verdict_c["score"])
+            faithfulness_scores.append(verdict_f["score"])
         except Exception as exc:
             print(f"[评测失败] 用例 '{q}' 请求模型或打分出错：{exc}", file=sys.stderr)
             return 1
 
+    avg_correct = sum(correctness_scores) / len(correctness_scores)
+    avg_faith = sum(faithfulness_scores) / len(faithfulness_scores)
+    print("--- 汇总 ---")
+    print(f"评测用例数: {len(eval_cases)}")
+    print(f"平均正确性: {avg_correct:.2f}/5")
+    print(f"平均忠实度: {avg_faith:.2f}/5")
     print("[在线评测完成] 真实大模型裁判双维度打分执行完毕。")
     return 0
 

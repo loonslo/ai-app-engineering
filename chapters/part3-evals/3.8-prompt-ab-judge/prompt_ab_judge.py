@@ -14,15 +14,20 @@
      * citation_score：预期来源标识命中比例（无来源记 1.0）；
      * refusal_alignment：拒答行为与用例预期对齐度（1.0 / 0.0）。
 3. LLM-as-judge 与人工一致性校验：
-   - 采用结构化打分标准（1~5 分量表与 passed 判定）；
+   - live 模式复用 3.3 的 run_native_judge_eval（关闭思考模式，只在思考模式冲突的 400 时降级），
+     不再在调用失败后静默改用规则打分；
    - 对比人工标注分数（manual_score >= 4 记为人工合格），计算判断一致率（Agreement Rate）与 Cohen's Kappa；
-   - 生成本地分析报告 reports/prompt_ab_judge_agreement.json 供流水线验证。
+   - 人工标签只有一类时 κ 无定义，报告为“不可计算”并说明原因；
+   - 默认只写章节目录下的 reports/；只有 live 运行并显式加 --update-evidence 才更新仓库根目录
+     reports/prompt_ab_judge_agreement.json，报告记录 mode、模型 ID、生成时间与 judge 来源。
 
 运行模式：
   默认离线模式（无需外部 API Key，运行确定性样本评估与指标计算）：
     python tools/run_chapter.py 3.8
   在线真实模型调用（显式开启 --live，需配置模型环境变量）：
     python tools/run_chapter.py 3.8 --live
+  在线运行并更新仓库根目录的证据文件（仅此路径会写根 reports/）：
+    python tools/run_chapter.py 3.8 --live --update-evidence
 ==========================================================
 """
 
@@ -32,12 +37,19 @@ import argparse
 import json
 import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+# 复用 3.3 的裁判调用：关闭思考模式、只在思考模式冲突的 400 时降级、失败会抛出而不是静默吞掉。
+JUDGE_DIR = Path(__file__).resolve().parents[1] / "3.3-llm-judge"
+if str(JUDGE_DIR) not in sys.path:
+    sys.path.insert(0, str(JUDGE_DIR))
+from llm_judge import run_native_judge_eval  # noqa: E402
 
 try:
     from common import (
@@ -134,12 +146,13 @@ PROMPT_AB_CASES = [
     },
     # --- 用例 3：拒答规范（元问题）---
     # 问题问的是"应该怎么回答"，所以不应拒答，而要给出规范说明。
+    # 措辞避开拒答特征词，规则判分才能和人工标签一致，不需要按题目写特判。
     {
         "id": "ab_048",
         "type": "prompt_ab",
-        "question": "上下文不足时应该怎么回答？",
-        "reference": "应拒答或说明信息不足，不能编造。",
-        "keywords": ["不足", "无法回答", "编造"],
+        "question": "资料里找不到答案时，助手应该怎么处理？",
+        "reference": "应说明资料中没有相关信息，避免猜测或编造。",
+        "keywords": ["资料", "猜测", "编造"],
         "expected_sources": [SOURCE_NAME],
         "should_refuse": False,
         "manual_score": 5,
@@ -231,6 +244,30 @@ PROMPT_AB_CASES = [
         "manual_score": 4,
         "expected_winner": "tie",
     },
+    # --- 用例 11、12：人工判为不合格的负向样本，用来让 κ 可计算 ---
+    # 两版都给出没有依据、也没有引用的回答；人工标注 2 分（不合格）。
+    {
+        "id": "ab_056",
+        "type": "prompt_ab",
+        "question": "退款一般多久到账？",
+        "reference": "退款一般 3 个工作日到账。",
+        "keywords": ["退款", "工作日"],
+        "expected_sources": [SOURCE_NAME],
+        "should_refuse": False,
+        "manual_score": 2,
+        "expected_winner": "tie",
+    },
+    {
+        "id": "ab_057",
+        "type": "prompt_ab",
+        "question": "如何评估 RAG 的召回质量？",
+        "reference": "用命中率、召回率和人工抽检评估。",
+        "keywords": ["召回", "命中率"],
+        "expected_sources": [SOURCE_NAME],
+        "should_refuse": False,
+        "manual_score": 2,
+        "expected_winner": "tie",
+    },
 ]
 
 # --------------------------- 评测基础函数（Gate 接口） ---------------------------
@@ -291,7 +328,7 @@ def format_docs(docs: list[dict]) -> str:
 
 # --------------------------- 生成回答（Strict 与 Helpful） ---------------------------
 
-# 离线确定性回答库（覆盖全部 10 个用例）
+# 离线确定性回答库（覆盖全部用例，含 2 条人工不合格的负向样本）
 OFFLINE_PRESETS: dict[str, dict[str, str]] = {
     "ab_046": {
         "strict": "RAG 是检索增强生成，先检索相关内容，再交给模型生成答案。【来源：prompt_comparison_notes】",
@@ -302,8 +339,8 @@ OFFLINE_PRESETS: dict[str, dict[str, str]] = {
         "helpful": "RAG 特别适合知识经常更新、对可解释性与溯源有强要求的业务，以及不能仅依赖大模型内部记忆回答的问答场景 [来源：prompt_comparison_notes]。",
     },
     "ab_048": {
-        "strict": "当上下文不足时，RAG 助手应该明确说明信息不足，无法回答，绝不能随意编造。【来源：prompt_comparison_notes】",
-        "helpful": "遇到上下文信息不足的情况时，应当坦诚提示信息不足、无法回答，解释原因并避免模型虚构编造 [来源：prompt_comparison_notes]。",
+        "strict": "应说明资料中没有相关信息，并避免猜测或编造。【来源：prompt_comparison_notes】",
+        "helpful": "遇到资料中没有相关信息的情况，助手应坦诚说明，并建议用户补充资料，而不是猜测或编造 [来源：prompt_comparison_notes]。",
     },
     "ab_049": {
         "strict": "应与人工标注进行一致性核验，若一致率太低则不能轻信。【来源：prompt_comparison_notes】",
@@ -332,6 +369,15 @@ OFFLINE_PRESETS: dict[str, dict[str, str]] = {
     "ab_055": {
         "strict": "不行，必须结合人工抽样标注做一致性校验，防范 judge 产生的机器偏差。【来源：prompt_comparison_notes】",
         "helpful": "不能单独依赖 judge 评估，必须引入人工质检标注进行一致性复核，以防止大模型裁判自身固有的幻觉与位置偏差 [来源：prompt_comparison_notes]。",
+    },
+    # 负向样本：两版都给出没有依据、也没有引用的回答，人工标注为不合格。
+    "ab_056": {
+        "strict": "资金会原路退回，请耐心等待。",
+        "helpful": "款项将退回您的支付账户，具体时间以银行处理为准。",
+    },
+    "ab_057": {
+        "strict": "需要持续观察线上表现。",
+        "helpful": "可以结合业务反馈综合判断。",
     },
 }
 
@@ -393,76 +439,32 @@ def generate_answer_live(
 
 # --------------------------- LLM-as-judge 与一致性校验 ---------------------------
 
-JUDGE_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "judge_verdict",
-        "description": "评估 RAG 候选回答在正确性、来源与拒答上的表现打分",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "score": {"type": "integer", "description": "1 到 5 分评价，4~5 分为及格", "minimum": 1, "maximum": 5},
-                "passed": {"type": "boolean", "description": "回答是否达到上线合格标准"},
-                "reason": {"type": "string", "description": "打分核心理由与扣分点简述"},
-            },
-            "required": ["score", "passed", "reason"],
-        },
-    },
-}
+def _build_judge_prompt(case: dict, answer: str) -> str:
+    """构造与 3.3 裁判工具兼容的单条裁决 Prompt（1~5 分，4 分及以上视为合格）。"""
+    return (
+        f"你是 RAG 问答质量裁判。请比对问题、参考答案、要求来源与模型实际回答，执行客观裁决：\n"
+        f"问题：{case['question']}\n"
+        f"参考答案：{case['reference']}\n"
+        f"要求关键词：{case.get('keywords', [])}\n"
+        f"要求来源：{case.get('expected_sources', [])}\n"
+        f"是否应当拒答：{case.get('should_refuse', False)}\n"
+        f"模型实际回答：{answer}\n\n"
+        f"评分 Rubric 规则：\n"
+        f"- 5分：完全正确覆盖参考要点、来源/拒答完全对齐、无幻觉。\n"
+        f"- 4分：基本正确但有轻微冗余或用词欠佳。\n"
+        f"- 3分：核心要点部分缺失或拒答不够果断。\n"
+        f"- 2分：答非所问、遗漏关键事实或未按要求引用来源。\n"
+        f"- 1分：严重事实错误、严重幻觉或应拒答而编造。\n"
+        f"4 分及以上视为人工合格；请调用 submit_verdict 提交 score 与 reason。"
+    )
 
 
-def judge_answer(
-    case: dict,
-    answer: str,
-    client: Any = None,
-    model: str = "",
-) -> dict[str, Any]:
-    """对生成的单条回答执行 LLM Judge 评分（支持离线确定性与在线调用）。"""
-    if client is not None:
-        judge_prompt = (
-            f"你是 RAG 问答质量裁判。请比对问题、参考答案、要求来源与模型实际回答，执行客观裁决：\n"
-            f"问题：{case['question']}\n"
-            f"参考答案：{case['reference']}\n"
-            f"要求关键词：{case.get('keywords', [])}\n"
-            f"要求来源：{case.get('expected_sources', [])}\n"
-            f"是否应当拒答：{case.get('should_refuse', False)}\n"
-            f"模型实际回答：{answer}\n\n"
-            f"评分 Rubric 规则：\n"
-            f"- 5分：完全正确覆盖参考要点、来源/拒答完全对齐、无幻觉。passed=True\n"
-            f"- 4分：基本正确但有轻微冗余或用词欠佳。passed=True\n"
-            f"- 3分：核心要点部分缺失或拒答不够果断。passed=False\n"
-            f"- 2分：答非所问、遗漏关键事实或未按要求引用来源。passed=False\n"
-            f"- 1分：严重事实错误、严重幻觉或应拒答而编造。passed=False"
-        )
-        try:
-            res = client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": judge_prompt}],
-                tools=[JUDGE_TOOL],
-                tool_choice={"type": "function", "function": {"name": "judge_verdict"}},
-                temperature=0.0,
-            )
-            tool_calls = res.choices[0].message.tool_calls
-            if tool_calls:
-                args = json.loads(tool_calls[0].function.arguments)
-                return {
-                    "score": int(args.get("score", 3)),
-                    "passed": bool(args.get("passed", False)),
-                    "reason": str(args.get("reason", "")),
-                }
-        except Exception as exc:
-            print(f"[警告] Judge 模型调用异常：{exc}，转入保底离线规则打分", file=sys.stderr)
-
-    # 离线确定性打分规则（Rubric 确定性实现）
+def _rule_verdict(case: dict, answer: str) -> dict[str, Any]:
+    """离线确定性规则打分；仅用于离线演练或 live 裁判失败后的显式降级。"""
     should_refuse = case.get("should_refuse", False)
     kw_score = keyword_score(answer, case.get("keywords", []))
     cit_score = citation_score(answer, case.get("expected_sources", []))
     ref_ok = refusal_alignment(answer, should_refuse)
-
-    # 元问题特例（ab_048）：询问"应该怎么回答"，回答包含"无法回答"字样属于引用规范而非模型拒答
-    if case.get("id") == "ab_048":
-        if kw_score >= 0.67 and cit_score >= 0.67:
-            return {"score": 5, "passed": True, "reason": "正确阐述了上下文不足时的拒答与防编造规范（元问题）"}
 
     if should_refuse:
         if ref_ok == 1.0:
@@ -481,13 +483,59 @@ def judge_answer(
     return {"score": 2, "passed": False, "reason": "关键事实未命中或存在脱离材料的不实阐述"}
 
 
+def judge_answer(
+    case: dict,
+    answer: str,
+    client: Any = None,
+    model: str = "",
+) -> dict[str, Any]:
+    """对单条回答执行裁判评分。
+
+    live 模式复用 3.3 的 run_native_judge_eval；调用失败时不再静默改用规则，
+    而是显式标记 `degraded=True` / `source="rule"`，并在汇总时排除出一致率。
+    """
+    if client is not None:
+        try:
+            verdict = run_native_judge_eval(client, model, _build_judge_prompt(case, answer))
+            score = int(verdict["score"])
+            return {
+                "score": score,
+                "passed": score >= 4,
+                "reason": verdict["reason"],
+                "source": "llm",
+                "method": verdict.get("method", "tool_calling"),
+            }
+        except Exception as exc:
+            print(
+                f"[警告] {case.get('id', '?')} 的 LLM Judge 调用失败，本条降级为规则打分，"
+                f"不计入 LLM Judge 一致率：{exc}",
+                file=sys.stderr,
+            )
+            rule = _rule_verdict(case, answer)
+            rule.update({
+                "source": "rule",
+                "degraded": True,
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+            return rule
+
+    rule = _rule_verdict(case, answer)
+    rule["source"] = "rule"
+    return rule
+
+
 def calculate_agreement(
     human_passes: list[bool],
     judge_passes: list[bool],
-) -> tuple[float, float]:
-    """计算 Judge 判定与人工标注的简单一致率（Agreement Rate）与 Cohen's Kappa 系数。"""
+) -> tuple[float, float | None, str]:
+    """计算一致率与 Cohen's Kappa。
+
+    返回 (agreement, kappa, note)。当人工或裁判标签只有一类时，Pe=1，κ 无定义，
+    此时 kappa 返回 None，并在 note 中说明原因，不再报成 1.0。
+    """
     if not human_passes or len(human_passes) != len(judge_passes):
-        return 0.0, 0.0
+        return 0.0, None, "无有效样本或两组标签长度不一致"
+
     n = len(human_passes)
     matches = sum(1 for h, j in zip(human_passes, judge_passes) if h == j)
     p_o = matches / n
@@ -502,11 +550,9 @@ def calculate_agreement(
     p_e = p_yes + p_no
 
     if abs(1.0 - p_e) < 1e-9:
-        kappa = 1.0 if p_o == 1.0 else 0.0
-    else:
-        kappa = (p_o - p_e) / (1.0 - p_e)
+        return round(p_o, 4), None, "人工与裁判标签都只有一类，κ 无定义（不可计算）"
 
-    return round(p_o, 4), round(kappa, 4)
+    return round(p_o, 4), round((p_o - p_e) / (1.0 - p_e), 4), ""
 
 
 def summarize_variant(rows: list[dict]) -> dict[str, Any]:
@@ -537,28 +583,86 @@ def summarize_variant(rows: list[dict]) -> dict[str, Any]:
     }
 
 
-def write_ab_report(
-    strict_summary: dict,
-    helpful_summary: dict,
-    strict_agreement: float,
-    strict_kappa: float,
-    helpful_agreement: float,
-    helpful_kappa: float,
-    cases: list[dict],
-) -> Path:
-    """写入 A/B 对比与 Judge 校准汇总报告，供 capstone/interview_evidence 等模块复验。"""
-    conclusion = (
-        f"Strict 变体偏好精准拒答与句末紧凑引用（平均长度 {strict_summary['avg_len']:.1f} 字），"
-        f"Helpful 变体具备更好的口语化展开能力（平均长度 {helpful_summary['avg_len']:.1f} 字）。"
-        f"LLM Judge 与人工抽样标注的一致率达 {strict_agreement * 100:.1f}%（Strict）与 "
-        f"{helpful_agreement * 100:.1f}%（Helpful），表明当前裁判标准稳定可信。"
+L3_EXIT_AGREEMENT = 0.80
+
+
+def _agreement_block(
+    *,
+    mode: str,
+    agreement: float,
+    kappa: float | None,
+    note: str,
+    judged_cases: int,
+    degraded_cases: list[str],
+) -> dict[str, Any]:
+    available = mode == "live" and judged_cases > 0
+    if mode != "live":
+        note = "离线模式使用规则打分，不计算 LLM Judge 一致率"
+    return {
+        "available": available,
+        "agreement_rate": agreement if available else None,
+        "cohen_kappa": kappa if available else None,
+        "kappa_note": note,
+        "judged_cases": judged_cases,
+        "degraded_cases": degraded_cases,
+    }
+
+
+def _build_conclusion(mode: str, strict_block: dict, helpful_block: dict) -> str:
+    if mode != "live":
+        return (
+            "离线模式使用确定性规则打分，不计算 LLM Judge 与人工的一致率；"
+            "本报告只用于教学演示，不能作为 LLM Judge 校准证据。"
+        )
+    if strict_block["agreement_rate"] is None or helpful_block["agreement_rate"] is None:
+        return "至少一个变体没有可用的 LLM Judge 结果，无法按 L3 出口判定一致率。"
+    rates = [
+        (name, block["agreement_rate"])
+        for name, block in (("Strict", strict_block), ("Helpful", helpful_block))
+    ]
+    parts = [f"{name} 一致率 {rate * 100:.1f}%" for name, rate in rates]
+    passed = all(rate >= L3_EXIT_AGREEMENT for _, rate in rates)
+    notes = [
+        block["kappa_note"]
+        for block in (strict_block, helpful_block)
+        if block["kappa_note"]
+    ]
+    degraded = sum(
+        len(block["degraded_cases"]) for block in (strict_block, helpful_block)
+    )
+    if degraded:
+        notes.append(f"另有 {degraded} 条降级未计入")
+    suffix = f"（{'；'.join(notes)}）" if notes else ""
+    return (
+        f"{'，'.join(parts)}；L3 出口要求一致率 ≥ {L3_EXIT_AGREEMENT * 100:.0f}%，"
+        f"{'达到' if passed else '未达到'}{suffix}。"
     )
 
-    report_payload = {
+
+def build_report_payload(
+    strict_summary: dict,
+    helpful_summary: dict,
+    strict_block: dict,
+    helpful_block: dict,
+    cases: list[dict],
+    *,
+    mode: str,
+    model: str,
+) -> dict[str, Any]:
+    """构造报告内容；默认离线运行不会写入仓库根目录。"""
+    return {
         "dataset": "prompt-comparison-tracing",
         "project": "prompt-comparison-judge",
         "cases": len(cases),
         "module": "prompt_ab_judge.py",
+        "mode": mode,
+        "model": model or None,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "judge": {
+            "implementation": "3.3-llm-judge/run_native_judge_eval",
+            "thinking": "disabled via extra_body.thinking.type=disabled",
+            "degraded_policy": "rule fallback is marked degraded and excluded from agreement",
+        },
         "experiments": {
             "strict": {
                 "name": "prompt-comparison-strict",
@@ -589,34 +693,43 @@ def write_ab_report(
             "judge_human_agreement",
         ],
         "judge_human_agreement": {
-            "strict": {
-                "agreement_rate": strict_agreement,
-                "cohen_kappa": strict_kappa,
-            },
-            "helpful": {
-                "agreement_rate": helpful_agreement,
-                "cohen_kappa": helpful_kappa,
-            },
+            "strict": strict_block,
+            "helpful": helpful_block,
         },
+        "l3_exit_threshold": L3_EXIT_AGREEMENT,
         "expected_winner_summary": {
             "strict": sum(1 for c in cases if c.get("expected_winner") == "strict"),
             "helpful": sum(1 for c in cases if c.get("expected_winner") == "helpful"),
             "tie": sum(1 for c in cases if c.get("expected_winner") == "tie"),
         },
-        "conclusion": conclusion,
+        "conclusion": _build_conclusion(mode, strict_block, helpful_block),
     }
 
-    # 1. 写入章节本地 reports/
+
+def write_ab_report(payload: dict[str, Any], *, root_evidence: bool = False) -> Path:
+    """写章节报告；根目录更新还要求 live、模型 ID 与两版可用的裁判结果。"""
+    # 在写任何文件前检查，直接调用此函数也不能绕过 CLI 的证据保护。
+    if root_evidence:
+        blocks = payload.get("judge_human_agreement", {})
+        if payload.get("mode") != "live" or not payload.get("model"):
+            raise ValueError("更新仓库证据需要 live 报告与模型 ID")
+        if not all(
+            blocks.get(variant, {}).get("available") is True
+            and blocks.get(variant, {}).get("judged_cases", 0) > 0
+            for variant in ("strict", "helpful")
+        ):
+            raise ValueError("更新仓库证据需要两版均有可用的 LLM Judge 结果")
+
     local_reports = Path(__file__).resolve().parent / "reports"
     local_reports.mkdir(exist_ok=True)
     local_out = local_reports / "prompt_ab_judge_agreement.json"
-    local_out.write_text(json.dumps(report_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    local_out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    # 2. 写入仓库根目录 reports/（供 capstone/interview_evidence.py 严格证据链复验）
-    root_reports = REPO_ROOT / "reports"
-    root_reports.mkdir(exist_ok=True)
-    root_out = root_reports / "prompt_ab_judge_agreement.json"
-    root_out.write_text(json.dumps(report_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    if root_evidence:
+        root_reports = REPO_ROOT / "reports"
+        root_reports.mkdir(exist_ok=True)
+        root_out = root_reports / "prompt_ab_judge_agreement.json"
+        root_out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return local_out
 
@@ -626,7 +739,21 @@ def write_ab_report(
 def main() -> int:
     parser = argparse.ArgumentParser(description="L3.6 Prompt A/B 对比与 LLM Judge 校准评测")
     parser.add_argument("--live", action="store_true", help="显式开启在线调用模型评测")
+    parser.add_argument(
+        "--update-evidence",
+        action="store_true",
+        help="仅 live 模式：把本次结果写入仓库根目录 reports/prompt_ab_judge_agreement.json",
+    )
     args = parser.parse_args()
+
+    if args.update_evidence and not args.live:
+        print(
+            "[参数错误] --update-evidence 只能与 --live 一起使用；离线结果不会覆盖仓库证据文件。",
+            file=sys.stderr,
+        )
+        return 2
+
+    mode = "live" if args.live else "offline"
 
     print("==========================================================")
     print("  L3.6 Prompt A/B 对比与 LLM Judge 校验（原生实现）")
@@ -646,7 +773,8 @@ def main() -> int:
             return 1
     else:
         print("\n[模式说明] 当前为默认【离线确定性演练】模式（未加 --live）。")
-        print("[离线演示] 采用预设确定性回答展示 Strict 与 Helpful 两版 Prompt 的指标差异与裁判打分。\n")
+        print("[离线演示] 采用预设确定性回答展示 Strict 与 Helpful 两版 Prompt 的指标差异与裁判打分。")
+        print("[离线演示] 裁判为确定性规则，不调用模型，也不写仓库根目录的 reports/。\n")
 
     strict_rows = []
     helpful_rows = []
@@ -708,23 +836,56 @@ def main() -> int:
             "judge_verdict": verdict_h,
         })
 
-        print(f"[{idx:02d}/10] {case['id']}: {q}")
+        print(f"[{idx:02d}/{len(PROMPT_AB_CASES)}] {case['id']}: {q}")
         print(f"  [Strict ] ({len(ans_s)}字) {ans_s[:60]}...")
-        print(f"            关键词={kw_s:.2f}, 引用={cit_s:.2f}, 拒答={ref_s:.2f} | Judge: {verdict_s['score']}分 ({'PASS' if verdict_s['passed'] else 'FAIL'})")
+        print(f"            关键词={kw_s:.2f}, 引用={cit_s:.2f}, 拒答={ref_s:.2f} | Judge: {verdict_s['score']}分 ({'PASS' if verdict_s['passed'] else 'FAIL'}, {verdict_s['source']})")
         print(f"  [Helpful] ({len(ans_h)}字) {ans_h[:60]}...")
-        print(f"            关键词={kw_h:.2f}, 引用={cit_h:.2f}, 拒答={ref_h:.2f} | Judge: {verdict_h['score']}分 ({'PASS' if verdict_h['passed'] else 'FAIL'})")
+        print(f"            关键词={kw_h:.2f}, 引用={cit_h:.2f}, 拒答={ref_h:.2f} | Judge: {verdict_h['score']}分 ({'PASS' if verdict_h['passed'] else 'FAIL'}, {verdict_h['source']})")
         print(f"  [标注参考] 人工打分={manual_score}分 ({'人工合格' if manual_score >= 4 else '人工不合格'})")
         print()
 
-    # 3. 指标统计与一致率计算
+    # 3. 指标统计与一致率计算（只统计未降级的 LLM 裁判条目）
     strict_summary = summarize_variant(strict_rows)
     helpful_summary = summarize_variant(helpful_rows)
 
-    strict_judge_passes = [r["judge_verdict"]["passed"] for r in strict_rows]
-    helpful_judge_passes = [r["judge_verdict"]["passed"] for r in helpful_rows]
+    strict_llm = [
+        (human, row)
+        for human, row in zip(human_passes, strict_rows)
+        if row["judge_verdict"].get("source") == "llm"
+    ]
+    helpful_llm = [
+        (human, row)
+        for human, row in zip(human_passes, helpful_rows)
+        if row["judge_verdict"].get("source") == "llm"
+    ]
+    strict_degraded = [r["case_id"] for r in strict_rows if r["judge_verdict"].get("degraded")]
+    helpful_degraded = [r["case_id"] for r in helpful_rows if r["judge_verdict"].get("degraded")]
 
-    strict_agree, strict_kappa = calculate_agreement(human_passes, strict_judge_passes)
-    helpful_agree, helpful_kappa = calculate_agreement(human_passes, helpful_judge_passes)
+    strict_agree, strict_kappa, strict_note = calculate_agreement(
+        [h for h, _ in strict_llm],
+        [r["judge_verdict"]["passed"] for _, r in strict_llm],
+    )
+    helpful_agree, helpful_kappa, helpful_note = calculate_agreement(
+        [h for h, _ in helpful_llm],
+        [r["judge_verdict"]["passed"] for _, r in helpful_llm],
+    )
+
+    strict_block = _agreement_block(
+        mode=mode,
+        agreement=strict_agree,
+        kappa=strict_kappa,
+        note=strict_note,
+        judged_cases=len(strict_llm),
+        degraded_cases=strict_degraded,
+    )
+    helpful_block = _agreement_block(
+        mode=mode,
+        agreement=helpful_agree,
+        kappa=helpful_kappa,
+        note=helpful_note,
+        judged_cases=len(helpful_llm),
+        degraded_cases=helpful_degraded,
+    )
 
     print("==========================================================")
     print("  Prompt A/B 综合评测结果与 Judge 校准汇总")
@@ -747,19 +908,47 @@ def main() -> int:
     )
     print()
     print("--- 裁判与人工标注一致性 (Judge-Human Agreement) ---")
-    print(f"Strict  裁判与人工一致率: {strict_agree * 100:.1f}% (Cohen's Kappa: {strict_kappa:.4f})")
-    print(f"Helpful 裁判与人工一致率: {helpful_agree * 100:.1f}% (Cohen's Kappa: {helpful_kappa:.4f})")
+    if mode == "live":
+        for name, block in (("Strict", strict_block), ("Helpful", helpful_block)):
+            if block["agreement_rate"] is None:
+                print(f"{name} 裁判与人工一致率: 不可计算（{block['kappa_note']}）")
+            else:
+                kappa_text = (
+                    f"{block['cohen_kappa']:.4f}"
+                    if block["cohen_kappa"] is not None
+                    else f"不可计算（{block['kappa_note']}）"
+                )
+                print(
+                    f"{name} 裁判与人工一致率: {block['agreement_rate'] * 100:.1f}% "
+                    f"(Cohen's Kappa: {kappa_text}, 计入 {block['judged_cases']} 条)"
+                )
+            if block["degraded_cases"]:
+                print(f"  [降级] {name} 有 {len(block['degraded_cases'])} 条未计入：{block['degraded_cases']}")
+    else:
+        print("离线模式：裁判为确定性规则，不计算 LLM Judge 与人工的一致率。")
 
-    report_path = write_ab_report(
+    if mode == "live" and (not strict_llm or not helpful_llm):
+        print(
+            "[评测失败] 至少一个变体没有可用的 LLM Judge 结果；请检查模型端点、思考模式与 tool_choice 配置。",
+            file=sys.stderr,
+        )
+        return 1
+
+    payload = build_report_payload(
         strict_summary,
         helpful_summary,
-        strict_agree,
-        strict_kappa,
-        helpful_agree,
-        helpful_kappa,
+        strict_block,
+        helpful_block,
         PROMPT_AB_CASES,
+        mode=mode,
+        model=model,
     )
+    report_path = write_ab_report(payload, root_evidence=args.update_evidence)
     print(f"\n[产物生成] A/B 与 Judge 校验报告已保存：{report_path}")
+    if args.update_evidence:
+        print("[证据更新] 已写入仓库根目录 reports/prompt_ab_judge_agreement.json（仅 live 模式）。")
+    else:
+        print("[证据保护] 未写入仓库根目录 reports/；需要更新证据时使用 --live --update-evidence。")
     return 0
 
 

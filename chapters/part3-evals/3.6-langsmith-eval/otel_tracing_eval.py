@@ -13,13 +13,18 @@
    - `gen_ai.request.model` / `gen_ai.response.model`: 请求与实际响应模型标识；
    - `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`: Token 消耗量指标；
    - `gen_ai.response.finish_reasons`: 结束原因列表（如 ["stop"]）；
-   - 检索 Span 规范：Span 名为 `retrieval {gen_ai.data_source.id}`，属性包含 `gen_ai.data_source.id` 与 `gen_ai.retrieval.top_k`；
+   - 检索 Span 规范：Span 名为 `retrieval {gen_ai.data_source.id}`，SpanKind 为 CLIENT，
+     属性包含 `gen_ai.data_source.id` 与 `gen_ai.retrieval.top_k`；
    - 推理 Span 规范：Span 名为 `{gen_ai.operation.name} {gen_ai.request.model}`，SpanKind 为 CLIENT；
+   - Agent 与工具调用：`invoke_agent`、`execute_tool` 两类操作，工具执行 Span 的 kind 为 INTERNAL；
    - 自定义属性约定：非官方约定的项目私有属性统一使用 `app.*` 前缀。
 3. 隐私与数据安全脱敏：
    - Prompt 与生成的回答正文属于高敏感数据，默认不采集（使用 [REDACTED_BY_DEFAULT] 占位）；
    - 即使显式开启采集选项（--capture-content），也须先经过基础脱敏过滤器处理；
-   - 异常发生时，仅记录 error.type 与清洗后的错误描述，不写入包含本机文件路径的原始堆栈（stacktrace）。
+     正文按约定要求的 JSON schema（role + parts）序列化后写入 `gen_ai.input.messages` /
+     `gen_ai.output.messages`；
+   - 异常发生时，仅记录 error.type 与清洗后的错误描述，不写入包含本机文件路径的原始堆栈
+     （stacktrace）：span 以 record_exception=False 创建，异常信息手动记录。
 
 运行模式：
   默认离线控制台导出（无需外部 API Key 与网络，输出 Span 到 Console）：
@@ -35,6 +40,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -71,6 +77,10 @@ except ImportError:
     )
 
 
+# 正文未采集时的统一占位符：README、workbook、代码与测试共用这一种写法。
+REDACTED_PLACEHOLDER = "[REDACTED_BY_DEFAULT]"
+
+
 # --------------------------- 脱敏与隐私辅助函数 ---------------------------
 
 def sanitize_text(text: str) -> str:
@@ -86,15 +96,73 @@ def sanitize_text(text: str) -> str:
     return scrubbed
 
 
+def build_input_messages_attr(question: str, context: str) -> str:
+    """按 GenAI 输入消息 JSON schema（role + parts）序列化，记录到 span 时写成 JSON 字符串。"""
+    messages = [
+        {
+            "role": "user",
+            "parts": [
+                {
+                    "type": "text",
+                    "content": sanitize_text(f"问题：{question}\n\n上下文：\n{context}"),
+                }
+            ],
+        }
+    ]
+    return json.dumps(messages, ensure_ascii=False)
+
+
+def build_output_messages_attr(answer: str) -> str:
+    """按 GenAI 输出消息 JSON schema（role + parts）序列化模型回答。"""
+    messages = [
+        {
+            "role": "assistant",
+            "parts": [{"type": "text", "content": sanitize_text(answer)}],
+        }
+    ]
+    return json.dumps(messages, ensure_ascii=False)
+
+
+# 注册表中的提供商标识；azure 对应 azure.ai.openai，bedrock 对应 aws.bedrock。
+_PROVIDER_NAMES = {
+    "deepseek": "deepseek",
+    "openai": "openai",
+    "anthropic": "anthropic",
+    "ollama": "ollama",
+    "azure": "azure.ai.openai",
+    "bedrock": "aws.bedrock",
+}
+
+
 def resolve_provider_name() -> str:
-    """根据配置解析符合 OpenTelemetry GenAI 约定的提供商标识。"""
+    """根据配置解析符合 OpenTelemetry GenAI 注册表的提供商标识。
+
+    注册表见 semantic-conventions-genai 的 `docs/registry/attributes/gen-ai.md`。
+    取不到注册表值时使用 `custom`，不把未知网关冒用成 `openai`。
+    """
     prov = str(LLM_PROVIDER).strip().lower()
-    if prov in ("deepseek", "openai", "anthropic", "ollama", "azure"):
-        return prov
-    if "deepseek" in prov:
-        return "deepseek"
-    if "openai" in prov:
-        return "openai"
+    if prov in _PROVIDER_NAMES:
+        return _PROVIDER_NAMES[prov]
+
+    # 兼容网关：只有能从地址明确判断厂商时才写具体值，否则保留 custom。
+    base_url = (
+        os.getenv("OPENAI_COMPATIBLE_BASE_URL")
+        or os.getenv("OPENAI_BASE_URL")
+        or os.getenv("DEEPSEEK_BASE_URL")
+        or ""
+    ).lower()
+    vendor_markers = {
+        "deepseek": "deepseek",
+        "anthropic": "anthropic",
+        "moonshot": "moonshot_ai",
+        "mistral": "mistral",
+        "groq": "groq",
+        "x.ai": "x_ai",
+        "openai": "openai",
+    }
+    for marker, registry_name in vendor_markers.items():
+        if marker in base_url:
+            return registry_name
     return "custom"
 
 
@@ -169,15 +237,15 @@ def run_scripted_rag_with_trace(
         root_span.set_attribute("app.pipeline.type", "standard_rag")
         root_span.set_attribute(
             "app.user.query",
-            sanitize_text(question) if capture_content else "[REDACTED_BY_DEFAULT]",
+            sanitize_text(question) if capture_content else REDACTED_PLACEHOLDER,
         )
 
         data_source_id = "test_doc.txt"
         mock_context = "RAG 是检索增强生成，先从外部知识库检索相关分块，再拼装上下文交给大模型。"
 
-        # 1. 检索阶段 Span（对齐 GenAI semconv: retrieval {gen_ai.data_source.id}）
+        # 1. 检索阶段 Span（对齐 GenAI semconv: retrieval {gen_ai.data_source.id}，kind SHOULD 为 CLIENT）
         retrieval_span_name = f"retrieval {data_source_id}"
-        with tracer.start_as_current_span(retrieval_span_name, kind=trace.SpanKind.INTERNAL) as ret_span:
+        with tracer.start_as_current_span(retrieval_span_name, kind=trace.SpanKind.CLIENT) as ret_span:
             ret_span.set_attribute("gen_ai.operation.name", "retrieval")
             ret_span.set_attribute("gen_ai.data_source.id", data_source_id)
             ret_span.set_attribute("gen_ai.retrieval.top_k", 3)
@@ -212,15 +280,16 @@ def run_scripted_rag_with_trace(
             if capture_content:
                 llm_span.set_attribute(
                     "gen_ai.input.messages",
-                    [f"user: {sanitize_text(question)}", f"context: {sanitize_text(mock_context)}"],
+                    build_input_messages_attr(question, mock_context),
                 )
                 llm_span.set_attribute(
                     "gen_ai.output.messages",
-                    [f"assistant: {sanitize_text(mock_answer)}"],
+                    build_output_messages_attr(mock_answer),
                 )
             else:
-                llm_span.set_attribute("app.prompt.status", "redacted_for_privacy")
-                llm_span.set_attribute("app.completion.status", "redacted_for_privacy")
+                llm_span.set_attribute("app.prompt.status", REDACTED_PLACEHOLDER)
+                llm_span.set_attribute("app.completion.status", REDACTED_PLACEHOLDER)
+                llm_span.set_attribute("app.privacy.placeholder", REDACTED_PLACEHOLDER)
 
             time.sleep(0.010)
 
@@ -249,16 +318,19 @@ def run_live_rag_with_trace(
     provider_name = resolve_provider_name()
     data_source_id = str(SAMPLE_DOC.name)
 
-    with tracer.start_as_current_span("rag_pipeline", kind=trace.SpanKind.INTERNAL) as root_span:
+    # record_exception=False：异常只手动写 error.type 与状态，不把本机路径的 stacktrace 写进 span。
+    with tracer.start_as_current_span(
+        "rag_pipeline", kind=trace.SpanKind.INTERNAL, record_exception=False
+    ) as root_span:
         root_span.set_attribute("app.pipeline.type", "live_rag")
         root_span.set_attribute(
             "app.user.query",
-            sanitize_text(question) if capture_content else "[REDACTED_BY_DEFAULT]",
+            sanitize_text(question) if capture_content else REDACTED_PLACEHOLDER,
         )
 
-        # 1. 真实检索（读取 SAMPLE_DOC 摘录）
+        # 1. 真实检索（读取 SAMPLE_DOC 摘录；kind SHOULD 为 CLIENT）
         retrieval_span_name = f"retrieval {data_source_id}"
-        with tracer.start_as_current_span(retrieval_span_name, kind=trace.SpanKind.INTERNAL) as ret_span:
+        with tracer.start_as_current_span(retrieval_span_name, kind=trace.SpanKind.CLIENT) as ret_span:
             ret_span.set_attribute("gen_ai.operation.name", "retrieval")
             ret_span.set_attribute("gen_ai.data_source.id", data_source_id)
             ret_span.set_attribute("gen_ai.retrieval.top_k", 1)
@@ -279,7 +351,9 @@ def run_live_rag_with_trace(
 
         # 3. 真实模型生成与 Token 记录
         inference_span_name = f"chat {model}"
-        with tracer.start_as_current_span(inference_span_name, kind=trace.SpanKind.CLIENT) as llm_span:
+        with tracer.start_as_current_span(
+            inference_span_name, kind=trace.SpanKind.CLIENT, record_exception=False
+        ) as llm_span:
             llm_span.set_attribute("gen_ai.provider.name", provider_name)
             llm_span.set_attribute("gen_ai.operation.name", "chat")
             llm_span.set_attribute("gen_ai.request.model", model)
@@ -300,6 +374,7 @@ def run_live_rag_with_trace(
                 llm_span.set_attribute("error.type", err_type)
                 llm_span.set_status(trace.StatusCode.ERROR, description=sanitize_text(str(exc)[:200]))
                 root_span.set_attribute("app.pipeline.success", False)
+                root_span.set_attribute("error.type", err_type)
                 root_span.set_status(trace.StatusCode.ERROR, description=f"LLM call failed with {err_type}")
                 raise
 
@@ -319,15 +394,16 @@ def run_live_rag_with_trace(
             if capture_content:
                 llm_span.set_attribute(
                     "gen_ai.input.messages",
-                    [f"user: {sanitize_text(prompt)}"],
+                    build_input_messages_attr(question, context),
                 )
                 llm_span.set_attribute(
                     "gen_ai.output.messages",
-                    [f"assistant: {sanitize_text(ans)}"],
+                    build_output_messages_attr(ans),
                 )
             else:
-                llm_span.set_attribute("app.prompt.status", "redacted_for_privacy")
-                llm_span.set_attribute("app.completion.status", "redacted_for_privacy")
+                llm_span.set_attribute("app.prompt.status", REDACTED_PLACEHOLDER)
+                llm_span.set_attribute("app.completion.status", REDACTED_PLACEHOLDER)
+                llm_span.set_attribute("app.privacy.placeholder", REDACTED_PLACEHOLDER)
 
         root_span.set_attribute("app.pipeline.success", True)
         return {

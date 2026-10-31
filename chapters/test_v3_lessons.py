@@ -940,6 +940,174 @@ def test_v3_3_prompt_ab_metrics():
     assert mod.citation_score("没有提及来源", ["prompt_comparison_notes"]) == 0.0
 
 
+def test_v3_3_prompt_ab_kappa_and_report_mode():
+    mod = _load_v3_3_mod("part3-evals/3.8-prompt-ab-judge/prompt_ab_judge.py", "v3_3_l36_ab_report")
+
+    # 人工与裁判都只有一类：κ 无定义，不能报 1.0
+    agreement, kappa, note = mod.calculate_agreement([True, True, True], [True, True, True])
+    assert agreement == 1.0
+    assert kappa is None
+    assert "不可计算" in note
+
+    # 两类标签都存在：κ 可计算
+    agreement2, kappa2, note2 = mod.calculate_agreement(
+        [True, True, False, False], [True, False, False, False]
+    )
+    assert agreement2 == 0.75
+    assert kappa2 is not None and 0.0 < kappa2 < 1.0
+    assert note2 == ""
+
+    # 负向用例的规则裁判应判不合格
+    negative = next(c for c in mod.PROMPT_AB_CASES if c["id"] == "ab_056")
+    verdict = mod.judge_answer(negative, "资金会原路退回，请耐心等待。")
+    assert verdict["passed"] is False
+    assert verdict["source"] == "rule"
+
+    # 离线报告写明 mode，且一致率不可用（不冒充 LLM Judge 结果）
+    summary = {"pass_rate": 0.0, "keyword_score": 0.0, "citation_score": 0.0,
+               "refusal_alignment": 0.0, "judge_pass_rate": 0.0, "avg_judge_score": 0.0,
+               "avg_len": 0.0}
+    block = mod._agreement_block(
+        mode="offline", agreement=0.0, kappa=None, note="", judged_cases=0, degraded_cases=[]
+    )
+    payload = mod.build_report_payload(
+        summary, summary, block, block, mod.PROMPT_AB_CASES, mode="offline", model=""
+    )
+    assert payload["mode"] == "offline"
+    assert payload["model"] is None
+    assert payload["judge_human_agreement"]["strict"]["available"] is False
+    assert "不能作为 LLM Judge 校准证据" in payload["conclusion"]
+
+
+@pytest.mark.parametrize("invalid", ["offline", "missing_model", "missing_judge"])
+def test_v3_3_prompt_ab_writer_protects_evidence(tmp_path, monkeypatch, invalid):
+    mod = _load_v3_3_mod("part3-evals/3.8-prompt-ab-judge/prompt_ab_judge.py", "v3_3_ab_writer")
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(mod, "__file__", str(tmp_path / "chapter" / "prompt_ab_judge.py"))
+    (tmp_path / "chapter").mkdir()
+    root_report = tmp_path / "reports" / "prompt_ab_judge_agreement.json"
+    root_report.parent.mkdir()
+    root_report.write_bytes(b"previous evidence")
+    before = root_report.stat().st_mtime_ns
+    block = {"available": True, "judged_cases": 2}
+    payload = {
+        "mode": "live", "model": "test-model",
+        "judge_human_agreement": {"strict": dict(block), "helpful": dict(block)},
+    }
+    if invalid == "offline":
+        payload["mode"] = "offline"
+    elif invalid == "missing_model":
+        payload["model"] = None
+    else:
+        payload["judge_human_agreement"]["helpful"] = {"available": False, "judged_cases": 0}
+    with pytest.raises(ValueError):
+        mod.write_ab_report(payload, root_evidence=True)
+    assert root_report.read_bytes() == b"previous evidence"
+    assert root_report.stat().st_mtime_ns == before
+
+
+@pytest.mark.parametrize("scenario", ["offline", "invalid_cli", "live", "degraded", "partial"])
+def test_v3_3_prompt_ab_cli_report_boundary(tmp_path, monkeypatch, scenario):
+    import json
+    import sys
+
+    mod = _load_v3_3_mod("part3-evals/3.8-prompt-ab-judge/prompt_ab_judge.py", "v3_3_ab_cli")
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    chapter = tmp_path / "chapter"
+    chapter.mkdir()
+    monkeypatch.setattr(mod, "__file__", str(chapter / "prompt_ab_judge.py"))
+    root_report = tmp_path / "reports" / "prompt_ab_judge_agreement.json"
+    root_report.parent.mkdir()
+    root_report.write_bytes(b"previous evidence")
+    before = root_report.stat().st_mtime_ns
+    args = ["prompt_ab_judge.py"]
+    if scenario != "offline":
+        args.append("--update-evidence")
+    if scenario in {"live", "degraded", "partial"}:
+        args.append("--live")
+    monkeypatch.setattr(sys, "argv", args)
+
+    calls = []
+
+    def fake_generate(client, model, case, variant):
+        return mod.generate_answer_offline(case, variant)
+
+    def fake_judge(client, model, prompt):
+        calls.append(prompt)
+        if scenario == "degraded" or (scenario == "partial" and len(calls) == 1):
+            raise RuntimeError("scripted judge unavailable")
+        return {"score": 5, "reason": "scripted verdict"}
+
+    monkeypatch.setattr(mod, "get_openai_client", lambda **kwargs: object())
+    monkeypatch.setattr(mod, "chat_model_name", lambda: "test-model")
+    monkeypatch.setattr(mod, "generate_answer_live", fake_generate)
+    monkeypatch.setattr(mod, "run_native_judge_eval", fake_judge)
+    assert mod.main() == {"invalid_cli": 2, "degraded": 1}.get(scenario, 0)
+    if scenario in {"offline", "invalid_cli", "degraded"}:
+        assert root_report.read_bytes() == b"previous evidence"
+        assert root_report.stat().st_mtime_ns == before
+    else:
+        payload = json.loads(root_report.read_text(encoding="utf-8"))
+        assert payload["mode"] == "live"
+        assert payload["model"] == "test-model"
+        assert payload["generated_at"]
+        blocks = payload["judge_human_agreement"]
+        assert blocks["strict"]["judged_cases"] == len(mod.PROMPT_AB_CASES) - (scenario == "partial")
+        assert blocks["helpful"]["judged_cases"] == len(mod.PROMPT_AB_CASES)
+        assert len(blocks["strict"]["degraded_cases"]) == (scenario == "partial")
+
+
+def test_v3_3_prompt_ab_judge_reuses_33_and_marks_degraded():
+    from types import SimpleNamespace
+
+    mod = _load_v3_3_mod("part3-evals/3.8-prompt-ab-judge/prompt_ab_judge.py", "v3_3_l36_ab_judge")
+    case = mod.PROMPT_AB_CASES[0]
+
+    # 成功路径：复用 3.3 的裁判工具，强制 tool_choice 时同时关闭思考模式
+    captured = {}
+
+    class GoodCompletions:
+        def create(self, **kw):
+            captured.update(kw)
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(
+                            content=None,
+                            tool_calls=[
+                                SimpleNamespace(
+                                    function=SimpleNamespace(
+                                        arguments='{"score": 5, "reason": "回答正确"}'
+                                    )
+                                )
+                            ],
+                        )
+                    )
+                ]
+            )
+
+    good_client = SimpleNamespace(chat=SimpleNamespace(completions=GoodCompletions()))
+    verdict = mod.judge_answer(case, "回答", good_client, "fake-model")
+    assert verdict["source"] == "llm"
+    assert verdict["passed"] is True
+    assert captured["extra_body"] == {"thinking": {"type": "disabled"}}
+    assert captured["tool_choice"]["function"]["name"] == "submit_verdict"
+
+    # 失败路径：不再静默改用规则，而是标记 degraded 并排除出一致率
+    class Fake400(Exception):
+        status_code = 400
+
+    class BadCompletions:
+        def create(self, **kw):
+            raise Fake400("Thinking mode does not support this tool_choice")
+
+    bad_client = SimpleNamespace(chat=SimpleNamespace(completions=BadCompletions()))
+    degraded = mod.judge_answer(case, "回答", bad_client, "fake-model")
+    assert degraded["source"] == "rule"
+    assert degraded["degraded"] is True
+    assert "Fake400" in degraded["error"]
+
+
 def test_v3_3_failure_diagnosis():
     mod = _load_v3_3_mod("part3-evals/3.10-eval-report-failures/failure_diagnosis.py", "v3_3_l36_fail")
 
@@ -975,9 +1143,12 @@ def test_v3_3_failure_diagnosis():
 
 
 def test_v3_3_otel_tracing_offline():
+    import json
+
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+    from opentelemetry.trace import SpanKind
 
     mod = _load_v3_3_mod("part3-evals/3.6-langsmith-eval/otel_tracing_eval.py", "v3_3_l37_otel")
 
@@ -1012,11 +1183,53 @@ def test_v3_3_otel_tracing_offline():
     assert attrs["gen_ai.usage.input_tokens"] == 85
     assert attrs["gen_ai.usage.output_tokens"] == 36
     assert list(attrs["gen_ai.response.finish_reasons"]) == ["stop"]
-    assert attrs["app.prompt.status"] == "redacted_for_privacy"
+    assert attrs["app.prompt.status"] == "[REDACTED_BY_DEFAULT]"
+    assert attrs["app.privacy.placeholder"] == "[REDACTED_BY_DEFAULT]"
 
     retrieval_span = next(s for s in spans if s.name == "retrieval test_doc.txt")
     assert retrieval_span.attributes["gen_ai.data_source.id"] == "test_doc.txt"
     assert retrieval_span.attributes["app.retrieval.chunk_count"] == 2
+    # 规范：检索 span kind SHOULD 为 CLIENT
+    assert retrieval_span.kind == SpanKind.CLIENT
+
+    # 显式采集正文时，消息按 role + parts 的 JSON schema 序列化后写入
+    provider2 = TracerProvider()
+    exporter2 = InMemorySpanExporter()
+    provider2.add_span_processor(SimpleSpanProcessor(exporter2))
+    tracer2 = provider2.get_tracer("test-tracer-capture")
+    mod.run_scripted_rag_with_trace(
+        tracer=tracer2,
+        question="什么是 RAG",
+        capture_content=True,
+    )
+    capture_spans = exporter2.get_finished_spans()
+    chat2 = next(s for s in capture_spans if s.name == "chat deepseek-flash")
+    input_messages = json.loads(chat2.attributes["gen_ai.input.messages"])
+    output_messages = json.loads(chat2.attributes["gen_ai.output.messages"])
+    assert input_messages[0]["role"] == "user"
+    assert input_messages[0]["parts"][0]["type"] == "text"
+    assert "什么是 RAG" in input_messages[0]["parts"][0]["content"]
+    assert output_messages[0]["role"] == "assistant"
+    assert output_messages[0]["parts"][0]["type"] == "text"
+
+
+def test_v3_3_otel_provider_mapping(monkeypatch: pytest.MonkeyPatch):
+    mod = _load_v3_3_mod("part3-evals/3.6-langsmith-eval/otel_tracing_eval.py", "v3_3_l37_provider")
+
+    monkeypatch.setattr(mod, "LLM_PROVIDER", "azure")
+    assert mod.resolve_provider_name() == "azure.ai.openai"
+
+    monkeypatch.setattr(mod, "LLM_PROVIDER", "bedrock")
+    assert mod.resolve_provider_name() == "aws.bedrock"
+
+    # 兼容网关无法判断厂商时用 custom，不冒用 openai
+    monkeypatch.setattr(mod, "LLM_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("OPENAI_COMPATIBLE_BASE_URL", "https://gateway.example.com/v1")
+    assert mod.resolve_provider_name() == "custom"
+
+    # 能从地址判断厂商时写具体值
+    monkeypatch.setenv("OPENAI_COMPATIBLE_BASE_URL", "https://api.deepseek.com")
+    assert mod.resolve_provider_name() == "deepseek"
 
 
 def test_v3_3_llm_judge_position_swap_scenarios():
@@ -1053,6 +1266,36 @@ def test_v3_3_llm_judge_position_swap_scenarios():
     assert res2["consistent"] is False
     assert res2["position_bias_detected"] is True
     assert res2["consensus_winner"] == "inconsistent"
+
+    # 场景 3：逆序胜出（候选 B 始终胜出，与位置无关）
+    def compare_cons_b(first: str, second: str) -> dict[str, str]:
+        return {"winner": "B" if first == "劣质 A" else "A", "reason": "候选 B 内容更准确"}
+
+    res3 = mod.run_pairwise_comparison_with_position_swap(
+        compare_fn=compare_cons_b,
+        question="什么是 RAG",
+        answer_a="劣质 A",
+        answer_b="优质 B",
+        reference="标准参考",
+    )
+    assert res3["consensus_winner"] == "B"
+    assert res3["consistent"] is True
+    assert res3["position_bias_detected"] is False
+
+    # 场景 4：两轮均判平局
+    def compare_tie(first: str, second: str) -> dict[str, str]:
+        return {"winner": "tie", "reason": "两者质量接近"}
+
+    res4 = mod.run_pairwise_comparison_with_position_swap(
+        compare_fn=compare_tie,
+        question="什么是 RAG",
+        answer_a="候选 A",
+        answer_b="候选 B",
+        reference="标准参考",
+    )
+    assert res4["consensus_winner"] == "tie"
+    assert res4["consistent"] is True
+    assert res4["position_bias_detected"] is False
 
 
 def test_v3_3_llm_judge_dual_rubric():

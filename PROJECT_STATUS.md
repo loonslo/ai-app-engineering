@@ -1,10 +1,10 @@
 ---
-project_id: langchain-learning
-updated: 2026-10-30
+project_id: ai-app-engineering
+updated: 2026-10-31
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "V3-0、V3-1、V3-2 审核均已通过并合入 master。V3-3（L3 质量闭环：3.3、3.6、3.7、3.8、3.10）针对 2026-10-30 审核退回的 2 个阻断项（B1 OTel GenAI 语义约定规范重构、B2 Anthropic 出处订正）与 8 个主要问题（恢复被测 RAG 双维度评测与离线位置互换、恢复 3.7 切片检索与 --fail-on-regression、恢复 3.8 人工标注一致率与 reports、修复 3.7 到 3.10 失败库对接与 3.10 缺文件退出码 2 无堆栈、对齐 3.7 docstring 与 Gate 边界、规范 3.6 README/workbook/OTLP 协议）已在 wip-v3-3 全量整改完毕。复测结果：4 个 gate 骨架 0 通过，参考解全过且两次输出一致；pytest 71 + 34 = 105 项通过；368 篇 Markdown 0 断链；ruff 0 errors；Part 3 无 LangChain 泄漏；v2 标签 111 个未变；--live 缺密钥与模型不可达两种场景均以退出码 1 结束且零堆栈。未调用真实商用模型。记录见 docs/gate-v3-3-validation.md 与 docs/v3/reviews/V3-3.md。"
-next: "统一提交 wip-v3-3 修改，由审核者复核 V3-3；通过后快进合入 master，清理 .tmp/gate_solutions/v3/ 临时参考解，再启动 V3-4（L4 Agent 架构）。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、重排模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
+progress: "2026-10-31 live 补查：3.3 平均 5.00/5，3.7 候选版本通过率 10% 触发回归告警，3.8 一致率 83.3%/100% 且无降级；单次运行。2026-10-31 后续补查：修复 3.8 写入函数可绕过 CLI 覆盖证据的缺口，新增 8 个离线测试；完整回归 116 passed，ruff 通过、368 个 Markdown 0 断链；模拟在线成功与降级只使用假客户端及临时目录，仍待 Claude 复核。以下为此前整改记录：V3-0、V3-1、V3-2 审核均已通过并合入 master。V3-3（L3 质量闭环：3.3、3.6、3.7、3.8、3.10）在 2026-10-31 复核退回后完成第二轮整改：3.8 默认不再写仓库根证据，只有 --live --update-evidence 才更新；live 裁判复用 3.3 的 run_native_judge_eval，失败条目标记 degraded 并排除出一致率；κ 只有一类标签时记为不可计算；补 2 条人工不合格用例；3.6 检索 span 改 CLIENT，消息正文按 JSON schema 记录；3.3、3.7 复用 2.6 的检索与 RAG 链，3.3 live 读取 eval_set_full.json 并汇总平均分；span 不再记录 stacktrace；3.6 README 补 Agent/工具调用属性与 Stack Overflow 出处；验证记录、TASKS、PROJECT_STATUS 按实际改正。离线复跑：4 个 gate 骨架 0 通过、参考解与本章实现全过；pytest 74 + 34 = 108 passed；368 篇 Markdown 0 断链；ruff 通过；part3 无 LangChain 泄漏；v2 标签 111 unchanged；离线运行全部 exit 0；--live 缺密钥与模型不可达均 exit 1 无堆栈；3.8 默认运行未改根报告 mtime。未调用真实模型。reports/prompt_ab_judge_agreement.json 原件仍丢失，内容不可作为证据，已从 capstone 证据中移除。等待审核者复核。记录见 docs/v3/reviews/V3-3.md 与 docs/gate-v3-3-validation.md。"
+next: "审核者按 docs/v3/reviews/V3-3.md 复核 N1、B1-r、M1-r、M9、M6-r、M8-r 与 5 个次要问题；通过后快进合入 master，删除 V3-3 临时参考解，再启动 V3-4（L4 Agent 架构）。3.3、3.7、3.8 的 DeepSeek live 成功路径已于 2026-10-31 各跑一次且退出 0（单次、未写根 reports/，见 docs/gate-v3-3-validation.md 第 8 节）。用户已决定不再恢复 LangSmith 原报告。进入真实学习/试教：按各章任务书执行 gate 或清单并记录失败；补真实模型、重排模型、数据库、Docker/GPU、远端 CI/staging 证据；核对第三方内容版权与课程时长。"
 evidence:
   - README.md
   - TASKS.md
@@ -45,10 +45,9 @@ evidence:
   - docs/v3/reviews/V3-2.md
   - docs/gate-v3-3-validation.md
   - docs/v3/reviews/V3-3.md
-  - reports/prompt_ab_judge_agreement.json
 ---
 
-# LangChain 学习记录 · 项目概览与进度
+# AI 应用工程实战 · 项目概览与进度
 
 本页是本项目的概览与进度摘要。更新进度时先核对证据文件及实际验收；任务细节仍以项目原有的 TASKS、ROADMAP 或验收记录为准。只根据有证据的变化修改状态与日期；未验证事项保留“待核实”，不把文件存在或 Git 改动当作完成。
 
@@ -223,7 +222,27 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 
 
 2026-10-30 完成 V3-3 退回问题整改与全量复测（在 `wip-v3-3` 分支，等待审核者复审）：
-- 阻断项 B1 闭环（3.6 OTel GenAI 语义约定）：依据 `open-telemetry/semantic-conventions-genai` commit `3fe84604a5`，重构属性名为 `gen_ai.provider.name`，Span 命名对齐 `{operation} {model}`（CLIENT）与 `retrieval {data_source.id}`（INTERNAL），finish reasons 采用列表，自定义指标使用 `app.*` 前缀，彻底移除废弃与自造属性；支持 OTLP HTTP 与 gRPC 导出协议，默认离线控制台；`langsmith_eval.py` 补充 `--live` 与离线说明；补齐 README 模板各节与细则要点；workbook 恢复待填；锁定 `opentelemetry-api/sdk==1.44.0`；
+- 阻断项 B1 闭环（3.6 OTel GenAI 语义约定）：依据 `open-telemetry/semantic-conventions-genai` commit `3fe84604a5`，重构属性名为 `gen_ai.provider.name`，Span 命名对齐 `{operation} {model}`（CLIENT）与 `retrieval {data_source.id}`（2026-10-31 复核更正：规范为 SHOULD 用 CLIENT，上一轮误写为 INTERNAL，本轮已改），finish reasons 采用列表，自定义指标使用 `app.*` 前缀，彻底移除废弃与自造属性；支持 OTLP HTTP 与 gRPC 导出协议，默认离线控制台；`langsmith_eval.py` 补充 `--live` 与离线说明；补齐 README 模板各节与细则要点；workbook 恢复待填；锁定 `opentelemetry-api/sdk==1.44.0`；
 - 阻断项 B2 闭环（Anthropic 出处订正）：3.3 与 3.7 引用的 Anthropic 链接更正为有效地址 `/engineering/demystifying-evals-for-ai-agents`；删除编造引语，准确转述其按产品需求选择评测指标的逻辑；
-- 主要问题 M1–M8 闭环：3.3 恢复被测 RAG 正确性与忠实度双维度评测、恢复离线脚本化位置互换裁决，增加思考模式冲突重试与严格校准校验；3.7 恢复原生切片检索、逐条异常捕获、`--fail-on-regression` 回归卡点退出与 3.10 兼容的失败案例写出；3.8 恢复 10 例人工标注对比、LLM Judge 打分、一致率与 $\kappa$ 计算及报告生成（通过 Capstone 证据门禁）；3.10 `load_failures` 缺文件抛 `ValueError` 对齐 Gate，`main()` 统一捕获规范退出 2 且零堆栈，增加 `deepeval` 可选导入安全防御；3.7 `starter.py` 对齐 $k<1$、空字典与截断下界；
+- 主要问题 M1–M8 闭环：3.3 恢复被测 RAG 正确性与忠实度双维度评测、恢复离线脚本化位置互换裁决，增加思考模式冲突重试与严格校准校验；3.7 恢复原生切片检索、逐条异常捕获、`--fail-on-regression` 回归卡点退出与 3.10 兼容的失败案例写出；3.8 恢复 10 例人工标注对比、LLM Judge 打分、一致率与 $\kappa$ 计算及报告生成（2026-10-31 复核更正：该报告被离线替身覆盖、原件丢失，已从 Capstone 证据中移除；本轮改为 12 条用例且只有 live+`--update-evidence` 才写根目录）；3.10 `load_failures` 缺文件抛 `ValueError` 对齐 Gate，`main()` 统一捕获规范退出 2 且零堆栈，增加 `deepeval` 可选导入安全防御；3.7 `starter.py` 对齐 $k<1$、空字典与截断下界；
 - 全量验证复跑：按 Section 11 命令 1–10 复跑，4 个 gate 骨架 0 通过退出 1、参考解全过退出 0 且两次输出一致；pytest 71 + 34 = 105 passed；368 篇 Markdown 0 断链；ruff 0 errors；Part 3 无 LangChain 泄漏；v2 标签 111 unchanged；5 个参考实现离线运行退出码为 0，`--live` 缺密钥与模型不可达场景均以退出码 1 结束且零堆栈。未调用真实商用付费模型。证据见 `docs/gate-v3-3-validation.md`。
+
+2026-10-31 审核者复核 V3-3（提交 50f5feb），结论仍为退回。
+- 复跑：4 个 gate 骨架全部 0 通过，参考解全过且两次输出一致；测试 71 + 34 项通过；断链 0；ruff 通过；part3 无 LangChain 泄漏；v2 标签 111 个未变；参考实现离线运行无堆栈，`--live` 两种失败场景都以 1 退出；3.7 写出的失败库能被 3.10 读取。未调用真实模型。
+- 已解决：Anthropic 出处与转述、3.10 缺文件处理、3.7 docstring 与 gate 一致、OTLP 导出与 `langsmith_eval.py` 的 `--live`，以及 3 个次要问题。
+- 仍阻断：3.8 默认运行就把离线替身结果写进 capstone 引用的 `reports/prompt_ab_judge_agreement.json`，主工作区原件已于 2026-10-30 23:20 被覆盖，git 与 `.tmp` 中都没有原件；live judge 遇到思考模式的 400 会静默改用规则打分，κ 在人工标签只有一类时被报成 1.0。3.6 README 把检索 span 的 kind 写成 INTERNAL（规范为 SHOULD 用 CLIENT）。
+- 另有 4 个主要问题：3.3、3.7 未复用 2.6；OTel span 仍记录带本机路径的 stacktrace；3.6 README 没讲 Agent 与工具调用的属性；验证记录与实际不符。上一段“退回问题已全部整改”的说法以本次复核为准。记录见 `docs/v3/reviews/V3-3.md`。
+
+2026-10-31 完成 V3-3 复核退回整改（在 `wip-v3-3` 分支，等待审核者复核）：
+- N1（3.8）：默认离线只写章节目录，`--live --update-evidence` 才更新仓库根目录；live 裁判复用 3.3 的 `run_native_judge_eval`（关闭思考模式，只在冲突时降级），失败条目标记 `degraded` 并排除出一致率；删除 `ab_048` 特判，补 2 条人工不合格用例，κ 只有一类标签时记 `null`，结论按 L3 出口 80% 阈值计算；`reports/README.md` 说明原件已丢失，`capstone/interview_evidence.py` 移除该证据。
+- B1-r（3.6）：检索 span 改为 `CLIENT`；`gen_ai.input/output.messages` 按 role+parts 的 JSON schema 序列化；provider 按注册表映射（`azure`→`azure.ai.openai`、`bedrock`→`aws.bedrock`，未知网关用 `custom`）。
+- M1-r：3.3、3.7 改用 2.6 的 `build_retriever`/`build_rag_chain`；3.3 live 读取 `eval_set_full.json`（17 条）并汇总正确性/忠实度平均分。
+- M9：span 以 `record_exception=False` 创建，`--live` 不可达场景只记录 `error.type`，输出中没有 `exception.stacktrace`。
+- M6-r：3.6 README 补 Agent 与工具调用属性、Stack Overflow 链接与读取日期，并改正 2,277 的样本说明。
+- M8-r：验证记录按实际重写；TASKS 与 PROJECT_STATUS 同步改正“新增报告”“检索 INTERNAL”“恢复真实文档切片检索”等说法。
+- 复跑：4 个 gate 骨架 0 通过，参考解与本章实现全过；pytest 74 + 34 = 108 passed；368 篇 Markdown 0 断链；ruff 通过；part3 无 LangChain 泄漏；v2 标签 111 unchanged；6 个离线运行 exit 0；`--live` 缺密钥/模型不可达均 exit 1 无堆栈；3.8 默认运行未改根报告 mtime；3.7→3.10 失败库可读。未调用真实模型。证据见 `docs/gate-v3-3-validation.md`。
+- 仍未验证：3.3、3.7、3.8 的真实模型 live 成功路径；远端 OTLP 后端；DeepEval 维度分；`reports/prompt_ab_judge_agreement.json` 原件恢复。
+
+2026-10-31 继续 V3-3 交付前自检：先复跑原有 108 项测试，再以 3 个失败测试复现报告写入函数的证据保护缺口。最小修复后，新增 8 个场景的完整回归 116 passed；ruff 通过，368 个 Markdown 0 断链。真实模型成功路径、远端 OTLP 和原报告恢复仍未验证；Claude 审核状态不变，未合并、未启动 V3-4。具体命令与边界见 `docs/gate-v3-3-validation.md` 的后续补查一节。
+
+2026-10-31 DeepSeek live 补查：`deepseek-flash` 实跑 3.3/3.7/3.8 `--live`，均退出 0；3.3 平均正确性与忠实度 5.00/5，3.7 候选版本通过率 10%（基线 100%）触发回归告警，3.8 Strict/Helpful 一致率 83.3%/100%、无降级。单次运行，未加 `--update-evidence`；远端 OTLP、DeepEval、原报告恢复仍未验证。

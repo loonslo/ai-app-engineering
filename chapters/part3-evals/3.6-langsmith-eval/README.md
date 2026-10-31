@@ -30,20 +30,24 @@ RAG 或 Agent 产生错误回答时，你往往想知道：
 
 为了统一不同 LLM 框架与模型的追踪口径，OpenTelemetry 社区在独立仓库维护了专门的生成式 AI 语义约定（规范来源：[open-telemetry/semantic-conventions-genai](https://github.com/open-telemetry/semantic-conventions-genai)，依据 commit `3fe84604a5`，截至 2026-10-30 仍处于 Development 实验性演进状态）。它规范了生成式 AI 调用的标准命名空间 `gen_ai.*`：
 
-- **提供商**：`gen_ai.provider.name`（在 semconv v1.37.0 中已替代旧的 `gen_ai.system`，如 `deepseek`、`openai`、`anthropic`）。
+- **提供商**：`gen_ai.provider.name`（在 semconv v1.37.0 中已替代旧的 `gen_ai.system`，如 `deepseek`、`openai`、`anthropic`）。取值按注册表：`azure` 记为 `azure.ai.openai`，Bedrock 记为 `aws.bedrock`；兼容网关无法从地址判断厂商时记 `custom`，不冒用 `openai`。
 - **操作类型**：`gen_ai.operation.name`（如 `chat`、`text_completion`、`retrieval`）。
 - **模型标识**：`gen_ai.request.model` / `gen_ai.response.model`（请求模型与实际返回模型）。
 - **Token 消耗**：`gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`（约定中无 `total_tokens`，需由调用方按需计算）。
 - **结束原因**：`gen_ai.response.finish_reasons`（复数，字符串数组，如 `["stop"]`）。
 - **检索 Span 规范**：
   - Span 名称规范为 `retrieval {gen_ai.data_source.id}`（如 `retrieval test_doc.txt`）；
-  - Span 类型为 `SpanKind.INTERNAL`；
+  - Span 类型 SHOULD 为 `SpanKind.CLIENT`（规范原文为 “Span kind SHOULD be `CLIENT`”，见 `gen-ai-spans.md` 的 Retrievals 一节）；
   - 属性包含 `gen_ai.operation.name = "retrieval"`、`gen_ai.data_source.id` 与 `gen_ai.retrieval.top_k`（约定中不存在 `documents_count`）；
   - 授权采集时可记录 `gen_ai.retrieval.query.text`。
 - **推理 Span 规范**：
   - Span 名称规范为 `{gen_ai.operation.name} {gen_ai.request.model}`（如 `chat deepseek-flash`）；
   - 远程大模型调用设为 `SpanKind.CLIENT`。
-- **内容属性演进**：旧版的 `gen_ai.prompt` 与 `gen_ai.completion` 已被废弃并移除，正文采集改用 `gen_ai.input.messages` 与 `gen_ai.output.messages`。
+- **Agent 与工具调用 Span 规范**（[gen-ai-agent-spans.md](https://github.com/open-telemetry/semantic-conventions-genai/blob/3fe84604a5/docs/gen-ai/gen-ai-agent-spans.md)，读取于 2026-10-31）：
+  - `invoke_agent`：远程 Agent 调用 kind 为 `CLIENT`，进程内 Agent 循环 kind 为 `INTERNAL`；span 名优先为 `invoke_agent {gen_ai.agent.name}`，取不到名称时用 `invoke_agent`；常用属性有 `gen_ai.agent.name`、`gen_ai.agent.id`、`gen_ai.agent.version`、`gen_ai.conversation.id`。
+  - `execute_tool`：kind SHOULD 为 `INTERNAL`；span 名 `execute_tool {gen_ai.tool.name}`；必需属性 `gen_ai.tool.name`，条件属性 `gen_ai.tool.call.id`、`gen_ai.agent.name`，推荐属性 `gen_ai.tool.type`、`gen_ai.tool.description`。
+  - 工具参数 `gen_ai.tool.call.arguments` 与结果 `gen_ai.tool.call.result` 属于 Opt-In 内容，采集时按各自 JSON schema 记录；没有真实工具调用时不要凭空造这两个属性。
+- **内容属性演进**：旧版的 `gen_ai.prompt` 与 `gen_ai.completion` 已被废弃并移除，正文采集改用 `gen_ai.input.messages` 与 `gen_ai.output.messages`。两者 MUST 遵循约定的 JSON schema：消息数组，每条消息含 `role` 与 `parts`（文本部分为 `{"type": "text", "content": ...}`）；记录在 span 上时写成 JSON 字符串。
 - **自定义属性原则**：凡不属于官方标准约定的私有属性（如脱敏状态、业务流水线类型），统一使用自有前缀 `app.*`（如 `app.pipeline.type`、`app.prompt.status`），避免私造 `gen_ai.*` 属性导致与未来标准冲突。
 
 ### 2. 三大主流可观测性平台定位与选型
@@ -56,7 +60,7 @@ RAG 或 Agent 产生错误回答时，你往往想知道：
 | **LangSmith** | LangChain / LangGraph 深度原生整合，支持 OTLP 摄取 | 商业托管 SaaS，混合部署需企业版 | 深度依赖 LangChain 生态、需要网页端多人标注与评测集管理的团队 |
 | **Phoenix (Arize)** | 原生基于 OpenTelemetry 架构 | **Elastic License 2.0 (ELv2)** 源码可用（非 OSI 纯开源） | 专注于 RAG 检索深度评估、Embedding 漂移分析与可解释性的团队 |
 
-> **行业数据参考**：根据 Stack Overflow 2026 年开发者调查 AI 章节数据（在 2,277 位使用 AI 工具的专业开发者中：LangSmith 使用率为 17.3%，Langfuse 使用率为 15.2%，Arize AI 整体使用率为 5.8%）。
+> **行业数据参考**：Stack Overflow 2026 年开发者调查 AI 章节的 [AI agent observability and security](https://survey.stackoverflow.co/2026/ai/data/ai-obs) 数据页（读取于 2026-10-31）。样本是回答“过去一年是否用过以下 AI agent 可观测性、提示词或评测工具”这道题的 2,277 名受访者，不是“使用 AI 工具的专业开发者”总数。该样本中 LangSmith 使用率为 17.3%，Langfuse 为 15.2%，Arize AI 为 5.8%（Phoenix 未单列）。
 
 ### 3. 离线评测与在线评测在平台的哪一环
 
@@ -66,9 +70,9 @@ RAG 或 Agent 产生错误回答时，你往往想知道：
 ### 4. 隐私防线（Privacy & Security）
 
 在生产环境中，可观测性追踪必须严格遵守数据安全防线：
-1. **默认不采集明文**：用户输入可能包含个人身份信息（PII）、敏感凭据或商业机密。追踪平台默认仅记录 Token 数量与模型元数据，对正文使用 `[REDACTED_BY_DEFAULT]` 占位掩码；
-2. **脱敏过滤**：即使显式开启调试采集（`--capture-content`），也必须先经过基础脱敏过滤器处理（如掩码 API Key、邮箱、手机号）；
-3. **异常堆栈防泄漏**：Span 记录异常事件时，若直接写入包含本机文件路径的完整 stacktrace，极易泄漏内部文件系统结构和变量。生产实践应仅记录 `error.type` 与清洗后的错误描述；
+1. **默认不采集明文**：用户输入可能包含个人身份信息（PII）、敏感凭据或商业机密。追踪平台默认仅记录 Token 数量与模型元数据，对正文使用 `[REDACTED_BY_DEFAULT]` 占位掩码；代码里 `app.prompt.status`、`app.completion.status` 与 `app.privacy.placeholder` 使用同一个占位符，README、workbook 与测试不再各写一种；
+2. **脱敏过滤与 schema**：即使显式开启调试采集（`--capture-content`），也必须先经过基础脱敏过滤器处理（如掩码 API Key、邮箱、手机号）。`gen_ai.input.messages` 与 `gen_ai.output.messages` 按约定 MUST 遵循的 JSON schema（`role` + `parts`）序列化后写入，不能写成 `["user: …"]` 这样的字符串列表；
+3. **异常堆栈防泄漏**：Span 记录异常事件时，若直接写入包含本机文件路径的完整 stacktrace，极易泄漏内部文件系统结构和变量。本章的 span 以 `record_exception=False` 创建，异常路径只手动记录 `error.type` 与清洗后的状态描述，不写入 `exception.stacktrace`；
 4. **第三方云服务边界**：使用外部 SaaS 平台（如 LangSmith 云端）会把 Prompt、上下文与回答发送至第三方服务器，处理生产或内部数据前须确认合规授权。
 
 ## 流程
@@ -96,7 +100,7 @@ RAG 或 Agent 产生错误回答时，你往往想知道：
 
 ## 练习
 
-1. 运行 `otel_tracing_eval.py`，观察控制台打印的各个 Span，找出哪一个是 `SpanKind.CLIENT`，哪几个是 `SpanKind.INTERNAL`；
+1. 运行 `otel_tracing_eval.py`，观察控制台打印的各个 Span，找出哪些是 `SpanKind.CLIENT`（检索与推理），哪些是 `SpanKind.INTERNAL`（根 Span 与上下文拼装）；
 2. 检查 `chat` Span 中是否包含了 `gen_ai.provider.name`、`gen_ai.response.finish_reasons` 等标准属性；
 3. 故意制造一次调用失败（如 `--live` 模式下提供无效的 API 端点），观察 Span 如何记录 `error.type` 与错误状态，同时避免泄漏本机文件路径；
 4. 在 [workbook.md](workbook.md) 中记录你的观察并完成 4 项清单。

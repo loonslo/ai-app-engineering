@@ -61,6 +61,14 @@ python tools/run_chapter.py 3.8
 2. 在关键词命中率与拒答一致性评测中，文本归一化（normalize）解决了什么现实问题？
 3. 为什么 A/B 测试必须在同一份黄金测试集上运行才能得出科学结论？
 
+## 运行模式与报告
+
+- **默认离线**：`python tools/run_chapter.py 3.8`。裁判是确定性规则，只写章节目录下的 `reports/prompt_ab_judge_agreement.json`，不写仓库根目录的 `reports/`，也不计算 LLM Judge 与人工的一致率。
+- **在线评测**：`python tools/run_chapter.py 3.8 --live`。裁判复用 3.3 的 `run_native_judge_eval`（关闭思考模式，只在思考模式冲突的 400 时降级）；调用失败或降级的条目会标记 `degraded`，不计入一致率。
+- **更新仓库证据**：只有 `python tools/run_chapter.py 3.8 --live --update-evidence` 才会写仓库根目录的 `reports/prompt_ab_judge_agreement.json`。报告里记录 `mode`、模型 ID、生成时间与 judge 来源；离线运行加 `--update-evidence` 会以退出码 2 拒绝。
+- `write_ab_report` 在写文件前也校验 live 模式、模型 ID 和两版均有可用的 LLM Judge 结果；直接调用函数不能用离线报告覆盖根目录证据。校验失败抛出 `ValueError`，保留原文件。
+- 报告中的 `judge_human_agreement` 在人工标签只有一类时把 `cohen_kappa` 记为 `null`，并在 `kappa_note` 说明“不可计算”；结论句按 L3 出口阈值（一致率 ≥ 80%）由数值得出。
+
 ## 提交物
 
 - `gate/starter.py`（实现后的版本）。
@@ -69,5 +77,5 @@ python tools/run_chapter.py 3.8
 
 ## 边界
 
-- 不调用模型/LangSmith，只算指标。
-- 真实 A/B 结论需真实运行与评测集。
+- gate 不调用模型/LangSmith，只算指标。
+- 真实 A/B 结论需真实运行与评测集；离线规则结果不能当作 LLM Judge 校准证据。

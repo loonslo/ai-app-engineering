@@ -1,7 +1,7 @@
 {
-    "python.defaultInterpreterPath": "d:/workspace/langchain-learning/.venv/Scripts/python.exe",
+    "python.defaultInterpreterPath": "d:/workspace/ai-app-engineering/.venv/Scripts/python.exe",
     "code-runner.executorMap": {
-        "python": "$env:PYTHONIOENCODING='utf-8'; & 'd:/workspace/langchain-learning/.venv/Scripts/python.exe' -u $fullFileName"
+        "python": "$env:PYTHONIOENCODING='utf-8'; & 'd:/workspace/ai-app-engineering/.venv/Scripts/python.exe' -u $fullFileName"
     },
     "code-runner.runInTerminal": true
 }

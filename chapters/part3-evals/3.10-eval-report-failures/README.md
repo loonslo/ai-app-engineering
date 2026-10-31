@@ -42,6 +42,7 @@ python chapters/part3-evals/3.10-eval-report-failures/gate/gate_check.py
 - 缺文件/坏 JSON -> `ValueError`。
 - `passed` 缺省视为通过，过滤掉。
 - 任一失败含非空 `retrieval_context` -> `live`，否则 `offline`。
+- 3.7 的失败库现在带 `mode` 字段，但本 gate 的参考实现仍按 `retrieval_context` 推断；用 3.7 离线写出的失败库时，显式加 `--mode offline`，否则会被误判为 live 产物。
 - 分组顺序：`refusal_ok=False` > `citation_score<0.67` > `keyword_score<0.67` > 其他。
 - 统计只按 `layer_suspected` 计数。
 

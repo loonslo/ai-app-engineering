@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>知识库问答 · 演示</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+    label { display: block; margin: .75rem 0 .25rem; font-weight: 600; }
+    input[type=text], input[type=password], textarea { width: 100%; box-sizing: border-box; padding: .5rem; font: inherit; }
+    button { padding: .5rem 1rem; font: inherit; cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .6; }
+    #answer { white-space: pre-wrap; margin: .5rem 0; }
+    .badge { display: inline-block; padding: .1rem .5rem; border-radius: .25rem; font-size: .85rem; margin-right: .5rem; }
+    .degraded { background: #fff3cd; color: #664d03; }
+    .human { background: #f8d7da; color: #58151c; }
+    .error { background: #f8d7da; color: #58151c; padding: .5rem .75rem; border-radius: .25rem; }
+    .muted { color: #666; font-size: .9rem; }
+    #result[hidden], #error[hidden], #feedback-note[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <h1>知识库问答</h1>
+  <p class="muted">演示页面：提问、展示引用、展示降级与“需要人工”、提交反馈、可读的错误提示。</p>
+
+  <label for="key">API key（可选；不会被保存，也不要写进源码）</label>
+  <input id="key" type="password" autocomplete="off">
+
+  <label for="question">问题</label>
+  <textarea id="question" rows="3" maxlength="1000"></textarea>
+  <p><button id="ask" type="button">提问</button> <span id="status" class="muted"></span></p>
+
+  <div id="error" class="error" role="alert" hidden></div>
+
+  <section id="result" hidden>
+    <div id="badges"></div>
+    <div id="answer"></div>
+    <h2>引用</h2>
+    <ul id="sources"></ul>
+    <p>
+      这个回答：
+      <button id="up" type="button">有用</button>
+      <button id="down" type="button">没用</button>
+      <span id="feedback-note" class="muted" hidden></span>
+    </p>
+    <p class="muted">trace_id：<span id="trace"></span>（报障时提供）</p>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

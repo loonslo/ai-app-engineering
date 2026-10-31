@@ -1761,3 +1761,27 @@ def test_v3_6_capacity_math_survives_float_rounding():
     assert plan["instances"] == 3 and plan["bottleneck"] == "rpm"
     results = [mod.RequestResult(100, 200)] * 8 + [mod.RequestResult(100, 429), mod.RequestResult(5000, 0)]
     assert mod.summarize_load(results, 10)["error_rate"] == 0.2  # 429 与超时都算失败
+
+
+# ---------------------------------------------------------------- V3-8 ----
+def _run_checker(rel_path: str, *args: str):
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    script = Path(__file__).resolve().parent / rel_path
+    return subprocess.run([sys.executable, str(script), *args], capture_output=True, text=True, encoding="utf-8")
+
+
+def test_v3_8_coding_drill_fails_before_fix_with_exactly_three_bugs():
+    result = _run_checker("part12-job-track/12.3-coding-interview/drill/check_drill.py")
+    assert result.returncode == 1
+    assert [line.split("]")[0] for line in result.stdout.splitlines() if line.startswith("[")] == ["[FAIL", "[FAIL", "[FAIL", "[PASS"]
+    assert "分队列" in result.stdout.splitlines()[3]  # 没有预埋 bug 的对照项应通过
+
+
+@pytest.mark.parametrize("name", ["a", "b", "c"])
+def test_v3_8_take_home_checkers_reject_empty_starters(name):
+    result = _run_checker(f"part12-job-track/12.5-take-home-sim/checkers/check_{name}.py")
+    assert result.returncode == 1
+    assert "[PASS]" not in result.stdout  # 空实现不能让任何一项通过

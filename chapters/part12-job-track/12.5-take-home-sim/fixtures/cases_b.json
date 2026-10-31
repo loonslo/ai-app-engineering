@@ -1,0 +1,66 @@
+[
+  {
+    "id": "b1",
+    "text": "我被重复扣款了两次，请尽快退一笔。",
+    "expected": {
+      "category": "billing",
+      "priority": 1
+    }
+  },
+  {
+    "id": "b2",
+    "text": "点击导出按钮后页面白屏，控制台报错。",
+    "expected": {
+      "category": "bug",
+      "priority": 2
+    }
+  },
+  {
+    "id": "b3",
+    "text": "希望能增加暗色模式，现在晚上看着很刺眼。",
+    "expected": {
+      "category": "feature",
+      "priority": 3
+    }
+  },
+  {
+    "id": "b4",
+    "text": "发票抬头开错了，想重新开一张。",
+    "expected": {
+      "category": "billing",
+      "priority": 2
+    }
+  },
+  {
+    "id": "b5",
+    "text": "登录一直转圈，整个团队都进不去了！",
+    "expected": {
+      "category": "bug",
+      "priority": 1
+    }
+  },
+  {
+    "id": "b6",
+    "text": "能不能支持导出为 Excel？不急。",
+    "expected": {
+      "category": "feature",
+      "priority": 3
+    }
+  },
+  {
+    "id": "b7",
+    "text": "请问你们公司在哪个城市？",
+    "expected": {
+      "category": "other",
+      "priority": 3
+    }
+  },
+  {
+    "id": "b8",
+    "text": "同步卡在 99% 好几个小时了，数据有风险吗？",
+    "expected": {
+      "category": "bug",
+      "priority": 1
+    }
+  }
+]

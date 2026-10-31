@@ -1,0 +1,44 @@
+[
+  {
+    "id": "a1",
+    "question": "团队版每月多少钱？",
+    "expect_source": "d-pricing",
+    "marker": "每月每人 25 元"
+  },
+  {
+    "id": "a2",
+    "question": "误删的文件还能找回吗，保留多久？",
+    "expect_source": "d-restore",
+    "marker": "回收站保留 14 天"
+  },
+  {
+    "id": "a3",
+    "question": "丢了密钥官方能帮我找回吗？",
+    "expect_source": "d-security",
+    "marker": "官方无法替用户找回丢失的密钥"
+  },
+  {
+    "id": "a4",
+    "question": "一个文件最大能备份多大？",
+    "expect_source": "d-limits",
+    "marker": "单个文件最大 5GB"
+  },
+  {
+    "id": "a5",
+    "question": "外部分享链接多久失效？",
+    "expect_source": "d-share",
+    "marker": "默认 7 天后失效"
+  },
+  {
+    "id": "a6",
+    "question": "今天上海天气怎么样？",
+    "expect_source": null,
+    "marker": null
+  },
+  {
+    "id": "a7",
+    "question": "怎样做红烧肉才好吃？",
+    "expect_source": null,
+    "marker": null
+  }
+]

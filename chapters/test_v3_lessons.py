@@ -1765,12 +1765,21 @@ def test_v3_6_capacity_math_survives_float_rounding():
 
 # ---------------------------------------------------------------- V3-8 ----
 def _run_checker(rel_path: str, *args: str):
+    import os
     import subprocess
     import sys
     from pathlib import Path
 
     script = Path(__file__).resolve().parent / rel_path
-    return subprocess.run([sys.executable, str(script), *args], capture_output=True, text=True, encoding="utf-8")
+    env = os.environ.copy()
+    env["PYTHONUTF8"] = "1"
+    return subprocess.run(
+        [sys.executable, str(script), *args],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=env,
+    )
 
 
 def test_v3_8_coding_drill_fails_before_fix_with_exactly_three_bugs():

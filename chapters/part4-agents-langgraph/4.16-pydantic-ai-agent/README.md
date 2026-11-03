@@ -20,7 +20,7 @@ python chapters/part4-agents-langgraph/4.16-pydantic-ai-agent/gate/gate_check.py
 
 本章把 L4.2 的手写循环换成真实 SDK，而不是再造一个名字相似的 Agent。SDK 负责模型往返、工具参数解析、校验反馈和暂停；租户隔离、审批人的权限和退款防重仍是应用责任。离线替换的是模型决策，不是 SDK 执行过程。
 
-**本章基于 Pydantic AI 2.31.1**，安装项为 `pydantic-ai-slim[openai]==2.31.1`，以仓库锁定依赖为准。本机已核对该版本的 `Agent.run_sync`、`FunctionModel`、`DeferredToolResults`、`UsageLimits` 和消息适配器签名。在线文档持续更新，下面只使用已在锁定版存在的接口；不要照抄新版文档中的 capability handler 或 `conversation=` 接口来替换本章的历史续跑。
+**本章基于 Pydantic AI 2.53.0**，安装项为 `pydantic-ai-slim[openai]==2.53.0`，以仓库锁定依赖为准。离线回归覆盖本章使用的 `Agent.run_sync`、`FunctionModel`、`DeferredToolResults`、`UsageLimits` 和消息适配器；在线文档持续更新，新增接口先核对锁定版。
 
 ## 概念
 
@@ -77,11 +77,11 @@ FunctionModel 的回调可以返回 `ToolCallPart("get_order", {"order_id": "A10
 
 ### 8. 追踪、持久执行与锁定版本安全边界
 
-OpenTelemetry 把一次运行拆成 Agent、模型请求和工具调用的 span，便于定位失败与预算消耗。本章**不启用** Pydantic AI 自带埋点：不写 `instrument=True`，不调用 `Agent.instrument_all()`，在创建 Agent 后明确设置 `agent.instrument = False`。本机标识为 2.31.1 的安装版不接受构造参数 `instrument=`，但提供该属性，因此使用已核对的属性接口。锁定版的 PYSEC-2026-4284 会在 `include_content=False` 下仍通过异常事件、状态描述等导出正文；不能把该选项当作完整的脱敏防线。追踪应按后续 L5.6 用独立 `opentelemetry-sdk` 明确选择字段，避免异常堆栈和订单正文泄露。
+OpenTelemetry 把一次运行拆成 Agent、模型请求和工具调用的 span，便于定位失败与预算消耗。本章不启用 Pydantic AI 自带埋点，沿用 L5.6 的显式字段选择与脱敏策略，避免把订单正文和异常堆栈作为 trace 属性。
 
-PyPI 的 2.31.1 元数据列出 5 条安全公告，修复版本分布于 2.44.0、2.52.0、2.53.0。本章不使用 `web_fetch_tool`、允许本地下载的 `FileUrl`，也不使用 `ConcurrencyLimitedModel`。这是受限教学环境，不推荐把锁定版本直接暴露到公网。依赖兼容允许后应升级至至少 2.53.0 并复核公告与回归，不能只凭本章 gate 判定安全。
+仓库当前锁定 Pydantic AI 2.53.0。PyPI 2.31.1 的五条安全公告与 `openai<3` 约束是历史情况，不应再作为当前版限制。本章不使用 `web_fetch_tool`、本地下载 `FileUrl` 或 `ConcurrencyLimitedModel`，这是示例范围，不是当前 SDK 的统一禁用要求。模型思考模式、结构化输出与工具调用的兼容性按具体端点验证；课程离线 gate 不证明真实服务行为。
 
-持久执行引擎会记录已完成步骤，在进程中断后恢复；保存消息 JSON 并不等于具备这种能力。官方概览当前列出 Temporal、DBOS、Prefect、Restate、AWS Lambda、Absurd、pgtask、Apache Airflow。本章只讲概念，不安装这些可选集成，也不把新版概览中所有接口视为 2.31.1 的已验证能力。
+持久执行引擎会记录已完成步骤，在进程中断后恢复；保存消息 JSON 并不等于具备这种能力。官方概览当前列出 Temporal、DBOS、Prefect、Restate、AWS Lambda、Absurd、pgtask、Apache Airflow。本章只讲概念，不安装这些可选集成，也不把在线文档中的所有接口视为课程锁定版已验证能力。
 
 ### 9. 与 OpenAI Agents SDK 对照
 
@@ -164,7 +164,7 @@ DeepSeek V4 默认思考，思考模式不接受强制 `tool_choice`；本章经
 
 ## 官方阅读
 
-以下页面均实际读取于 **2026-10-31**；在线页面可能比锁定版新，以本机 2.31.1 接口和 gate 结果约束实现。
+以下页面实际读取于 **2026-10-31**；在线页面可能比锁定版新，以本机 2.53.0 依赖与离线 gate 约束已验证接口。2.31.1 链接仅作历史接口记录。
 
 - [Deferred tools：审批、拒绝和历史续跑](https://ai.pydantic.dev/deferred-tools/)
 - [Testing：TestModel、FunctionModel、override 与请求开关](https://ai.pydantic.dev/testing/)
@@ -173,5 +173,6 @@ DeepSeek V4 默认思考，思考模式不接受强制 `tool_choice`；本章经
 - [OpenAI：自定义异步客户端和兼容 provider](https://ai.pydantic.dev/models/openai/)
 - [DeepSeek：思考模式和结构化输出限制](https://ai.pydantic.dev/models/deepseek/)
 - [Durable execution：引擎概览](https://ai.pydantic.dev/durable_execution/overview/)
-- [PyPI 2.31.1 元数据及安全公告列表](https://pypi.org/pypi/pydantic-ai-slim/2.31.1/json)
+- [PyPI 2.31.1 元数据及历史安全公告](https://pypi.org/pypi/pydantic-ai-slim/2.31.1/json)
+- [PyPI 当前锁定版 2.53.0 元数据](https://pypi.org/pypi/pydantic-ai-slim/2.53.0/json)
 - [OpenAI Agents SDK：handoffs、guardrails、sessions](https://openai.github.io/openai-agents-python/)

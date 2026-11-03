@@ -1,4 +1,4 @@
-"""L4.5：真实 Pydantic AI 2.31.1；默认 FunctionModel，只有 --live 联网。"""
+"""L4.5：真实 Pydantic AI 2.53.0；默认 FunctionModel，只有 --live 联网。"""
 from __future__ import annotations
 
 import argparse

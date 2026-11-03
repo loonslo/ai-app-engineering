@@ -12,23 +12,14 @@ from datetime import UTC, datetime
 from . import config as C
 from .cache import AnswerCache
 from .contracts import AssistRequest
-from .knowledge_base import KnowledgeBase
+from .knowledge_base import KnowledgeBase, is_refusal
 from .permissions import User
 from .service import AssistantService
 
-REFUSE_HINTS = [
-    "没有提到",
-    "我不知道",
-    "未提及",
-    "无法回答",
-    "未涉及",
-    "找不到",
-    "没有相关",
-]
-
 
 def _refused(ans: str) -> bool:
-    return any(h in ans for h in REFUSE_HINTS)
+    """评测只把知识库的规范拒答句式判作拒答。"""
+    return is_refusal(ans)
 
 
 def load_eval_set() -> list[dict]:

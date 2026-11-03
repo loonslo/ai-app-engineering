@@ -2,7 +2,7 @@
 
 只读本文件、本章 README 与官方 SDK 文档；通过前不要打开参考实现。
 运行：python chapters/part4-agents-langgraph/4.16-pydantic-ai-agent/gate/gate_check.py
-不允许修改 gate_check.py。指定 SDK：pydantic-ai-slim[openai]==2.31.1。
+不允许修改 gate_check.py。指定 SDK：pydantic-ai-slim[openai]==2.53.0。
 """
 from __future__ import annotations
 

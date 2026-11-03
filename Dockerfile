@@ -9,13 +9,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN groupadd --system app && useradd --system --gid app --home /app app
-
-COPY requirements.txt /app/requirements.txt
-RUN python -m pip install --no-cache-dir --requirement /app/requirements.txt
+COPY requirements-capstone.txt /app/requirements-capstone.txt
+RUN python -m pip install --no-cache-dir --requirement /app/requirements-capstone.txt
 
 COPY common.py /app/common.py
 COPY capstone /app/capstone
-
+COPY capstone/data/docs /var/lib/capstone/docs
 RUN mkdir -p /var/lib/capstone && chown -R app:app /app /var/lib/capstone
 
 USER app

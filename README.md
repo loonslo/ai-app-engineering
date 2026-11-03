@@ -19,9 +19,10 @@ python tools/run_chapter.py 0.1        # 自检：缺哪一篇的依赖会直接
 
 | 文件 | 内容 |
 |---|---|
-| `requirements-course.txt` | 课程依赖（推荐）：锁定依赖 + 各章直接导入的其他包 |
+| `requirements-course.txt` | 课程依赖（推荐）：课程与选修章节所需依赖 |
 | `requirements-dev.txt` | 锁定依赖 + 测试工具（pytest、ruff、locust） |
-| `requirements.txt` | 锁定的运行依赖，capstone 与 Docker 镜像使用 |
+| `requirements.txt` | 课程/冻结旗舰项目的锁定依赖 |
+| `requirements-capstone.txt` | capstone 与 Docker 镜像的最小锁定运行依赖，不含未使用的 LangChain 组件 |
 | `requirements-pgvector.txt`、`requirements-bedrock.txt` | capstone 的可选后端 |
 
 **密钥**：把 `.env.example` 复制为 `.env`。第 0–6 篇只需要一项：
@@ -45,7 +46,7 @@ print(snapshot_download('BAAI/bge-small-zh-v1.5'))   # 打印模型所在的本�
 
 默认路径是 `~/.cache/modelscope/hub/models/BAAI/bge-small-zh-v1___5`（ModelScope 把点号换成了三个下划线）。模型在别处时，在 `.env` 里设置 `EMBED_MODEL_PATH=模型目录`。2.11 的 reranker 同理：下载 `BAAI/bge-reranker-base`，用 `RERANKER_MODEL_PATH` 指定。
 
-> **技术路线**：默认使用原生 SDK + Pydantic；LangGraph 用于状态图、检查点与人工介入（第 4 篇相关章节）；LangChain 只作为框架对照（如 4.15）与选修章节、冻结的历史快照中的实现。Pydantic AI 用于 4.16 等章（版本锁在 `requirements-course.txt`，含 2.31.1 的已知限制说明）；OpenTelemetry 用于 3.6、5.9 与 capstone（`opentelemetry-sdk` 已锁定，向 OTLP 后端发送另需 `opentelemetry-exporter-otlp-proto-http`，未锁定、可选）。
+> **技术路线**：默认使用原生 SDK + Pydantic；LangGraph 用于状态图、检查点与人工介入（第 4 篇相关章节）；LangChain 只作为框架对照（如 4.15）与选修章节、冻结的历史快照中的实现。Pydantic AI 用于 4.16 等章，当前统一锁定 `pydantic-ai-slim[openai]==2.53.0`；旧版 2.31.1 的安全限制只作为历史记录。OpenTelemetry 用于 3.6、5.9 与 capstone（`opentelemetry-sdk` 已锁定，向 OTLP 后端发送另需 `opentelemetry-exporter-otlp-proto-http`，未锁定、可选）。
 
 ## 课程结构
 
@@ -81,7 +82,7 @@ memory/            个人背景与项目约定
 reports/           评测报告输出
 ```
 
-`面试题/`、`pdf-course/` 是面试笔记和课程 PDF 的整理与生成脚本，不属于学习路线。
+`面试题/` 是面试笔记与题库参考，不属于学习路线。
 
 ## 运行独立练习
 

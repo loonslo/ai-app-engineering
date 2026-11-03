@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 .idea/
+.vscode/
+.deepeval/
 .venv/
 .tmp/
 .build/
@@ -39,7 +41,6 @@ chapters/**/.dockerignore.example
 chapters/**/gate/gate_report.json
 
 # 构建产物与其他工具的运行目录（可重新生成，不入库）
-pdf-course/out/
 面试题/**/自检/
 面试题/**/report.html
 面试题/**/_正文.txt

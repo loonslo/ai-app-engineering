@@ -37,6 +37,13 @@ jobs:
         working-directory: flagship-project/m1-rag-mvp/step1
         run: python -m pytest -q
 
+      - name: Verify course maps, links, and lint
+        run: |
+          python tools/apply_v2_map.py --check
+          python tools/apply_v3_map.py --check
+          python tools/check_course_links.py
+          ruff check --target-version py311 capstone tools chapters/test_v3_lessons.py
+
       - name: Verify course tools and unified project baseline
         run: |
           python -m pytest tools chapters/test_new_lessons.py chapters/test_v3_lessons.py -q

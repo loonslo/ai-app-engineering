@@ -65,7 +65,7 @@ Agent 协议：plan/draft 返回 L4.11 `StageOutput`；gather 返回 `{'tool':�
 
 `python tools/run_chapter.py 4.23 async_agent.py`
 
-默认使用 SQLite 临时数据库、固定资料、Pydantic AI 2.31.1 的真实 Agent + FunctionModel、可信本地批准与本地发布账本，独立运行三次并输出报告。FunctionModel 只替代模型决策，阶段内结构化输出工具与校验由 SDK 执行；StageOutput.tokens 的 4/8 是教学固定值，不是真实计费量。可用 `--report <路径>` 指定报告；不写仓库根 reports，不覆盖 capstone 证据；无真实模型与 `--live` 模式。SDK 版本沿用 requirements-course.txt / requirements-dev.txt，与 L4.5 一致，不启用自带埋点。
+默认使用 SQLite 临时数据库、固定资料、Pydantic AI 2.53.0 的真实 Agent + FunctionModel、可信本地批准与本地发布账本，独立运行三次并输出报告。FunctionModel 只替代模型决策，阶段内结构化输出工具与校验由 SDK 执行；StageOutput.tokens 的 4/8 是教学固定值，不是真实计费量。可用 `--report <路径>` 指定报告；不写仓库根 reports，不覆盖 capstone 证据；无真实模型与 `--live` 模式。SDK 版本沿用 requirements-course.txt / requirements-dev.txt，不启用自带埋点。
 
 对照：1. 把权限放在 prompt 中会少哪条强制边界？2. 三次试验复用同一个成功 Task 会怎样误报？3. 发布成功但回执未落盘如何解决，为什么需要业务端幂等？
 

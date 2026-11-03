@@ -14,6 +14,7 @@ import random
 import re
 import secrets
 import subprocess
+import shutil
 import sys
 import tempfile
 import time
@@ -402,6 +403,10 @@ def main() -> int:
     if args.fake:
         temporary_data = tempfile.TemporaryDirectory(
             prefix="capstone-loadtest-", ignore_cleanup_errors=True
+        )
+        shutil.copytree(
+            ROOT / "capstone" / "data" / "docs",
+            Path(temporary_data.name) / "docs",
         )
         host = f"http://127.0.0.1:{args.port}"
         secret = secrets.token_urlsafe(48)

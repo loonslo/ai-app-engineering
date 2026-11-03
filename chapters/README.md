@@ -202,14 +202,14 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 
 | 章节 | 文字教程 | 运行环境 |
 |---|---|---|
-| 1.1 | [L1.1 一次调用（Gate）](part1-foundations/1.1-first-call/README.md) | 离线 gate；参考实现需真实模型 |
-| 1.2 | [L1.3 输出控制（Gate）](part1-foundations/1.2-control-output/README.md) | 离线 gate；参考实现需真实模型 |
-| 1.3 | [L1.4 结构化输出（Gate）](part1-foundations/1.3-structured-output/README.md) | 离线 gate；参考实现需真实模型 |
-| 1.4 | [L1.5 上下文与记忆（Gate）](part1-foundations/1.4-context-memory/README.md) | 离线 gate；参考实现需真实模型 |
-| 1.5 | [L1.6 工具调用（Gate）](part1-foundations/1.5-tool-calling/README.md) | 离线 gate；参考实现需真实模型 |
+| 1.1 | [L1.1 一次调用（Gate）](part1-foundations/1.1-first-call/README.md) | 离线 gate；live 运行方式见 README |
+| 1.2 | [L1.3 输出控制（Gate）](part1-foundations/1.2-control-output/README.md) | 离线 gate；live 运行方式见 README |
+| 1.3 | [L1.4 结构化输出（Gate）](part1-foundations/1.3-structured-output/README.md) | 离线 gate；live 运行方式见 README |
+| 1.4 | [L1.5 上下文与记忆（Gate）](part1-foundations/1.4-context-memory/README.md) | 离线 gate；live 运行方式见 README |
+| 1.5 | [L1.6 工具调用（Gate）](part1-foundations/1.5-tool-calling/README.md) | 离线 gate；live 运行方式见 README |
 | 1.6 | [MCP 入门（清单）](part1-foundations/1.6-mcp-intro/README.md) | 清单验收 |
 | 1.7 | [LLM 原理认知（清单）](part1-foundations/1.7-llm-internals/README.md) | 清单验收 |
-| 1.8 | [L1.9 CLI 助手（Gate）](part1-foundations/1.8-cli-chatbot/README.md) | 离线 gate；参考实现需真实模型 |
+| 1.8 | [L1.9 CLI 助手（Gate）](part1-foundations/1.8-cli-chatbot/README.md) | 离线 gate；live 运行方式见 README |
 | 1.9 | [L1.7 Provider 抽象、第二厂商与成本（Gate）](part1-foundations/1.9-provider-cost/README.md) | 离线 gate |
 | 1.10 | [L1.10 嵌入式 LLM 功能与 eval harness（Gate）](part1-foundations/1.10-embedded-llm-feature/README.md) | 离线 gate |
 
@@ -221,13 +221,13 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 |---|---|---|
 | 2.1 | [L2.2 加载与切分（Gate）](part2-rag/2.1-load-split/README.md) | 离线 gate；参考实现离线 |
 | 2.2 | [L2.3 向量化与召回（Gate）](part2-rag/2.2-embed-retrieve/README.md) | 离线 gate；参考实现需本地 embedding |
-| 2.3 | [L2.4 最小 RAG（Gate）](part2-rag/2.3-minimal-rag/README.md) | 离线 gate；参考实现需真实模型 + embedding |
+| 2.3 | [L2.4 最小 RAG（Gate）](part2-rag/2.3-minimal-rag/README.md) | 离线 gate；live 与 embedding 运行方式见 README |
 | 2.4 | [L2.11 RAG 评测基线（Gate）](part2-rag/2.4-eval-seed/README.md) | 离线 gate |
 | 2.5 | [L1.8 手写 Harness（Gate）](part2-rag/2.5-raw-sdk-rag-agent-loop/README.md) | 离线 gate，参考实现可选真实模型 |
-| 2.6 | [L2.2 扩展：PDF 与来源（Gate）](part2-rag/2.6-pdf-sources/README.md) | 离线 gate；参考实现需真实模型 + embedding |
+| 2.6 | [L2.2 扩展：PDF 与来源（Gate）](part2-rag/2.6-pdf-sources/README.md) | 离线 gate；live 与 embedding 运行方式见 README |
 | 2.7 | [L2.5 切分策略（Gate）](part2-rag/2.7-chunk-strategy/README.md) | 离线 gate；参考实现需本地 embedding |
 | 2.8 | [L2.6 混合检索（Gate）](part2-rag/2.8-hybrid-search/README.md) | 离线 gate；参考实现需本地 embedding |
-| 2.9 | [L2.7 查询改写（Gate）](part2-rag/2.9-query-rewrite/README.md) | 离线 gate；参考实现需真实模型 + embedding |
+| 2.9 | [L2.7 查询改写（Gate）](part2-rag/2.9-query-rewrite/README.md) | 离线 gate；live 与 embedding 运行方式见 README |
 | 2.10 | [L2.8 向量库持久化（Gate）](part2-rag/2.10-chroma-persist/README.md) | 离线 gate；参考实现需本地 embedding |
 | 2.11 | [L2.6 重排与多模态（Gate）](part2-rag/2.11-multimodal-rerank/README.md) | 离线 gate；参考实现需 reranker，多模态选做 |
 | 2.12 | [L2.1 上下文工程总论（Gate）](part2-rag/2.12-context-engineering/README.md) | 离线 gate |
@@ -242,12 +242,12 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 | 章节 | 文字教程 | 运行环境 |
 |---|---|---|
 | 3.1 | [L3.1 失败分析（Gate）](part3-evals/3.1-error-analysis/README.md) | 离线 gate |
-| 3.2 | [L3.3 基础评测（Gate）](part3-evals/3.2-eval-basics/README.md) | 离线 gate；参考实现需真实模型 |
+| 3.2 | [L3.3 基础评测（Gate）](part3-evals/3.2-eval-basics/README.md) | 离线 gate；live 运行方式见 README |
 | 3.3 | [L3.4 LLM Judge 与校准（Gate）](part3-evals/3.3-llm-judge/README.md) | 离线 gate，参考实现可选真实模型 |
 | 3.4 | [L3.2 评测集建设（Gate）](part3-evals/3.4-eval-dataset-build/README.md) | 离线 gate |
 | 3.5 | [L3.5 Ragas 与指标口径（Gate）](part3-evals/3.5-eval-dataset-ragas/README.md) | 离线 gate；参考实现 RAGAS 需真实模型 |
 | 3.6 | [L3.7 LangSmith 可观测性（清单）](part3-evals/3.6-langsmith-eval/README.md) | 外部服务，清单验收 |
-| 3.7 | [L3.6 回归对比（Gate）](part3-evals/3.7-eval-regression-curve/README.md) | 离线 gate；参考实现需真实模型 |
+| 3.7 | [L3.6 回归对比（Gate）](part3-evals/3.7-eval-regression-curve/README.md) | 离线 gate；live 运行方式见 README |
 | 3.8 | [L3.6 扩展：Prompt A/B 指标（Gate）](part3-evals/3.8-prompt-ab-judge/README.md) | 离线 gate；真实 A/B 需模型 |
 | 3.9 | [L4.7 Agent 轨迹评测（Gate）](part3-evals/3.9-agent-trajectory-eval/README.md) | 离线 gate |
 | 3.10 | [L3.6 扩展：失败诊断（Gate）](part3-evals/3.10-eval-report-failures/README.md) | 离线 gate；live 模式需真实模型 |
@@ -264,14 +264,14 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 | 4.4 | [L4.9 状态与 Reducer（Gate）](part4-agents-langgraph/4.4-state-reducer/README.md) | 离线 gate |
 | 4.5 | [L4.2 ReAct 与工具设计（Gate）](part4-agents-langgraph/4.5-react-agent/README.md) | 离线 gate，参考实现可选真实模型 |
 | 4.6 | [L4.9 扩展：节点可靠性（Gate）](part4-agents-langgraph/4.6-node-reliability/README.md) | 离线 gate；参考实现一处需真实模型 |
-| 4.7 | [L4.4 结构化路由（Gate）](part4-agents-langgraph/4.7-structured-routing/README.md) | 离线 gate；参考实现需真实模型 |
-| 4.8 | [L4.4 扩展：规划与执行（Gate）](part4-agents-langgraph/4.8-plan-and-execute/README.md) | 离线 gate；参考实现需真实模型 |
+| 4.7 | [L4.4 结构化路由（Gate）](part4-agents-langgraph/4.7-structured-routing/README.md) | 离线 gate；live 运行方式见 README |
+| 4.8 | [L4.4 扩展：规划与执行（Gate）](part4-agents-langgraph/4.8-plan-and-execute/README.md) | 离线 gate；live 运行方式见 README |
 | 4.9 | [v2 L5.6 可观测性（Gate）](part4-agents-langgraph/4.9-observability/README.md) | 离线 gate |
-| 4.10 | [L4.10 检查点与上下文（Gate）](part4-agents-langgraph/4.10-checkpoint-context/README.md) | 离线 gate；参考实现需真实模型 |
+| 4.10 | [L4.10 检查点与上下文（Gate）](part4-agents-langgraph/4.10-checkpoint-context/README.md) | 离线 gate；live 运行方式见 README |
 | 4.11 | [L4.10 流式与人工介入（Gate）](part4-agents-langgraph/4.11-streaming-hitl/README.md) | 离线 gate |
-| 4.12 | [L4.13 搜索信任边界（Gate）](part4-agents-langgraph/4.12-tool-safety-search/README.md) | 离线 gate；参考实现需真实模型 |
+| 4.12 | [L4.13 搜索信任边界（Gate）](part4-agents-langgraph/4.12-tool-safety-search/README.md) | 离线 gate；live 运行方式见 README |
 | 4.13 | [v2 L4.12 Text2SQL 安全门（Gate）](part4-agents-langgraph/4.13-text2sql-agent/README.md) | 离线 gate |
-| 4.14 | [L4.6 Supervisor 与并行（Gate）](part4-agents-langgraph/4.14-supervisor-fanout/README.md) | 离线 gate；参考实现需真实模型 |
+| 4.14 | [L4.6 Supervisor 与并行（Gate）](part4-agents-langgraph/4.14-supervisor-fanout/README.md) | 离线 gate；live 运行方式见 README |
 | 4.15 | [框架取舍（清单）](part4-agents-langgraph/4.15-framework-landscape/README.md) | 清单验收 |
 | 4.16 | [L4.5 用 Pydantic AI 写 Agent（Gate）](part4-agents-langgraph/4.16-pydantic-ai-agent/README.md) | 离线 gate |
 | 4.17 | [L4.8 Gate：原生版与 SDK 版（Gate）](part4-agents-langgraph/4.17-native-vs-sdk-gate/README.md) | 离线 gate |
@@ -288,9 +288,9 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 
 | 章节 | 文字教程 | 运行环境 |
 |---|---|---|
-| 5.1 | [L5.1 FastAPI 服务与可靠性（Gate）](part5-production/5.1-serve-fastapi/README.md) | 离线 gate，参考实现需真实模型 |
-| 5.2 | [L5.1 可靠性：退避/重试/成本（Gate）](part5-production/5.2-reliability-retry/README.md) | 离线 gate；参考实现需真实模型 |
-| 5.3 | [L5.2 扩展：成本/缓存/路由（Gate）](part5-production/5.3-cost-cache-routing/README.md) | 离线 gate；参考实现需真实模型 |
+| 5.1 | [L5.1 FastAPI 服务与可靠性（Gate）](part5-production/5.1-serve-fastapi/README.md) | 离线 gate；live 运行方式见 README |
+| 5.2 | [L5.1 可靠性：退避/重试/成本（Gate）](part5-production/5.2-reliability-retry/README.md) | 离线 gate；live 运行方式见 README |
+| 5.3 | [L5.2 扩展：成本/缓存/路由（Gate）](part5-production/5.3-cost-cache-routing/README.md) | 离线 gate；live 运行方式见 README |
 | 5.4 | [L5.3 SQLite 持久化（Gate）](part5-production/5.4-sqlite-persistence/README.md) | 离线 gate |
 | 5.5 | [L5.8 容器与配置（Gate）](part5-production/5.5-docker-packaging/README.md) | 离线 gate；真实构建需 Docker |
 | 5.6 | [调用日志与 Ollama 本地推理（清单）](part5-production/5.6-ollama-inference/README.md) | 清单验收（外部服务） |

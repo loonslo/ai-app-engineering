@@ -31,7 +31,7 @@ from .vector_store import ChromaStore
 
 LOG = logging.getLogger(__name__)
 SUPPORTED_SUFFIXES = {".txt", ".md", ".pdf"}
-SOURCE_VERSION_SCHEMA = "source-v3"  # v3：切分器与向量库改为原生实现，旧索引需要重建
+SOURCE_VERSION_SCHEMA = "source-v4"  # 业务语料改用独立目录；旧索引在新集合重建
 
 # 提示词要求信息不足时只回答这句话；回答后是否附来源也以它为准。
 REFUSAL_TEXT = "文档中没有提到"

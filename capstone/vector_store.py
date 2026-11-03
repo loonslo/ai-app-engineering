@@ -11,7 +11,7 @@ from typing import Any
 
 from .contracts import Document
 
-COLLECTION = "capstone"
+COLLECTION = "capstone_v4"
 
 
 class ChromaStore:

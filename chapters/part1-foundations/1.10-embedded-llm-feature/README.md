@@ -2,7 +2,7 @@
 
 [全书目录](../../README.md) · [上一章 L1.9](../1.8-cli-chatbot/README.md) · [下一章 L2.1](../../part2-rag/2.12-context-engineering/README.md)
 
-- **能力**：在现有后端服务中嵌入 LLM 洞察能力，构建业务校验、降级熔断与离线评测 Harness；掌握二阶校验、租户身份隔离、退款 fail-closed 安全策略；对比原生实现与 Pydantic AI (2.31.1) 实现。
+- **能力**：在现有后端服务中嵌入 LLM 洞察能力，构建业务校验、降级熔断与离线评测 Harness；掌握二阶校验、租户身份隔离、退款 fail-closed 安全策略；对比原生实现与 Pydantic AI 2.53.0 实现。
 - **v3 路径**：L1.10 / 核心（Gate；嵌入式功能）
 - **岗位任务 / 面试题型**：T1、T4 / F4、F5
 - **前置**：已完成 [L1.4 结构化输出](../1.3-structured-output/README.md)、[L1.6 工具调用协议](../1.5-tool-calling/README.md)、[L1.7 Provider 成本](../1.9-provider-cost/README.md)
@@ -53,13 +53,10 @@ python chapters/part1-foundations/1.10-embedded-llm-feature/gate/gate_check_pai.
 - **Grader（评分器）**：针对每个关键字段逐一对比期望值（计算字段级准确率与用例完全匹配率）；
 - **Transcript（运行轨迹与失误归因）**：完整记录错题的输入截断摘要、实际输出与失败字段，便于提示词优化。
 
-### 4. Pydantic AI (2.31.1) 的使用与安全限制
-本章对比了原生 SDK 与 Pydantic AI (`pydantic-ai-slim==2.31.1`) 两种实现方案。
-> [!IMPORTANT]
-> **锁定版本 2.31.1 的安全限制**（conventions.md 第 9 节）：
-> - **不启用自带的 OpenTelemetry 埋点**（`instrument=True`、`Agent.instrument_all()`）：PyPI 安全公告 PYSEC-2026-4284 指出，即使设置 `include_content=False`，prompt 正文仍会经由异常事件等途径导出泄露。追踪统一使用 L5.6 的 `opentelemetry-sdk` 手写脱敏埋点；
-> - **禁用受影响的额外功能**：不使用 `web_fetch_tool`、`FileUrl` 的本地文件下载与 `ConcurrencyLimitedModel`；
-> - **关闭思考模式**：2.31.1 的 `DeepSeekProvider` 尚未识别 `deepseek-flash` 思考参数，真实调用时须显式关闭思考。
+### 4. Pydantic AI 的使用与安全边界
+本章对比原生 SDK 与仓库当前锁定的 Pydantic AI（`pydantic-ai-slim[openai]==2.53.0`）实现方案。2.31.1 的安全公告与兼容限制属于历史记录，不适用于当前锁定版；具体 API 以当前锁定依赖和测试为准。
+
+本章不启用 Pydantic AI 自带的 OpenTelemetry 埋点，沿用课程 L5.6 的显式字段选择与脱敏策略。真实模型调用的思考模式、结构化输出与工具调用行为，须对所用模型和端点单独验证；不能从旧版 provider 限制推断当前行为。
 
 ---
 
@@ -163,5 +160,5 @@ python chapters/part1-foundations/1.10-embedded-llm-feature/ticket_service/app.p
 
 - **规则兜底能力有限**：`rules_fallback` 仅作为防止服务崩溃的熔断层，分类精度无法替代大模型；
 - **评测集规模**：24 条基准用例主要用于 CI 门禁与抗回归验证，生产环境能力评测需构建百条级业务评测集；
-- **Pydantic AI 2.31.1 安全边界**：如前述概念说明，严禁开启自带 OTel 埋点与使用受影响的下载/流式限流功能，真实调用显式关闭思考；
+- **SDK 安全与版本边界**：本章使用当前锁定的 Pydantic AI 2.53.0；旧版 2.31.1 公告限制不再是当前依赖约束。追踪仍采用课程的显式脱敏策略；真实模型兼容性按具体端点验证。
 - **语言范围**：当前用例与规则针对中文工单设计，多语言场景需扩展提示词定界与多语言分词。

@@ -14,13 +14,13 @@
 python chapters/part4-agents-langgraph/4.17-native-vs-sdk-gate/gate/gate_check.py
 ```
 
-全部 PASS 才算通过；写出 `gate/gate_report.json`，不允许改 gate_check.py 绕过检查。本章基于 Pydantic AI **2.31.1**，与课程锁定版本一致。
+全部 PASS 才算通过；写出 `gate/gate_report.json`，不允许改 gate_check.py 绕过检查。本章基于 Pydantic AI **2.53.0**，与课程锁定版本一致。
 
 ## 为什么做这个 gate
 
 换框架不能换题目。两边都接收完全相同的模型决策脚本，运行真正的工具与审批边界，再由同一个 `evaluate` 判分。原生版复用 L4.2 循环，SDK 版真实使用 `Agent`、`FunctionModel`、`DeferredToolRequests` 和 `UsageLimits`，不把原生结果改个标签称为 SDK 结果。
 
-`FunctionModel` 是由本地函数提供模型响应的测试模型，不请求网络；参考 [官方 FunctionModel 文档](https://ai.pydantic.dev/models/function/) 与 [v2.31.1 deferred tools 文档](https://github.com/pydantic/pydantic-ai/blob/v2.31.1/docs/deferred-tools.md)（读取于 2026-10-31）。锁定版的安全限制见 [课程约定第9节](../../../docs/v3/conventions.md#9-pydantic-ai-约定)：本章不启用 SDK 自动追踪或网页下载工具。
+`FunctionModel` 是由本地函数提供模型响应的测试模型，不请求网络；参考 [官方 FunctionModel 文档](https://ai.pydantic.dev/models/function/) 与 [v2.31.1 deferred tools 文档](https://github.com/pydantic/pydantic-ai/blob/v2.31.1/docs/deferred-tools.md)（读取于 2026-10-31）。该链接用于说明历史版本 API；当前课程约束见 [第 9 节](../../../docs/v3/conventions.md#9-pydantic-ai-约定)。本章不启用 SDK 自动追踪。
 
 ## 任务
 

@@ -27,7 +27,7 @@
 | 雷达 Vol.34（2026-04）将 LangGraph 从 Adopt 移到 Trial | [Thoughtworks 原文](https://www.thoughtworks.com/en-us/radar/languages-and-frameworks/summary/langgraph)：共享大状态图并非所有 Agent 的默认解，简单 Agent 可先通过代码协作，需要时再加图 | 有明确状态、分支、恢复与人工介入时用图，不把环位当“禁止使用” |
 | Microsoft Agent Framework 1.0 已面向 Python / .NET GA | [Microsoft 2026-04-29 发布记录](https://www.microsoft.com/releasecommunications/api/v2/azure/rss/560982)、[官方概览](https://learn.microsoft.com/en-us/agent-framework/overview/) | 已有 Microsoft 生态是评估理由；不能据此声称所有语言、集成和预览功能都稳定 |
 | OpenAI Agents Python SDK 的可核实发布 v0.24.0，2026-10-15，仍为 0.x | [官方发布](https://github.com/openai/openai-agents-python/releases/tag/v0.24.0) | 锁版本，复核升级对已保存运行、工具错误处理的影响；不要把 `openai` 客户端包与 `openai-agents` 混为一谈 |
-| 本课程基于 Pydantic AI **2.31.1**（v2），并非声称它是上游最新版 | [官方 v2.31.1 源码标签](https://github.com/pydantic/pydantic-ai/tree/v2.31.1)、[课程约束](../../../docs/v3/conventions.md#9-pydantic-ai-约定) | 保持课程锁定；不启用该版本自带遥测、web fetch、本地 FileUrl 下载或 ConcurrencyLimitedModel；不要照搬最新版 Harness 示例 |
+| 本课程基于 Pydantic AI **2.53.0**，由 `requirements-course.txt` 锁定 | [官方 v2.53.0 源码标签](https://github.com/pydantic/pydantic-ai/tree/v2.53.0)、[课程约束](../../../docs/v3/conventions.md#9-pydantic-ai-约定) | API 以锁定版本为准；外部服务、持久执行和工具权限仍需单独设计与验证 |
 
 **招聘现实如何表述？** 本次没有找到可复核的一手岗位样本、地区、时间窗口与去重口径，不能把“LangChain 出现率约 23–35%”写成 2026 招聘事实。上面的 30.2% 是开发者自报使用率，不是招聘率。练习时可自行采集一组公开 JD，记录网址、日期、岗位总数、去重规则与提及数，只对自己的样本下结论。
 
@@ -41,7 +41,7 @@ API 对照的作用是读懂项目，不是承诺所有框架语义相同。下�
 | 显式状态、条件分支、快照、暂停 | LangGraph [`StateGraph`、checkpointer、interrupt](https://docs.langchain.com/oss/python/langgraph/overview)；分别对应图、状态保存器、暂停点 | 崩溃任务的发现与调度、外部副作用恰好一次；见 L4.10、L4.11 |
 | 文件与计划、上下文卸载、子 Agent | [Deep Agents](https://docs.langchain.com/oss/python/deepagents/overview)，在 LangChain / LangGraph 之上加 harness | 虚拟文件系统不等于进程/网络隔离；复用审查见 L4.15 |
 | Agent 配置、执行循环、委派、校验、会话 | OpenAI Agents SDK 的 [`Agent`、`Runner`、handoff、guardrail、session](https://openai.github.io/openai-agents-python/)；handoff 转交控制，guardrail 检查输入/输出，session 保存会话上下文 | guardrail 不取代服务端鉴权；session 不等于完整持久执行。默认 OpenAI Responses 路径不能假设所有兼容网关支持 |
-| 带类型工具、宿主依赖、审批或外部执行待定 | Pydantic AI [`Agent`、`RunContext`](https://ai.pydantic.dev/agents/)、[deferred tools](https://ai.pydantic.dev/deferred-tools/)；RunContext 注入身份/资源；deferred tools 把待审批或外部结果交回宿主 | 不能信任客户端自报的租户或审批；保存历史、收集审批、续跑与幂等仍需设计；最新文档能力不代表课程 2.31.1 全部具备 |
+| 带类型工具、宿主依赖、审批或外部执行待定 | Pydantic AI [`Agent`、`RunContext`](https://ai.pydantic.dev/agents/)、[deferred tools](https://ai.pydantic.dev/deferred-tools/)；RunContext 注入身份/资源；deferred tools 把待审批或外部结果交回宿主 | 不能信任客户端自报的租户或审批；保存历史、收集审批、续跑与幂等仍需设计；课程实现以锁定版 2.53.0 与本地回归为准 |
 | Agent 与工作流组合 | [Google ADK 的 Agent / LlmAgent 与 workflows](https://google.github.io/adk-docs/agents/) | 与现有平台的模型、会话、部署适配需要逐项核实，不能因名称相似就互换快照 |
 | Agent、会话、工具、中间件、显式工作流 | [Microsoft Agent Framework 的 Agent / workflows](https://learn.microsoft.com/en-us/agent-framework/overview/) | 平台治理不等于应用权限；连接第三方服务的数据边界仍是自己的责任 |
 

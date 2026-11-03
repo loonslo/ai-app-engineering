@@ -1,0 +1,17 @@
+# Runtime dependencies for the native capstone service only.
+# The course and frozen flagship keep their separate framework dependencies.
+cachetools==7.1.1
+chromadb==1.5.9
+cryptography==47.0.0
+fastapi==0.139.2
+openai==3.19.0
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+pydantic==2.13.4
+PyJWT==2.13.0
+pypdf==6.14.2
+python-dotenv==1.2.2
+rank-bm25==0.2.2
+redis==8.0.1
+sentence-transformers==5.6.0
+uvicorn==0.46.0

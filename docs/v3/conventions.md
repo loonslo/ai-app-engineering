@@ -161,11 +161,11 @@ grep -rlE "^\s*(from|import) (langchain|langgraph)" chapters --include=*.py \
 - gate 中用 `TestModel` 或 `FunctionModel`，并在 gate_check 开头设置 `pydantic_ai.models.ALLOW_MODEL_REQUESTS = False`。
 - 真实调用走 `DeepSeekProvider`（或通用的 OpenAI 兼容 provider），模型名取自 `common.chat_model_name()`。
 - Pydantic AI 发版频繁。接口以锁定版本的官方文档为准，引用文档时写读取日期。
-- **锁定版本 2.31.1 的限制**（2026-10-28 复核时确认）：它是最后一个兼容 `openai<3` 的版本，PyPI 上登记了 5 条安全公告，修复都在 2.44.0 及以后。因此课程内：
-  - 不启用 Pydantic AI 自带的 OpenTelemetry 埋点（`instrument=True`、`Agent.instrument_all()`）。PYSEC-2026-4284：即使设置 `include_content=False`，正文仍会经由异常事件等途径导出。追踪统一用 L5.6 的 `opentelemetry-sdk` 写法；
-  - 不使用 `web_fetch_tool`、`FileUrl` 的 allow-local 下载与 `ConcurrencyLimitedModel`；
-  - 它的 `DeepSeekProvider` 不识别 `deepseek-flash`，真实调用时须显式关闭思考。
-  - 待 LangChain 锁定集允许 openai 3 后，升级到 ≥2.53.0，并复核本条。
+- **当前锁定版本为 2.53.0**（`requirements-course.txt`、`requirements-dev.txt`）。2026-11-02 核对的 PyPI 2.53.0 元数据没有列出 2.31.1 的五条安全公告；本条对 2.31.1 的公告与 `openai<3` 兼容限制是历史记录，不再适用于当前锁定集。
+  - 课程仍统一使用 L5.6 的 `opentelemetry-sdk` 明确选择并脱敏导出的字段；这属于项目追踪策略，不是对当前 Pydantic AI 埋点的漏洞结论。
+  - `web_fetch_tool`、`FileUrl` 和 `ConcurrencyLimitedModel` 是否适合特定场景，按当前官方文档与实际边界逐项评估；不是当前课程的统一禁用清单。
+  - DeepSeek 思考模式、结构化输出与工具调用兼容性按所用模型和端点验证，不沿用 2.31.1 的 provider 限制推断。
+  - 章节 API 以当前锁定版本与离线/在线验证结果为准；升级后仍需复核依赖解析与回归，不因 PyPI 无公告列表而宣称全面安全。
 
 ## 10. 依赖与版本
 

@@ -79,13 +79,13 @@ HTTP / CLI / Evaluation
 在仓库根目录、项目虚拟环境中执行：
 
 ```bash
-# 1) 安装依赖
+# 1) 安装依赖（开发测试用 requirements-dev.txt；生产最小依赖用 requirements-capstone.txt）
 python -m pip install -r requirements-dev.txt
-
 # 2) 复制配置模板，只填自己的本地地址和密钥；不要提交 .env（PowerShell 用 Copy-Item）
 cp .env.example .env
 
-# 3) 建知识库：公开文档放 capstone/docs/（已带示例），私有租户文档放 capstone/data/tenants/<tenant-key>/docs/
+# 3) 建知识库：公开业务文档放 capstone/data/docs/（含示例），
+#    私有租户文档放 capstone/data/tenants/<tenant-key>/docs/
 python -m capstone.main build
 
 # 4) 提问、跑评测（需要真实模型密钥）
@@ -101,8 +101,7 @@ uvicorn capstone.api_enterprise:app --reload
 streamlit run capstone/app_streamlit.py      # 开发调试界面
 # 公开演示用的静态页由 API 服务提供：启动 uvicorn 后访问 http://127.0.0.1:8000/ui/
 ```
-
-两个界面的分工：`app_streamlit.py` 面向开发调试（直接调用本地代码）；`static/` 是零依赖的静态 HTML + 原生 JS，通过 HTTP 调用 `/v1/chat` 与 `/v1/feedback`，用于公开演示，展示引用、降级（`degraded`）、需要人工审批（`status=pending_approval`）、缓存命中，提供“有用 / 没用”反馈与可读的错误提示。
+两个界面的分工：`app_streamlit.py` 面向开发调试；`static/` 是零依赖的静态 HTML + 原生 JS，通过 HTTP 调用 `/v1/chat` 与 `/v1/feedback`，用于公开演示，展示引用、降级（`degraded`）、需要人工审批（`status=pending_approval`）、缓存命中，提供“有用 / 没用”反馈与可读的错误提示。知识库只从 `CAPSTONE_DOCS_DIR`（默认 `capstone/data/docs/`）摄取业务语料；`capstone/docs/` 中的 ADR、runbook 和作品集材料不会被默认索引。
 
 可观测：设置 `CAPSTONE_OTEL=console` 把 span 打印到控制台；设置 `OTEL_EXPORTER_OTLP_ENDPOINT` 发送到 OTLP 后端（需另装 `opentelemetry-exporter-otlp-proto-http`）；默认不导出。span 只记 usage、模型 ID、request_id 与错误类型，**不记录问题、资料与回答的正文**。
 

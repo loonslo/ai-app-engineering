@@ -1,10 +1,10 @@
 ---
 project_id: ai-app-engineering
-updated: 2026-10-31
+updated: 2026-11-04
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "2026-10-31 V3-10（v3 标签、主线导航、章节总地图、根 README、提案状态）已实施并复跑：v3 标签 119 个 unchanged，v2 标签 111 个 unchanged，断链 0，pytest 151 passed（capstone 回归除外），限定范围 ruff 通过，导航链从 0.1 到 12.7 共 88 步无环、上一章与下一章互指；没有改 flagship-project；实施与自查为同一人，没有独立复核。V3-0 至 V3-10 全部实施，之后仍待真实学习与真实环境证据。2026-10-31 V3-9（capstone 去 LangChain、OTel、静态前端、文档对齐）已实施并复跑：capstone 内无 langchain/langgraph 导入，生产边界测试 43 项通过，里程碑与证据审计通过，真实模型回归 6/6，原生切分器与 LangChain 在 165 例上逐块一致；实施线程额度用完，由审核者亲自实施，没有实施与审核分离。V3-7、V3-8 已合入 master。2026-10-31 V3-7（篇 11 项目主线 P1–P6）与 V3-8（篇 12 就业轨道 J1–J7）已实施并复跑：断链 0，v3 标签 unchanged（“待建”为 0），ruff 通过，pytest 114 passed；12.3 演练原始代码恰好失败 3 项，12.5 三个检查器在空实现上全部失败，修复版与参考解在本机通过；11.5 前端在无头 Chromium 对假 API 验证。实施线程额度用完，由审核者亲自实施，没有实施与审核分离；V3-6 已合入 master。2026-10-31 V3-6（L5 服务化与生产：5.1/5.2/5.3/5.7 换实现或增补，新增 5.9–5.15，6.1 增补）已实施并复跑：gate 参考解 5.2 5/5、5.3 9/9、5.7 11/11、5.9 13/13、5.10 14/14、5.12 12/12，骨架 0 通过，pytest 110 passed，断链 0，ruff 通过，5.2/5.3 DeepSeek live 单次退出 0；实施线程额度用完，由审核者亲自实施，没有实施与审核分离。V3-5 已合入 master。2026-10-31 V3-5（L4-B，4.2–4.12/4.15 增改与新增 4.19–4.23）已在 wip-v3-5 实施并复跑：gate 参考解 106 项全过、骨架 0 通过，pytest 103 passed，断链 0，ruff 通过；4.3/4.6/4.12 DeepSeek live 单次退出 0。V3-4 已合入 master。V3-0–V3-3 已通过并合入 master。2026-10-31 完成 V3-4 的 L4.1–L4.8 课件实施，待审核：9 个离线 gate 骨架均 0 通过，临时解 106/106 且两次输出一致；工具与章节回归 91 passed，限定范围 ruff 通过、断链 0；v2 111 unchanged，新三章 v3 unchanged；13 个入口离线 exit 0；18 次适用的 live 缺钥/不可达检查均 exit 1 无堆栈。7 个主要入口 DeepSeek live 各单次 exit 0，不写根 reports/；4.16 批准后已登记 1 条，但模型仍说待审批，该语义不算通过。历史 V3-3 记录仍保留于正文及原证据，未把单次运行当成学习完成或真实系统验收。"
-next: "真实学习者按 workbook 闭卷练习并记录失败；补真实环境证据（云部署、真实用户、远端 CI、容量与恢复、托管运行时、OTLP 后端、真实 Postgres + pgvector）；核对 面试题/ 第三方内容版权；决定 待跟进.md 的去留。真实模型话术须与业务状态分别判分。"
+progress: "2026-11-02：修复 capstone 依赖分层与默认语料边界、评测拒答口径、fake 压测语料和 Windows UTF-8 子进程；离线 capstone 47、课程/工具 108、冻结 flagship 9 项通过，映射/链接/Ruff/baseline/本地 fake smoke 通过。详见 docs/capstone-repair-validation.md。2026-11-04：清理已废弃书籍排版工具（pdf-course/）与临时构建/缓存/IDE配置（释放 70MB+），更新 .gitignore 与 README，保留面试题/；测试 138 项、Ruff、strict-evidence 与 488 篇 Markdown 0 断链通过。历史 L2.12 Hybrid 拒答率 71.88% 未达 90%；真实学习、真实生产验收和第三方内容权利仍未完成，第三方材料按用户决定暂时保留且不得公开分发。"
+next: "真实学习与试教；为 L2.12 拒答门槛提供代表性评测和真实 reranker/model 证据；补齐真实模型、远端 CI、staging、容量、OTLP、恢复与事故演练；面试题/ 暂保留，公开前确认复用权利或移除复制内容。"
 evidence:
   - README.md
   - TASKS.md
@@ -57,6 +57,9 @@ evidence:
   - docs/gate-v3-10-validation.md
   - docs/v3/reviews/V3-10.md
   - docs/gate-v3-4-validation.md
+  - docs/capstone-repair-validation.md
+  - docs/v3/reviews/V3-4.md
+  - docs/v3/reviews/V3-5.md
 ---
 
 # AI 应用工程实战 · 项目概览与进度
@@ -270,3 +273,7 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 2026-10-31 V3-9 完成：见 `docs/gate-v3-9-validation.md`。未验证：真实 Postgres + pgvector、OTLP 后端、旧索引升级演练、备用模型的真实故障触发；`load_test --fake` 的 Windows 临时目录清理 PermissionError 已修复并复跑通过。下一步 V3-10（v3 标签、导航链接、章节总地图、根 README）。
 
 2026-10-31 V3-10 完成：见 `docs/gate-v3-10-validation.md`。未验证：真实学习者按新导航学习；各篇表格里“运行环境”列未逐章重核。
+
+2026-11-02 capstone 与课程修复：依赖分层、默认语料目录和旧索引隔离、拒答评测规则、fake 压测语料、课程运行说明与离线 CI 已修订。隔离 Python 3.14 环境下相关测试、结构/链接/lint 检查与本地 fake smoke 通过；Docker、外部 CI、真实模型与生产环境未验收。L2.12 既有 Hybrid 拒答率 71.88% 仍低于 90% 门槛；经用户决定，未确认授权的第三方题目暂时保留但不得公开分发；真实学习与外部生产条件仍待解决。具体命令和结果见 `docs/capstone-repair-validation.md`。
+
+2026-11-04 仓库存量废弃物与缓存清理：彻底删除历史旧版纸质书排版工具链（pdf-course/，含 23 个旧脚本及 out/ 编译产物）、IDE/外部工具临时配置（.vscode/、.deepeval/ 等）、.tmp/ 历史测试备份、.build/ 还原产物、output/ 与根临时数据库；更新 .gitignore 与根 README，严格保留面试题/ 与全部核心证据链。全量回归 138 passed、ruff 0 errors、milestones --strict-evidence 100% 通过、488 篇 Markdown 0 断链。未调用真实外部模型。

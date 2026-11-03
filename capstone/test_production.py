@@ -991,3 +991,30 @@ def test_feedback_endpoint_records_without_raw_content_and_static_ui_is_served(m
         assert client.get("/ui/app.js").status_code == 200
     line = (tmp_path / "feedback.jsonl").read_text(encoding="utf-8").strip()
     assert "13812345678" not in line and '"rating": -1' in line and "alice" not in line  # 评论脱敏，用户只存指纹
+
+
+def test_default_knowledge_base_uses_business_docs_only():
+    kb = KnowledgeBase(embeddings=object())
+    sources = {chunk.metadata["source_id"] for chunk in kb._load_chunks()}
+
+    assert "sample_kb.md" in sources
+    assert not any(
+        source.startswith(("adr/", "portfolio/", "runbooks/"))
+        for source in sources
+    )
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("文档中没有提到相关规则。", True),
+        ("根据已有资料，未提及相关规定。", False),
+        ("政策要求 30 天；文档中没有提到例外。", False),
+    ],
+)
+def test_evaluation_refusal_matches_citation_contract(answer, expected):
+    from .evaluation import _refused
+    from .knowledge_base import is_refusal
+
+    assert _refused(answer) is expected
+    assert is_refusal(answer) is expected

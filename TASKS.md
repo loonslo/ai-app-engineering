@@ -1,31 +1,34 @@
 # Tasks
 
-状态核对：2026-10-31。v2 的 82 章 + 29 步标签与验收结构保留。v3 的 V3-0–V3-3 已通过并合入 master；V3-4（L4.1–L4.8 Agent 控制流）已实施，9 个离线 gate 骨架全部 0 通过，临时解 106/106 且两次输出一致；工具与章节回归 91 passed，等待审核。真实模型仅有单次演示，4.16 话术与批准后状态不一致一处已在复核时加校验规则修复并复跑 live。统一入口见 `chapters/README.md`；课件实现与 gate 通过不代表本人已学完。证据见 `docs/gate-v3-4-validation.md`；岗位路径见 `docs/curriculum-v3.md`。
+状态核对：2026-11-04。V3-0–V3-10 的实施批次均有对应验证记录；V3-4 与 V3-5 审核结论均为通过，V3-4 复核见 `docs/v3/reviews/V3-4.md`。capstone 依赖、默认语料边界、评测拒答口径与 CI 检查的本轮修复/复测见 `docs/capstone-repair-validation.md`。2026-11-04 完成旧版书籍排版工具链（pdf-course/）与临时缓存/配置清理（释放 70MB+）。尚未关闭：L2.12 拒答率未达 90% 门槛、真实学习与试教、外部生产验收、第三方内容版权确认。统一入口见 `chapters/README.md`；课件实现与 gate 通过不代表本人已学完。
 
 ## Active
 
 - [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
-- [ ] **v3 改造（其他 AI 实施，Claude 审核）** - V3-0–V3-9 已通过并合入 master，V3-10 已完成（见下）。V3-9（capstone：去 LangChain、接入 OpenTelemetry、静态演示前端、文档对齐）已完成并复跑：`capstone/` 内无 langchain/langgraph 导入，生产边界测试 34 → 43 项全过，里程碑与证据审计通过，ruff 通过，真实模型回归 6/6、评测 拒答 2/2·关键词 4/4·引用 4/4；原生切分器与 LangChain 在 165 例上逐块一致；前端对真实服务冒烟通过。实施线程额度用完，由审核者亲自实施，没有实施与审核分离。记录见 `docs/gate-v3-9-validation.md`。V3-10 见 Done。未验证：真实 Postgres + pgvector、OTLP 后端、旧索引升级演练；`load_test --fake` 在 Windows 上临时目录清理的 PermissionError 已修复（`ignore_cleanup_errors=True`，2026-10-31 复跑：1204 请求、0 失败、SLO PASS、无堆栈）。
 - [ ] **V3-3 外部环境遗留** - 3.3/3.7/3.8 的 DeepSeek 单次 live 记录保留于 `docs/gate-v3-3-validation.md` 第 8 节；远端 OTLP、DeepEval 仍未验证。V3-3 已合入；用户决定不再恢复丢失的原 LangSmith 报告。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
-- [ ] **核对第三方内容与保留的证据文件** - `面试题/` 含第三方整理内容，公开前先核对版权；`reports/` 保留了 2 个压测文件（见 `reports/README.md`），删除它们会使 `capstone/docs/portfolio/` 引用的压测数字失去来源。`prompt_ab_judge_agreement.json` 被离线替身覆盖后的遗留文件已删除（原件仍丢失），已从 capstone 证据中移除，不再作为证据引用
+- [ ] **L2.12 拒答质量未达门槛** - 当前历史实测 Hybrid 拒答准确率 71.88%，低于 90% 要求；不得通过降低门槛、改评测集阈值或改指标定义伪造通过。需要有代表性的离线评估和真实 reranker/model 验证后再调整。证据：`docs/gate-v3-2-validation.md`。
 
+- [ ] **第三方内容与证据文件** - `面试题/` 含 98 道题目及答案/解析的复制内容；按用户决定暂时保留，但授权未确认前不得公开分发。公开前需核对许可证或移除复制材料。`reports/` 中的两个压测文件仍作为 portfolio 数字来源，未经迁移证据不得删除。
 ## Waiting On
 
 ## Someday
 
 - [ ] **求职准备** - 只从 `capstone/docs/portfolio/` 和真实报告提取可证明结论
-- [ ] **Pydantic AI 升级（待 LangChain 解除 openai 3 限制后）** - 当 LangChain 依赖集允许 openai>=3 时，将 `pydantic-ai-slim` 升级至 >=2.53.0，并消除 2.31.1 的 5 条安全公告限制（PYSEC-2026-4284..4291），复核 OTel 追踪与工具支持。
 
 ## Done
 
+- [x] **仓库存量冗余清理与构建瘦身（2026-11-04）** - 删除已废弃的旧版 PDF 书籍排版工具链（pdf-course/，释放 ~42MB 产物与 23 个旧脚本）；清除本地 IDE/工具目录与缓存（.vscode/、.deepeval/、.tmp/ 历史备份、.build/、output/、根临时数据库与 pycache）；更新 .gitignore 与 README.md，严格保留面试题/与核心课件/证据。全量回归 138 项通过、ruff 通过、strict-evidence 通过、488 篇 Markdown 0 断链。
+
 - [x] **V3-10 标签、导航与总地图（2026-10-31）** - 81 个旧章节补 v3 路径标签；主线 88 个章节的上一章/下一章按 v3 顺序重写（脚本验证 0.1 → 12.7 无环且互指）；`chapters/README.md` 加 v3 路线速查、补第 11、12 篇与新章节、v2 速查标为历史；根 README 改 v3 结构与技术路线说明；v3 提案标已采纳、v2 标已取代。验证与偏离见 `docs/gate-v3-10-validation.md`；未验证：真实学习者使用、“运行环境”列未逐章重核。
+- [x] **V3-4–V3-5 审核通过** - V3-4 审核记录确认通过；V3-5 已在 `docs/v3/reviews/V3-5.md` 确认通过。此前 TASKS 摘要中的“V3-4 待审核”和遗漏的 V3-5 记录已更正。
+- [x] **Pydantic AI 安全公告依赖升级（2026-11-02）** - 课程锁升级到 2.53.0，并同步 OpenAI 3.x 兼容依赖；resolver 与回归复测见 `docs/capstone-repair-validation.md`。
 - [x] **V3-9 capstone 去框架与叙事对齐（2026-10-31）** - 主链路改用原生 openai 客户端（超时、带抖动重试、可选备用模型）、chromadb 与自写切分器；pgvector 改 psycopg；新增 OTel 打点（默认不导出、不采集正文）、静态演示前端与反馈接口、ADR-002；简历与面试文档对齐代码（LangGraph、InMemorySaver、MCP 等对不上的说法已改）。验证与偏离见 `docs/gate-v3-9-validation.md`。
 - [x] **V3-7、V3-8 篇 11 项目主线与篇 12 就业轨道（2026-10-31）** - 新增 13 个章节：11.1–11.6（需求与指标、最小上线、控制面加固、执行面与真实证据、可演示前端、项目叙事）与 12.1–12.7（定位与简历、公开作品节奏、编码面试与 AI 辅助编码、系统设计模拟、take-home 模拟、行为面故事、投递与漏斗）。含 12.3 的预埋 bug 演练、12.5 的三个离线检查器、11.5 的静态前端示例。外部事实只写核对过的，没有来源的统计标“未核实”。验证与偏离见 `docs/gate-v3-7-validation.md`、`docs/gate-v3-8-validation.md`；未验证：真实学习者使用、模板填写、面试与市场信息的时效。
 - [x] **V3-6 L5 服务化与生产（2026-10-31；已合入 master）** - 5.1/5.2/5.3 换原生 openai SDK（带抖动的重试、SSE、成本与低峰调度），5.3 gate 追加 5 项、5.7 gate 追加 4 项，新增 5.9 OpenTelemetry、5.10 控制面与执行面、5.12 容量 SLO 与恢复三个 gate，新增 5.11、5.13、5.14、5.15 四个清单章，6.1 README 增补。外部出处逐项核对并标注读取日期，未核实的写“未核实”。验证与偏离见 `docs/gate-v3-6-validation.md`；未验证：OTLP 后端、真实云部署、托管运行时实测、并发与恢复。
-- [x] **V3-4 L4-A 控制流课件实施（2026-10-31；待审核）** - 完成 L4.1–L4.8：原生五种 workflow、有界工具循环、工具设计、枚举路由、JSON 计划恢复、Pydantic AI 审批与历史、多 Agent 上下文隔离、结果评分及两实现同场景 Gate。新增 4.16/4.17/4.18 并登记，依赖供 CI 离线使用。9 个骨架均 0 通过；临时解 106/106，连跑输出一致；工具与章节回归 91 passed（1 Chroma 弃用提示），限定范围 ruff 通过、断链 0、v2 111 unchanged，新三章 v3 unchanged；13 个入口离线 exit 0；9 个支持 live 的入口各验证缺钥/不可达，18 次均 exit 1 无堆栈。7 个主要入口 DeepSeek live 各单次 exit 0，不写根 reports/；4.16 首次 live 话术冲突已加校验规则修复并复跑 live（仅挡已知冲突）。未验证真实支付/审批 UI、并发恢复、远端追踪、部署、对照版真实成功路径。完整命令、偏离与临时解见 `docs/gate-v3-4-validation.md`。
+- [x] **V3-4 L4-A 控制流课件实施与审核（2026-10-31）** - 完成 L4.1–L4.8；审核结论通过，证据见 `docs/v3/reviews/V3-4.md` 与 `docs/gate-v3-4-validation.md`。离线课程测试与未验证外部路径按原记录区分。
 - [x] **V3-3 报告写入边界补查（2026-10-31；仍待 Claude 复核）** - 新增测试复现直接调用 `write_ab_report` 可绕过 CLI 覆盖证据；将 live 模式、模型 ID 和两版可用裁判结果的校验下沉到写入函数，校验失败前不写文件。新增 8 个离线测试覆盖直接写入拒绝、CLI 离线保护、模拟在线成功和全部/部分裁判降级；完整回归 116 passed、ruff 通过、368 个 Markdown 0 断链。模拟在线测试只写临时目录，不代表真实模型验收。证据见 `docs/gate-v3-3-validation.md` 的“后续补查”。未合并、未启动 V3-4；真实模型、远端 OTLP、原报告恢复仍未验证。
 - [x] **V3-3 复核退回整改（2026-10-31；等待审核者复核）** - 针对 `docs/v3/reviews/V3-3.md` 复核一节修复 N1、B1-r、M1-r、M9、M6-r、M8-r 与 b2-r、m2-r、m5-r、m7、m8：
   - N1：3.8 默认只写章节目录，`--live --update-evidence` 才更新仓库根目录证据；live 裁判复用 3.3 的 `run_native_judge_eval`（关闭思考模式，只在冲突时降级），失败条目标记 `degraded` 并排除出一致率；删 `ab_048` 特判，补 2 条人工不合格用例，κ 只有一类时记 `null`，结论按 80% 阈值计算；`reports/README.md` 说明原件已丢失，`capstone/interview_evidence.py` 移除该证据。

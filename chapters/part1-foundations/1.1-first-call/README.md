@@ -1,108 +1,149 @@
-# L1.1 一次调用 · Gate（原 1.1）
+# 1.1 第一次调用大模型 API
 
-[全书目录](../../README.md) · [上一章 L0.5](../../part0-setup/0.5-job-map-gap/README.md) · [下一章 L1.2](../1.7-llm-internals/README.md)
+平时调用大模型 API，如果只是写个脚本测试，传一句话拿回文本直接打印，一般不会觉得有什么问题。
 
-- **能力**：看懂一次模型往返的请求、响应、token 和失败出口；把失败转成可读结果。
-- **v2 路径**：L1.1 / 核心（Gate；一次调用）
-- **v3 路径**：L1.1 / 核心（Gate；一次调用）
-- **前置**：0.1（自检通过，`.env` 里有 `DEEPSEEK_API_KEY`）。
-- **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 失败分析）。
-- **闭卷规则**：只读本页和 `gate/starter.py`；**通过 gate 之前不要打开** `first_call.py`。
-- **验收命令**：
+但把代码接进服务跑一阵子，往往会遇到一些莫名其妙的状况：回答突然少了一半；请求卡住好几十秒；或者账单消耗对不上。
 
-```bash
-python chapters/part1-foundations/1.1-first-call/gate/gate_check.py
+底层其实就是一个 HTTP POST 请求。发一段 JSON 过去，拿一段 JSON 回来。正文之外，返回结构里有几个字段平时很容易被忽略。
+
+![请求与返回的主要结构](/shots/llm-request-anatomy.svg)
+
+## 发送请求时的两个角色
+
+传参的时候，消息列表里主要放两类内容：`system` 和 `user`。
+
+`system` 用来定规则，比如限制回答范围、设定角色。模型在生成回答时会优先参考这个设定。`user` 则是用户发过来的具体问题。这两个字段在代码里最好做一下非空判断，传空字符串过去只是在白白浪费请求。
+
+做具体功能时，通常会加上 `temperature=0`。数值设为 0，模型每次给出的回答会比较固定，适合系统稳定运行。
+
+## 返回内容里的两个关键字段
+
+拿到返回结果后，除了用来展示给用户的文字，通常还需要看一下这两个字段：
+
+### 结束原因：finish_reason
+
+这个字段说明了模型为什么停止生成。
+
+如果是 `stop`，说明回答正常结束了。
+
+如果拿到的是 `length`，说明回答太长，超过了预设的最大字数，后面的内容被直接截掉了。
+
+遇到回答只显示一半的情况，多数时候不是模型出错，而是触碰了字数上限。在业务代码里判断这个状态，可以用来提示用户内容被截断，或者自动发起二次请求补齐内容。
+
+### 字数消耗：usage
+
+这个字段记录了这次调用花了多少 token。
+
+里面分两项：输入的字数（`prompt_tokens`）和输出的字数（`completion_tokens`）。
+
+大模型的费用和耗时主要看这两个数字。因为模型是一个字一个字往外输出的，输出越长耗时就越久，费用也越高。在生产环境里，把这两个数字记进日志，方便后续排查耗时和核对账单。
+
+## 简单的调用代码
+
+大模型服务商大多兼容 OpenAI 的接口规范。直接使用官方提供的 `openai` 库即可，不需要引入太重的第三方框架：
+
+```python
+import os
+from openai import OpenAI
+
+# 从系统环境变量读取 API Key 和服务地址，避免把密钥直接写死在代码里
+client = OpenAI(
+    api_key=os.getenv("DEEPSEEK_API_KEY"),
+    base_url=os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com"),
+)
+
+response = client.chat.completions.create(
+    model="deepseek-flash",
+    messages=[
+        {"role": "system", "content": "你是一个严谨的技术助手，回答尽量精简。"},
+        {"role": "user", "content": "用一句话解释什么是检索增强生成（RAG）？"},
+    ],
+    temperature=0.0,  # 设为 0，让模型输出保持稳定
+)
+
+# choices 是一个列表，默认单次请求只生成一条候选回答
+choice = response.choices[0]
+content = choice.message.content
+finish_reason = choice.finish_reason
+
+# usage 记录当次调用的 token 统计，读取前做一下非空判断
+usage = response.usage
+
+print("回答内容:", content)
+print("结束状态:", finish_reason)
+if usage:
+    print(f"Token 统计: 输入 {usage.prompt_tokens}，输出 {usage.completion_tokens}")
 ```
 
-全部 PASS 才算通过；脚本会写 `gate/gate_report.json`。不允许改 `gate_check.py` 绕过检查。
+这段代码里有三个细节在实际写服务时比较常用：
 
-## 为什么做这个 gate
+一是通过环境变量读取密钥，防止不小心把 Key 提交到公开代码仓库。
 
-第一次调用最容易“跑通就以为会了”。真实服务里更常见的是：密钥错、请求超时、返回空内容、usage 缺失、上游返回非预期结构。如果你只写过 `print(response.content)`，这些情况都会变成线上事故。
+二是接口返回的候选回答 `choices` 是一个数组，平时默认取第 0 项就可以。
 
-这个 gate 让你把一次调用拆成三层：
+三是 `usage` 里的数字最好顺手记到系统日志里。后续如果遇到响应变慢或者费用偏高，调出日志比对输入和输出 token，能很快排查出是用户输入太长还是模型输出超长。
 
-1. **构造请求**：system / user 角色和顺序。
-2. **解析响应**：content、token、finish_reason；缺失时怎么记。
-3. **失败出口**：超时、模型异常、空响应、坏结构，都返回可读结果而不是堆栈。
+## 常见的报错处理
 
-## 任务
+调用外部接口总会遇到报错。遇到错误时，主要分清哪些需要人工看，哪些可以自动重试。
 
-实现 `gate/starter.py` 的三个函数：
+![常见报错与应对决策](/shots/llm-error-decision.svg)
 
-| 函数 | 你要交付的行为 |
-|---|---|
-| `build_messages` | 生成 system + user 两条消息；空参数抛 `ValueError` |
-| `parse_response` | 提取 content / input_tokens / output_tokens / finish_reason；非法结构抛 `CallError` |
-| `call_once` | 构造、调用、解析；超时/异常/空响应/坏结构都转成 `error` 字段 |
+常见的一般是这三类：
 
-关键口径：
+401 认证错误。通常是 API Key 填错了或者账号欠费了。这种错误重试多少次都没用，直接抛出异常并通知人去检查账号配置。
 
-- `chat_fn(messages)` 是注入的模型调用；gate 不联网。
-- `content` 缺失、不是字符串或只有空白 -> `CallError("empty_response")`。
-- `response` 不是 dict -> `CallError("bad_response")`。
-- `usage` 缺失 -> token 记 0；token 不是 int 也记 0。
-- `finish_reason` 缺省为 `"stop"`。
-- `call_once` 的 `error` 只能是 `timeout`、`model_error`、`empty_response`、`bad_response` 或 `None`。
+429 限流。请求发得太快，服务商暂时处理不过来。这种一般等一两秒再试一次就能过去，适合自动重试。
 
-## 故障注入（必须亲手触发）
+超时。网络抖动或者服务器响应太慢。客户端需要设一个超时时间（比如 15 秒），超时之后可以重试一次，或者切到备用模型。
 
-| # | 注入 | 期望 |
-|---|---|---|
-| 1 | 空 system / 空 question | `ValueError` |
-| 2 | `chat_fn` 抛 `TimeoutError` | `error="timeout"`，content 为空 |
-| 3 | `chat_fn` 抛 `RuntimeError` | `error="model_error"` |
-| 4 | 返回 `{"content": ""}` | `error="empty_response"` |
-| 5 | 返回 `["not a dict"]` | `error="bad_response"` |
-| 6 | 返回缺 `usage` | token 记 0，不崩 |
-| 7 | 返回 `finish_reason=""` | 缺省为 `"stop"` |
+在业务代码里，可以写一个分类函数，用布尔值告诉上层调用能不能直接重试：
 
-## 验收标准
+```python
+import openai
 
-`gate_check.py` 的 11 项全部 PASS：
+def classify_api_error(err: Exception) -> dict:
+    """
+    根据异常类型判断是否允许重试，并给出对应的处理建议
+    """
+    # 401 认证异常：通常是 Key 无效、账号欠费或无访问权限
+    if isinstance(err, openai.AuthenticationError):
+        return {"retryable": False, "msg": "Key 无效或欠费，需人工排查"}
 
-- 消息结构、空参数拒绝。
-- 正常响应解析、缺 usage 记 0、非法响应拒绝。
-- 调用成功、空问题、超时、模型异常、空响应、坏结构。
+    # 429 限流异常：请求频率或并发超过了服务商的配额
+    if isinstance(err, openai.RateLimitError):
+        return {"retryable": True, "msg": "触发服务商限流，稍后退避重试"}
 
-通过后，在 [workbook.md](workbook.md) 写：
+    # 超时异常：网络链路抖动或服务端推理耗时过长
+    if isinstance(err, openai.APITimeoutError):
+        return {"retryable": True, "msg": "请求超时，可重试一次或切换备用模型"}
 
-1. 为什么 `content` 为空要当失败，而不是当“模型不想回答”？
-2. token 缺失时记 0 有什么风险？生产里你会怎么补？
-3. 如果要把 `finish_reason` 用于判断“被截断”，它应该怎么参与业务逻辑？
-
-## 提交物
-
-- `gate/starter.py`（实现后的版本）。
-- `gate/gate_report.json`（11/11）。
-- workbook 里的失败分析与三个问题的回答。
-
-## 通过后对照参考实现
-
-不要提前看。通过后再运行并对照：
-
-```bash
-python chapters/part1-foundations/1.1-first-call/first_call.py
+    # 其他未预期的异常（如网络完全断开、入参格式错误）
+    return {"retryable": False, "msg": f"其他错误: {err}"}
 ```
 
-参考实现改用原生的 `common.get_openai_client()` 与 `common.chat_model_name()` 执行调用。需要认识到：框架里的聊天模型类（例如 LangChain 的 `ChatOpenAI`）在这一层本质上只是包装了同一个底层的 HTTP 请求与 JSON 往返，剥离框架后我们能更清晰地看见网络、错误捕获与 Token 计量的真实细节。
+通过 `retryable` 这个标识，代码在捕获异常时就很容易写重试逻辑：如果是 `True`，程序等待一两秒再重新发起一次；如果是 `False`，就直接把报错抛给外层或者记进告警，避免程序把大量无效重试打在已经欠费的接口上。
 
-对照时思考并回答：
+## 观察截断状态
 
-1. 参考实现直接通过原生 SDK 调用，并显式捕获了认证、超时、限流三类异常；如果要在生产落地，哪些属于可重试错误？
-2. 原生返回中的 `usage` 包含了哪些字段？为什么不能直接把响应剥离成纯字符串而忽略 `finish_reason`？
-3. 参考实现的 system prompt 和本 gate 的 `build_messages` 结构是否一致？
+验证截断逻辑时，可以在调用参数里加上 `max_tokens=5`，强行限制模型的最大输出长度：
 
-## 概念地图
+```python
+response = client.chat.completions.create(
+    model="deepseek-flash",
+    messages=[
+        {"role": "system", "content": "你是一个严谨的技术助手。"},
+        {"role": "user", "content": "用一句话解释什么是检索增强生成（RAG）？"},
+    ],
+    temperature=0.0,
+    max_tokens=5,  # 限制模型最多只能输出 5 个 token
+)
 
-- **一次往返**：请求（messages）→ 模型 → 响应（content + usage + finish_reason）。
-- **消息角色**：system 定规则，user 提问题；顺序会影响模型行为。
-- **usage**：token 计量，是成本和容量分析的数据源。
-- **可读失败**：上游不可靠时，服务要能降级并留下原因，而不是抛堆栈。
-- **离线替身**：`chat_fn` 注入让 gate 可重复、零费用。
+choice = response.choices[0]
+print("返回文本:", choice.message.content)
+print("结束状态:", choice.finish_reason)
+```
 
-## 边界
+运行这段代码，打印出来的文本通常只讲了半句话（例如“检索增强生成是”），后面的内容就没有了；此时打印出的 `finish_reason` 会明确变为 `length`。
 
-- gate 用假模型，不验证真实模型质量；真实调用见参考实现。
-- 通过 gate 只证明请求/响应/失败出口结构正确，不证明回答正确。
-- 认证、限流、成本预算在 L5.1 展开。
+在写接口自动化测试或核心业务时，只要判断出 `finish_reason == "length"`，就能知道当前回答并不完整，可以借此触发告警，或者提示用户调整提问。

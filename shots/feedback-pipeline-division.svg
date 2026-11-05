@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 380" width="100%" height="100%">
+  <defs>
+    <style>
+      .card-bg { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1; rx: 8px; }
+      .inner-box { fill: #f8fafc; stroke: #e2e8f0; stroke-width: 1; rx: 6px; }
+      .inner-box-red { fill: #fdf2f2; stroke: #fecaca; stroke-width: 1; rx: 6px; }
+      .inner-box-green { fill: #f0fdf4; stroke: #bbf7d0; stroke-width: 1; rx: 6px; }
+      .title-text { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif; font-size: 15px; font-weight: 600; fill: #0f172a; }
+      .sub-title { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif; font-size: 13px; font-weight: 600; fill: #334155; }
+      .desc-text { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif; font-size: 12px; fill: #64748b; }
+      .code-text { font-family: "SF Mono", Menlo, Monaco, Consolas, "Cascadia Code", monospace; font-size: 11px; fill: #475569; }
+      .alert-text { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif; font-size: 12px; font-weight: 600; fill: #b5442c; }
+      .success-text { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", sans-serif; font-size: 12px; font-weight: 600; fill: #166534; }
+      .arrow { stroke: #94a3b8; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+      .arrow-head { fill: #94a3b8; }
+      @media (prefers-color-scheme: dark) {
+        .card-bg { fill: #18191c; stroke: #2e3440; }
+        .inner-box { fill: #1e222b; stroke: #2a303c; }
+        .inner-box-red { fill: #2b1d1d; stroke: #5c2828; }
+        .inner-box-green { fill: #19271f; stroke: #22543d; }
+        .title-text { fill: #f8fafc; }
+        .sub-title { fill: #e2e8f0; }
+        .desc-text { fill: #94a3b8; }
+        .code-text { fill: #cbd5e1; }
+        .alert-text { fill: #f87171; }
+        .success-text { fill: #4ade80; }
+        .arrow { stroke: #64748b; }
+        .arrow-head { fill: #64748b; }
+      }
+    </style>
+  </defs>
+
+  <!-- 阶段 1：原始输入 -->
+  <g transform="translate(20, 20)">
+    <rect width="180" height="340" class="card-bg" />
+    <text x="18" y="36" class="title-text">1. 原始输入</text>
+    <text x="18" y="56" class="desc-text">用户直接提交的文本</text>
+
+    <rect x="14" y="75" width="152" height="110" class="inner-box" />
+    <text x="22" y="98" class="sub-title">典型输入特征</text>
+    <text x="22" y="120" class="desc-text">• 口语化、倒装句</text>
+    <text x="22" y="140" class="desc-text">• 错别字与情绪发泄</text>
+    <text x="22" y="160" class="desc-text">• 夹杂手机号与订单号</text>
+
+    <rect x="14" y="200" width="152" height="120" class="inner-box" />
+    <text x="22" y="224" class="sub-title">异常输入样本</text>
+    <text x="22" y="246" class="desc-text">• 空字符串、纯空格</text>
+    <text x="22" y="268" class="desc-text">• 纯符号、无意义乱码</text>
+    <text x="22" y="290" class="desc-text">• 重复刷屏垃圾文本</text>
+  </g>
+
+  <!-- 连接箭头 1 -->
+  <g transform="translate(205, 175)">
+    <line x1="0" y1="0" x2="20" y2="0" class="arrow" />
+    <polygon points="20,-4 26,0 20,4" class="arrow-head" />
+  </g>
+
+  <!-- 阶段 2：代码规则前置处理 -->
+  <g transform="translate(235, 20)">
+    <rect width="210" height="340" class="card-bg" />
+    <text x="18" y="36" class="title-text">2. 规则前置清洗</text>
+    <text x="18" y="56" class="desc-text">由 Python 确定性代码执行</text>
+
+    <rect x="14" y="75" width="182" height="110" class="inner-box" />
+    <text x="22" y="98" class="sub-title">硬性检查与脱敏</text>
+    <text x="22" y="120" class="desc-text">• 长度非空与最长截断</text>
+    <text x="22" y="140" class="desc-text">• 正则屏蔽手机/身份证号</text>
+    <text x="22" y="160" class="desc-text">• 基础字符去重与去空格</text>
+
+    <rect x="14" y="200" width="182" height="120" class="inner-box-red" />
+    <text x="22" y="224" class="alert-text">异常出口：直接丢弃</text>
+    <text x="22" y="246" class="desc-text">• 过滤后长度 &lt; 2 个字符</text>
+    <text x="22" y="268" class="desc-text">• 纯无意义表情符号</text>
+    <text x="22" y="290" class="alert-text">不调用模型，节省费用</text>
+  </g>
+
+  <!-- 连接箭头 2 -->
+  <g transform="translate(450, 130)">
+    <line x1="0" y1="0" x2="20" y2="0" class="arrow" />
+    <polygon points="20,-4 26,0 20,4" class="arrow-head" />
+    <text x="10" y="-8" text-anchor="middle" class="code-text">清洗通过</text>
+  </g>
+
+  <!-- 阶段 3：大模型语义理解 -->
+  <g transform="translate(475, 20)">
+    <rect width="200" height="340" class="card-bg" />
+    <text x="18" y="36" class="title-text">3. 模型语义理解</text>
+    <text x="18" y="56" class="desc-text">理解语境并抽取半结构数据</text>
+
+    <rect x="14" y="75" width="172" height="110" class="inner-box" />
+    <text x="22" y="98" class="sub-title">意图与类别判断</text>
+    <text x="22" y="120" class="desc-text">• 功能故障 (Bug)</text>
+    <text x="22" y="140" class="desc-text">• 体验吐槽 / 功能建议</text>
+    <text x="22" y="160" class="desc-text">• 发货退款 / 业务咨询</text>
+
+    <rect x="14" y="200" width="172" height="120" class="inner-box" />
+    <text x="22" y="224" class="sub-title">关键字段抽取</text>
+    <text x="22" y="246" class="desc-text">• 涉及模块名称</text>
+    <text x="22" y="268" class="desc-text">• 具体故障现象与诉求</text>
+    <text x="22" y="290" class="desc-text">• 情绪倾向与自述订单号</text>
+  </g>
+
+  <!-- 连接箭头 3 -->
+  <g transform="translate(680, 175)">
+    <line x1="0" y1="0" x2="20" y2="0" class="arrow" />
+    <polygon points="20,-4 26,0 20,4" class="arrow-head" />
+  </g>
+
+  <!-- 阶段 4：规则校验与终态分流 -->
+  <g transform="translate(705, 20)">
+    <rect width="195" height="340" class="card-bg" />
+    <text x="18" y="36" class="title-text">4. 校验与终态流转</text>
+    <text x="18" y="56" class="desc-text">代码校验字段并决定去向</text>
+
+    <rect x="14" y="75" width="167" height="75" class="inner-box-green" />
+    <text x="22" y="98" class="success-text">分支 A：自动入库</text>
+    <text x="22" y="118" class="desc-text">类别明确、模块枚举匹配</text>
+    <text x="22" y="136" class="desc-text">直接推送产研/客服工单</text>
+
+    <rect x="14" y="160" width="167" height="85" class="inner-box-red" />
+    <text x="22" y="183" class="alert-text">分支 B：人工复核</text>
+    <text x="22" y="203" class="desc-text">多意图混合、模块未匹配</text>
+    <text x="22" y="221" class="desc-text">信息缺失、疑似争议客诉</text>
+    <text x="22" y="238" class="alert-text">进入待人工确认队列</text>
+
+    <rect x="14" y="255" width="167" height="65" class="inner-box" />
+    <text x="22" y="278" class="sub-title">分支 C：记录忽略</text>
+    <text x="22" y="298" class="desc-text">非业务闲聊、纯赞赏</text>
+    <text x="22" y="314" class="desc-text">只沉淀数据，不建工单</text>
+  </g>
+</svg>

@@ -1,65 +1,78 @@
 ---
 project_id: ai-app-engineering
-updated: 2026-11-04
+updated: 2026-11-05
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: "2026-11-02：修复 capstone 依赖分层与默认语料边界、评测拒答口径、fake 压测语料和 Windows UTF-8 子进程；离线 capstone 47、课程/工具 108、冻结 flagship 9 项通过，映射/链接/Ruff/baseline/本地 fake smoke 通过。详见 docs/capstone-repair-validation.md。2026-11-04：清理已废弃书籍排版工具（pdf-course/）与临时构建/缓存/IDE配置（释放 70MB+），更新 .gitignore 与 README，保留面试题/；测试 138 项、Ruff、strict-evidence 与 488 篇 Markdown 0 断链通过。历史 L2.12 Hybrid 拒答率 71.88% 未达 90%；真实学习、真实生产验收和第三方内容权利仍未完成，第三方材料按用户决定暂时保留且不得公开分发。"
-next: "真实学习与试教；为 L2.12 拒答门槛提供代表性评测和真实 reranker/model 证据；补齐真实模型、远端 CI、staging、容量、OTLP、恢复与事故演练；面试题/ 暂保留，公开前确认复用权利或移除复制内容。"
+progress: 2026-11-05：完成 v7 AI 应用开发主线重排设计（8 章 51 篇主线与 12 篇独立选修，共 63 篇），完成 1.1 节《一个需求里，哪些步骤适合交给模型》图文样稿及
+  Task Spec 契约（docs/articles/1.1-task-decomposition.md），在 AGENTS.md 固化技术随笔与去 AI 味规范，产出纯矢量架构图
+  shots/feedback-pipeline-division.svg；大纲逐篇入口/实验边界/依据检查通过。此前记录：2026-11-05 完成 v6/v6.1
+  大纲设计，历史修复和离线测试结果见 docs/capstone-repair-validation.md。历史 L2.12 Hybrid 拒答率 71.88%
+  未达 90%；真实学习、真实生产验收和第三方内容权利仍未完成，第三方材料按用户决定暂时保留且不得公开分发。
+next: 真实学习与试教；为 L2.12 拒答门槛提供代表性评测和真实 reranker/model 证据；补齐真实模型、远端 CI、staging、容量、OTLP、恢复与事故演练；面试题/
+  暂保留，公开前确认复用权利或移除复制内容。
 evidence:
-  - README.md
-  - TASKS.md
-  - chapters/README.md
-  - docs/curriculum-v2.md
-  - docs/curriculum-v3.md
-  - docs/v3/README.md
-  - docs/v3/outline.md
-  - docs/course-v2-structure-validation.md
-  - docs/gate-samples-validation.md
-  - docs/gate-b1-validation.md
-  - docs/gate-b2a-validation.md
-  - docs/gate-b2b-validation.md
-  - docs/gate-b3a-validation.md
-  - docs/gate-b3b-validation.md
-  - docs/gate-b4a-validation.md
-  - docs/gate-b4b-validation.md
-  - docs/gate-b4c-validation.md
-  - docs/gate-b4d-validation.md
-  - docs/gate-b5a-validation.md
-  - docs/gate-b5b-validation.md
-  - docs/gate-b6a-validation.md
-  - docs/gate-b6b-validation.md
-  - docs/gate-b6i-validation.md
-  - flagship-project/ACCEPTANCE.md
-  - docs/course-restructure-validation.md
-  - docs/course-book-validation.md
-  - docs/course-review-validation.md
-  - docs/course-book-v1-validation.md
-  - docs/capstone-optimization-validation.md
-  - capstone/docs/portfolio/resume_evidence.md
-  - capstone/docs/portfolio/project_pitch.md
-  - docs/gate-v3-0-validation.md
-  - docs/v3/reviews/V3-0.md
-  - docs/gate-v3-1-validation.md
-  - docs/v3/reviews/V3-1.md
-  - docs/gate-v3-2-validation.md
-  - docs/v3/reviews/V3-2.md
-  - docs/gate-v3-3-validation.md
-  - docs/v3/reviews/V3-3.md
-  - docs/gate-v3-5-validation.md
-  - docs/gate-v3-6-validation.md
-  - docs/v3/reviews/V3-6.md
-  - docs/gate-v3-7-validation.md
-  - docs/gate-v3-8-validation.md
-  - docs/v3/reviews/V3-7.md
-  - docs/v3/reviews/V3-8.md
-  - docs/gate-v3-9-validation.md
-  - docs/v3/reviews/V3-9.md
-  - docs/gate-v3-10-validation.md
-  - docs/v3/reviews/V3-10.md
-  - docs/gate-v3-4-validation.md
-  - docs/capstone-repair-validation.md
-  - docs/v3/reviews/V3-4.md
-  - docs/v3/reviews/V3-5.md
+- docs/articles/1.1-task-decomposition.md
+- shots/feedback-pipeline-division.svg
+- docs/course-outline-v7.md
+- docs/course-outline-v7-validation.md
+- docs/course-outline-v6.1.md
+- docs/course-outline-v6.1-validation.md
+- docs/course-outline-v6.md
+- docs/course-outline-v6-validation.md
+- README.md
+- TASKS.md
+- chapters/README.md
+- docs/curriculum-v2.md
+- docs/curriculum-v3.md
+- docs/v3/README.md
+- docs/v3/outline.md
+- docs/course-v2-structure-validation.md
+- docs/gate-samples-validation.md
+- docs/gate-b1-validation.md
+- docs/gate-b2a-validation.md
+- docs/gate-b2b-validation.md
+- docs/gate-b3a-validation.md
+- docs/gate-b3b-validation.md
+- docs/gate-b4a-validation.md
+- docs/gate-b4b-validation.md
+- docs/gate-b4c-validation.md
+- docs/gate-b4d-validation.md
+- docs/gate-b5a-validation.md
+- docs/gate-b5b-validation.md
+- docs/gate-b6a-validation.md
+- docs/gate-b6b-validation.md
+- docs/gate-b6i-validation.md
+- flagship-project/ACCEPTANCE.md
+- docs/course-restructure-validation.md
+- docs/course-book-validation.md
+- docs/course-review-validation.md
+- docs/course-book-v1-validation.md
+- docs/capstone-optimization-validation.md
+- capstone/docs/portfolio/resume_evidence.md
+- capstone/docs/portfolio/project_pitch.md
+- docs/gate-v3-0-validation.md
+- docs/v3/reviews/V3-0.md
+- docs/gate-v3-1-validation.md
+- docs/v3/reviews/V3-1.md
+- docs/gate-v3-2-validation.md
+- docs/v3/reviews/V3-2.md
+- docs/gate-v3-3-validation.md
+- docs/v3/reviews/V3-3.md
+- docs/gate-v3-5-validation.md
+- docs/gate-v3-6-validation.md
+- docs/v3/reviews/V3-6.md
+- docs/gate-v3-7-validation.md
+- docs/gate-v3-8-validation.md
+- docs/v3/reviews/V3-7.md
+- docs/v3/reviews/V3-8.md
+- docs/gate-v3-9-validation.md
+- docs/v3/reviews/V3-9.md
+- docs/gate-v3-10-validation.md
+- docs/v3/reviews/V3-10.md
+- docs/gate-v3-4-validation.md
+- docs/capstone-repair-validation.md
+- docs/v3/reviews/V3-4.md
+- docs/v3/reviews/V3-5.md
 ---
 
 # AI 应用工程实战 · 项目概览与进度
@@ -277,3 +290,9 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 2026-11-02 capstone 与课程修复：依赖分层、默认语料目录和旧索引隔离、拒答评测规则、fake 压测语料、课程运行说明与离线 CI 已修订。隔离 Python 3.14 环境下相关测试、结构/链接/lint 检查与本地 fake smoke 通过；Docker、外部 CI、真实模型与生产环境未验收。L2.12 既有 Hybrid 拒答率 71.88% 仍低于 90% 门槛；经用户决定，未确认授权的第三方题目暂时保留但不得公开分发；真实学习与外部生产条件仍待解决。具体命令和结果见 `docs/capstone-repair-validation.md`。
 
 2026-11-04 仓库存量废弃物与缓存清理：彻底删除历史旧版纸质书排版工具链（pdf-course/，含 23 个旧脚本及 out/ 编译产物）、IDE/外部工具临时配置（.vscode/、.deepeval/ 等）、.tmp/ 历史测试备份、.build/ 还原产物、output/ 与根临时数据库；更新 .gitignore 与根 README，严格保留面试题/ 与全部核心证据链。全量回归 138 passed、ruff 0 errors、milestones --strict-evidence 100% 通过、488 篇 Markdown 0 断链。未调用真实外部模型。
+
+2026-11-05 完成 v6 独立文章大纲修订：11 章、55 篇，每篇明确问题、前置与起始材料、结果与范围；说明和综合练习放入附录。仅完成写作提案和文档结构核对，未替换现行 v3 课程，未制作正文或 starter 包，未进行试读和真实运行；原有测试与业务结论沿用其历史验证日期，本次未复测。记录见 `docs/course-outline-v6-validation.md`。
+
+2026-11-05 v6.1 补充设计：新增 11 篇工程主题并设计 P0—P5 连续项目及 W 可选写操作，明确需求与样本、模型/提示词比较、上游变化、发布回退、历史数据兼容、备份恢复和试用交接。文章总计 66 篇，结构检查通过。仅完成设计，现行 v3、capstone 与历史教学快照均未修改；代码包、真实调用、部署、迁移、容量与读者试用待实施。记录见 `docs/course-outline-v6.1-validation.md`；历史业务结论未重新验收。
+
+2026-11-05 v7 AI 应用开发主线重排：根据联网对照，将大纲重新组织为 8 章 51 篇主线与 12 篇独立选修。提示词、结构化输出与评估前置；RAG、上下文、工具与 Agent 分别成章；数据库、完整身份系统、同步、迁移、容量、备份、MCP、多 Agent 与微调实作按需选修。每篇有独立入口、实验边界和依据；正文说明一手资料支持的范围与不支持的结论。结构、来源编号、文风和格式检查通过。仅完成设计，未修改 v3、capstone 或历史快照，未制作代码包或做真实环境、读者试用和教学效果验收。记录见 `docs/course-outline-v7-validation.md`；既有业务结果未重新验收。

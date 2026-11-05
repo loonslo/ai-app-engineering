@@ -3,22 +3,16 @@ project_id: ai-app-engineering
 updated: 2026-11-05
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: 2026-11-05：完成 v7 AI 应用开发主线重排设计（8 章 51 篇主线与 12 篇独立选修，共 63 篇），完成 1.1 节《一个需求里，哪些步骤适合交给模型》图文样稿及
-  Task Spec 契约（docs/articles/1.1-task-decomposition.md），在 AGENTS.md 固化技术随笔与去 AI 味规范，产出纯矢量架构图
-  shots/feedback-pipeline-division.svg；大纲逐篇入口/实验边界/依据检查通过。此前记录：2026-11-05 完成 v6/v6.1
-  大纲设计，历史修复和离线测试结果见 docs/capstone-repair-validation.md。历史 L2.12 Hybrid 拒答率 71.88%
-  未达 90%；真实学习、真实生产验收和第三方内容权利仍未完成，第三方材料按用户决定暂时保留且不得公开分发。
-next: 真实学习与试教；为 L2.12 拒答门槛提供代表性评测和真实 reranker/model 证据；补齐真实模型、远端 CI、staging、容量、OTLP、恢复与事故演练；面试题/
-  暂保留，公开前确认复用权利或移除复制内容。
+progress: 2026-11-05：确立《从零到就业：生产级 AI 应用与 Agent 全栈工程实战 课程总纲、22 篇独立文章选题、撰稿规范与工程验收手册（最终编辑版 v3.0）》（docs/course-outline-22-articles-v3.0.md）为唯一最新大纲；完成阶段
+  0 第 0.1 篇《为什么 async def 里的阻塞调用会拖慢全部请求？——从脏发票校验到异步限流》随笔范文（docs/articles/0.1-async-blocking-invoice.md），配套发票模型、批处理限流与 5 项确定性/并发测试（tests/test_0_1.py）全部通过；清理历史中间过渡大纲草案（v6/v6.1/v7
+  共 6 个文档）与孤立样稿，消除干扰。此前记录：历史修复和离线测试结果见 docs/capstone-repair-validation.md。历史 L2.12 Hybrid 拒答率 71.88% 未达 90%；真实学习、真实生产验收和第三方内容权利仍未完成，第三方材料按用户决定暂时保留且不得公开分发。
+next: 真实学习与试教；为 L2.12 拒答门槛提供代表性评测和真实 reranker/model 证据；补齐真实模型、远端 CI、staging、容量、OTLP、恢复与事故演练；面试题/ 暂保留，公开前确认复用权利或移除复制内容。
 evidence:
-- docs/articles/1.1-task-decomposition.md
-- shots/feedback-pipeline-division.svg
-- docs/course-outline-v7.md
-- docs/course-outline-v7-validation.md
-- docs/course-outline-v6.1.md
-- docs/course-outline-v6.1-validation.md
-- docs/course-outline-v6.md
-- docs/course-outline-v6-validation.md
+- docs/course-outline-22-articles-v3.0.md
+- docs/articles/0.1-async-blocking-invoice.md
+- invoice_models.py
+- invoice_batch.py
+- tests/test_0_1.py
 - README.md
 - TASKS.md
 - chapters/README.md

@@ -1,12 +1,13 @@
 ---
 project_id: ai-app-engineering
-updated: 2026-11-05
+updated: 2026-11-09
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: 2026-11-05：确立《从零到就业：生产级 AI 应用与 Agent 全栈工程实战 课程总纲、22 篇独立文章选题、撰稿规范与工程验收手册（最终编辑版 v3.0）》（docs/course-outline-22-articles-v3.0.md）为唯一最新大纲；完成阶段
+progress: 2026-11-09：完成 v2 路线移除收尾——删除 30 个 v2 文档与 `tools/apply_v2_map.py`、112 个 README 去掉 `v2 路径` 行、CI 与 `docs/v3/` 去掉 v2 检查，并清掉上一会话被 ACL 拒绝的 `.pytest-tmp`、`.acl-recovery` 与残留缓存；离线复跑结果为 `apply_v3_map --check` 119 unchanged、462 个 Markdown 0 断链、ruff 通过、106 项工具与章节测试通过、capstone baseline 通过，`capstone.milestones --strict-evidence` 因运行产物 `capstone/data/failures.json` 被清理而缺一项，需一次真实评测重新生成。
+  此前 2026-11-05：确立《从零到就业：生产级 AI 应用与 Agent 全栈工程实战 课程总纲、22 篇独立文章选题、撰稿规范与工程验收手册（最终编辑版 v3.0）》（docs/course-outline-22-articles-v3.0.md）为唯一最新大纲；完成阶段
   0 第 0.1 篇《为什么 async def 里的阻塞调用会拖慢全部请求？——从脏发票校验到异步限流》随笔范文（docs/articles/0.1-async-blocking-invoice.md），配套发票模型、批处理限流与 5 项确定性/并发测试（tests/test_0_1.py）全部通过；清理历史中间过渡大纲草案（v6/v6.1/v7
   共 6 个文档）与孤立样稿，消除干扰。此前记录：历史修复和离线测试结果见 docs/capstone-repair-validation.md。历史 L2.12 Hybrid 拒答率 71.88% 未达 90%；真实学习、真实生产验收和第三方内容权利仍未完成，第三方材料按用户决定暂时保留且不得公开分发。
-next: 真实学习与试教；为 L2.12 拒答门槛提供代表性评测和真实 reranker/model 证据；补齐真实模型、远端 CI、staging、容量、OTLP、恢复与事故演练；面试题/ 暂保留，公开前确认复用权利或移除复制内容。
+next: 跑一次真实评测重新生成 capstone/data/failures.json，让 milestones 的严格证据检查恢复；真实学习与试教；为 L2.12 拒答门槛提供代表性评测和真实 reranker/model 证据；补齐真实模型、远端 CI、staging、容量、OTLP、恢复与事故演练；面试题/ 暂保留，公开前确认复用权利或移除复制内容。
 evidence:
 - docs/course-outline-22-articles-v3.0.md
 - docs/articles/0.1-async-blocking-invoice.md
@@ -16,31 +17,10 @@ evidence:
 - README.md
 - TASKS.md
 - chapters/README.md
-- docs/curriculum-v2.md
 - docs/curriculum-v3.md
 - docs/v3/README.md
 - docs/v3/outline.md
-- docs/course-v2-structure-validation.md
-- docs/gate-samples-validation.md
-- docs/gate-b1-validation.md
-- docs/gate-b2a-validation.md
-- docs/gate-b2b-validation.md
-- docs/gate-b3a-validation.md
-- docs/gate-b3b-validation.md
-- docs/gate-b4a-validation.md
-- docs/gate-b4b-validation.md
-- docs/gate-b4c-validation.md
-- docs/gate-b4d-validation.md
-- docs/gate-b5a-validation.md
-- docs/gate-b5b-validation.md
-- docs/gate-b6a-validation.md
-- docs/gate-b6b-validation.md
-- docs/gate-b6i-validation.md
 - flagship-project/ACCEPTANCE.md
-- docs/course-restructure-validation.md
-- docs/course-book-validation.md
-- docs/course-review-validation.md
-- docs/course-book-v1-validation.md
 - docs/capstone-optimization-validation.md
 - capstone/docs/portfolio/resume_evidence.md
 - capstone/docs/portfolio/project_pitch.md
@@ -67,6 +47,7 @@ evidence:
 - docs/capstone-repair-validation.md
 - docs/v3/reviews/V3-4.md
 - docs/v3/reviews/V3-5.md
+- docs/project-v2-removal-validation.md
 ---
 
 # AI 应用工程实战 · 项目概览与进度
@@ -290,3 +271,5 @@ V3-1 审核为退回。通过的部分：gate 参考解全过、骨架全挂、�
 2026-11-05 v6.1 补充设计：新增 11 篇工程主题并设计 P0—P5 连续项目及 W 可选写操作，明确需求与样本、模型/提示词比较、上游变化、发布回退、历史数据兼容、备份恢复和试用交接。文章总计 66 篇，结构检查通过。仅完成设计，现行 v3、capstone 与历史教学快照均未修改；代码包、真实调用、部署、迁移、容量与读者试用待实施。记录见 `docs/course-outline-v6.1-validation.md`；历史业务结论未重新验收。
 
 2026-11-05 v7 AI 应用开发主线重排：根据联网对照，将大纲重新组织为 8 章 51 篇主线与 12 篇独立选修。提示词、结构化输出与评估前置；RAG、上下文、工具与 Agent 分别成章；数据库、完整身份系统、同步、迁移、容量、备份、MCP、多 Agent 与微调实作按需选修。每篇有独立入口、实验边界和依据；正文说明一手资料支持的范围与不支持的结论。结构、来源编号、文风和格式检查通过。仅完成设计，未修改 v3、capstone 或历史快照，未制作代码包或做真实环境、读者试用和教学效果验收。记录见 `docs/course-outline-v7-validation.md`；既有业务结果未重新验收。
+
+2026-11-09 v2 路线移除收尾：2026-11-08 的清理改动（删 30 个 v2 文档与 `tools/apply_v2_map.py`、112 个 README 去掉 `v2 路径` 行、CI 与 `docs/v3/` 去掉 v2 检查）在上一会话中断，本次补完删除 ACL 异常目录、恢复 pytest 的 `--basetemp=.tmp/pytest`、整理 1.1 与 29 个旗舰步骤 README 的排版，并复跑标签、断链、ruff、测试与 capstone baseline。结果：`apply_v3_map --check` 119 unchanged、462 个 Markdown 0 断链、ruff 通过、106 项工具与章节测试通过、capstone baseline 通过；`capstone.milestones --strict-evidence` 因 `capstone/data/failures.json`（被 gitignore 的评测产物，随清理删除）缺一项，需要真实评测重新生成，不能用占位文件代替。此前段落里引用的 v2 验证记录（`docs/gate-b*.md`、`docs/course-*-validation.md` 等）已于本次删除，属历史记录，不再指向现存文件。本次未调用真实模型、未在 CI 的 Python 3.11 复跑、未提交；命令与边界见 `docs/project-v2-removal-validation.md`。

@@ -1,15 +1,16 @@
 # Tasks
 
-状态核对：2026-11-04。V3-0–V3-10 的实施批次均有对应验证记录；V3-4 与 V3-5 审核结论均为通过，V3-4 复核见 `docs/v3/reviews/V3-4.md`。capstone 依赖、默认语料边界、评测拒答口径与 CI 检查的本轮修复/复测见 `docs/capstone-repair-validation.md`。2026-11-04 完成旧版书籍排版工具链（pdf-course/）与临时缓存/配置清理（释放 70MB+）。尚未关闭：L2.12 拒答率未达 90% 门槛、真实学习与试教、外部生产验收、第三方内容版权确认。统一入口见 `chapters/README.md`；课件实现与 gate 通过不代表本人已学完。
+状态核对：2026-11-09。V3-0–V3-10 的实施批次均有对应验证记录；V3-4 与 V3-5 审核结论均为通过，V3-4 复核见 `docs/v3/reviews/V3-4.md`。capstone 依赖、默认语料边界、评测拒答口径与 CI 检查的本轮修复/复测见 `docs/capstone-repair-validation.md`。2026-11-04 完成旧版书籍排版工具链（pdf-course/）与临时缓存/配置清理（释放 70MB+）。2026-11-09 完成 v2 路线移除收尾，验证见 `docs/project-v2-removal-validation.md`。尚未关闭：L2.12 拒答率未达 90% 门槛、capstone 失败样本待重新生成、真实学习与试教、外部生产验收、第三方内容版权确认。统一入口见 `chapters/README.md`；课件实现与 gate 通过不代表本人已学完。
 
 ## Active
 
-- [ ] **课件维护** - 新增/修改章节时同步更新 `course-v2-map.json`（V3-0 后另有 `course-v3-map.json`）、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。
+- [ ] **课件维护** - 新增/修改章节时同步更新 `docs/course-v3-map.json`、章节索引、README 任务书与验收记录；改 gate 后跑参考解、骨架、pytest、断链、ruff。（`docs/course-v2-map.json` 与 `tools/apply_v2_map.py` 已于 2026-11-08 移除）
 - [ ] **V3-3 外部环境遗留** - 3.3/3.7/3.8 的 DeepSeek 单次 live 记录保留于 `docs/gate-v3-3-validation.md` 第 8 节；远端 OTLP、DeepEval 仍未验证。V3-3 已合入；用户决定不再恢复丢失的原 LangSmith 报告。
 - [ ] **真实学习/试教** - 按各章任务书实际完成 gate 或清单并记录失败；这不是课件结构完成的前置。
 - [ ] **核对 capstone 与选修阶段验收** - 按当前章节读取代码与测试，补运行证据（flagship-project 已冻结，不再补证据）；`python -m capstone.milestones --strict-evidence` 只确认所列文件存在，不等于运行验收
 - [ ] **完成真实环境证据** - 依次补齐真实模型评测（含第 1–6 篇需要模型的章节，本轮审查只做了离线运行）、远端 CI、staging、容量、恢复和事故演练
 - [ ] **L2.12 拒答质量未达门槛** - 当前历史实测 Hybrid 拒答准确率 71.88%，低于 90% 要求；不得通过降低门槛、改评测集阈值或改指标定义伪造通过。需要有代表性的离线评估和真实 reranker/model 验证后再调整。证据：`docs/gate-v3-2-validation.md`。
+- [ ] **capstone 失败样本待重新生成** - 2026-11-08 的清理删掉了 `capstone/data/failures.json`（`python -m capstone.main eval` 的运行产物，被 `.gitignore` 忽略），`python -m capstone.milestones --strict-evidence` 因此缺一项、退出码 1。需要一次真实评测重新生成，不能用占位文件冒充；其余里程碑条目已通过。
 
 - [ ] **第三方内容与证据文件** - `面试题/` 含 98 道题目及答案/解析的复制内容；按用户决定暂时保留，但授权未确认前不得公开分发。公开前需核对许可证或移除复制材料。`reports/` 中的两个压测文件仍作为 portfolio 数字来源，未经迁移证据不得删除。
 ## Waiting On
@@ -19,6 +20,8 @@
 - [ ] **求职准备** - 只从 `capstone/docs/portfolio/` 和真实报告提取可证明结论
 
 ## Done
+
+- [x] **v2 路线移除收尾（2026-11-09）** - 2026-11-08 的清理改动落盘后上一会话中断，本次补完：删除 30 个 v2 文档与 `tools/apply_v2_map.py`，112 个 README 去掉 `v2 路径` 行（chapters 83、flagship 29），CI 与 `docs/v3/` 去掉 v2 检查；删掉上一会话被 ACL 拒绝的 `.pytest-tmp`、`.acl-recovery`，以及 14 个空 `pytest-cache-files-*`、`chapters/.wtest_backend`、根目录 `.cleanup_v2.py`；恢复 `pytest.ini` 的 `--basetemp=.tmp/pytest` 并重建 `.tmp/`；1.1 README 头部改为标题、空行、标签、空行、正文，29 个旗舰 README 收敛删行后多出的空行。验证：`apply_v3_map --check` 119 unchanged、462 个 Markdown 0 断链、ruff py311 通过、106 项工具与章节测试通过、capstone baseline 通过；`milestones --strict-evidence` 因 `capstone/data/failures.json` 被删缺一项。未调用真实模型、未在 CI 的 3.11 复跑、未提交；证据见 `docs/project-v2-removal-validation.md`。
 
 - [x] **22 篇最新大纲落地与过期过渡大纲清理（2026-11-05）** - 确立《从零到就业：生产级 AI 应用与 Agent 全栈工程实战 课程总纲、22 篇独立文章选题、撰稿规范与工程验收手册（最终编辑版 v3.0）》（docs/course-outline-22-articles-v3.0.md）为唯一最新大纲；完成阶段 0 第 0.1 篇《为什么 async def 里的阻塞调用会拖慢全部请求？——从脏发票校验到异步限流》随笔范文（docs/articles/0.1-async-blocking-invoice.md），配套代码与 5 项确定性/受控并发测试全部通过（	ests/test_0_1.py）；清理历史中间过渡大纲草案（v6/v6.1/v7 共 6 个文档）与孤立草稿/配图，彻底消除干扰。
 

@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 7.8](../../../flagship-project/m8-evidence-final-frontend/step3/README.md) · [下一章 8.2](../8.2-eval-data-engineering/README.md)
 
 - **能力**：计算风险分/等级；风险入表去重；稳定排序；发现未覆盖领域。
-- **v2 路径**：L8 / 选做（Gate；风险建模）
 - **v3 路径**：选修 / 选修（AI 质量工程专项，评测岗加分）
 - **前置**：3.1（失败分析）。
 - **时间盒**：4 小时。

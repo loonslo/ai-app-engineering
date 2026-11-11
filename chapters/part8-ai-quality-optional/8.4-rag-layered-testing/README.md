@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 8.3](../8.3-mock-contract-invariant/README.md) · [下一章 8.5](../8.5-judge-calibration/README.md)
 
 - **能力**：计算 recall@k、precision@k、MRR、citation coverage；处理拒答样本和 k 截断。
-- **v2 路径**：L8 / 选做（Gate；RAG 分层检索评测）
 - **v3 路径**：选修 / 选修（AI 质量工程专项，评测岗加分）
 - **前置**：3.2（指标）、2.2（检索）。
 - **时间盒**：5 小时。

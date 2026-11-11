@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L4.5](../4.16-pydantic-ai-agent/README.md) · [下一章 L4.7](../../part3-evals/3.9-agent-trajectory-eval/README.md)
 
 - **能力**：用原生代码拆分任务、隔离子 Agent 上下文、并行执行并保留来源；先用纯函数 gate 自检阶段推进与合并。
-- **v2 路径**：L4.10 / 核心（Gate；Supervisor/Fan-out（可跳））
 - **v3 路径**：L4.6 / 核心（Gate；多 Agent 隔离）
 - **岗位任务 / 面试题型**：T3 / F3、F4
 - **前置**：4.4（reducer）、4.5、4.8。

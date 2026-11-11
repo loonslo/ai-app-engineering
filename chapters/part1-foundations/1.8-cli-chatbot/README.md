@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L1.8](../../part2-rag/2.5-raw-sdk-rag-agent-loop/README.md) · [下一章 L1.10](../1.10-embedded-llm-feature/README.md)
 
 - **能力**：把多轮历史、工具调用、命令解析和错误出口拼成一个可测试的 CLI 循环。
-- **v2 路径**：L1.7 / 核心（Gate；CLI 助手）
 - **v3 路径**：L1.9 / 核心（Gate；CLI 助手）
 - **前置**：1.1、1.4、1.5。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 故障分析）。

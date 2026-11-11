@@ -64,7 +64,7 @@
 2. **默认实现**：`openai` SDK 走 OpenAI 兼容接口；模型 ID 从环境变量读取，不写死。
 3. **核心 SDK**：Pydantic AI，版本在 V3-0 锁定。
 4. **LangChain 边界**：只允许出现在 [conventions.md 第 7 节](conventions.md#7-langchain-使用边界) 列出的位置。
-5. **标签**：内容批次不改任何 `v2 路径` 行；新章节直接写 `v3 路径` 行；旧章节的 v3 标签在 V3-10 统一添加，`v2 路径` 行保留（见第 7 节）。
+5. **标签**：只使用 `v3 路径` 行（2026-11-08 起 v2 路线与 `v2 路径` 标签已整体移除）。
 6. **flagship-project 已冻结**：所有批次都不修改 `flagship-project/`（见第 7 节）。
 7. **gate 与测试全部离线**：不调用真实模型，不联网。
 8. **索引统一更新**：内容批次不改 `chapters/README.md` 与根目录 `README.md`，由 V3-10 统一更新。
@@ -72,5 +72,5 @@
 ## 7. 用户决定（2026-10-27）
 
 1. **flagship-project 冻结**：作为基于 LangChain 1.x 的历史教学快照保留，不再更新。快照仍可还原运行，CI 继续跑 m1/step1 基线测试；项目实践以 capstone 与篇 11 为准。已同步：`flagship-project/README.md` 顶部的冻结说明、`AGENTS.md` 的代码边界约定、根目录 README 的课程表。
-2. **新增 v3 路径行**：V3-10 打标签时，旧章节保留 `v2 路径` 行，在其下方新增 `v3 路径` 行；不实现替换。冻结的旗舰步骤不加 v3 标签。
+2. **新增 v3 路径行**：V3-10 打标签时，旧章节保留 `v2 路径` 行，在其下方新增 `v3 路径` 行；不实现替换。冻结的旗舰步骤不加 v3 标签。2026-11-08 起 v2 标签已整体移除，见 `docs/project-v2-removal-validation.md`。
    - 起初定的是“上方”。V3-0 复核时发现这与 `apply_v2_map.py` 冲突，改为“下方”，原因见 [reviews/V3-0.md](reviews/V3-0.md)。

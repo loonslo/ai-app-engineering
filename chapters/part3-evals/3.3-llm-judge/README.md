@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L3.3（5.8）](../../part5-production/5.8-pytest-regression/README.md) · [下一章 L3.5](../3.5-eval-dataset-ragas/README.md)
 
 - **能力**：用 LLM 评语义正确性/忠实度，解析结构化裁决，并用人工标签校准裁判。
-- **v2 路径**：L3.4 / 核心（Gate；Judge 校准）
 - **v3 路径**：L3.4 / 核心（Gate；LLM Judge）
 - **前置**：1.3（结构化输出）、3.2（基础评测）、2.6（被测 RAG 与来源追踪）；真实跑裁判时还需要 `DEEPSEEK_API_KEY` 与本地 embedding 模型。
 - **时间盒**：6 小时（1h 读 + 3h 实现 + 2h 校准与失败分析）。

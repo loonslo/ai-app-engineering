@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L3.7](../../part3-evals/3.6-langsmith-eval/README.md) · [下一章 L4.2](../4.5-react-agent/README.md)
 
 - **能力**：用原生代码实现五种 workflow 与有界 Agent 循环，区分流程由谁决定。
-- **v2 路径**：L4.1 / 核心（Gate；Agent 模式）
 - **v3 路径**：L4.1 / 核心（Gate；工作流与 Agent）
 - **岗位任务 / 面试题型**：T3 / F3
 - **前置**：1.5（工具调用）。

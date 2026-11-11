@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L4.17](../../part4-agents-langgraph/4.23-async-agent-gate/README.md) · [下一章 L5.1（5.2）](../5.2-reliability-retry/README.md)
 
 - **能力**：把模型能力包装成可测试的 HTTP 服务；有超时/重试/降级、trace_id、就绪探针和失败落库。
-- **v2 路径**：L5.1 / 核心（Gate；服务与可靠性）
 - **v3 路径**：L5.1 / 核心（Gate；FastAPI 接口）
 - **前置**：2.6（RAG 链）、4.10（检查点与会话）。本章 gate 只要求最小超时/重试；5.2 会在通过后展开 jitter、主备切换和真实成本。
 - **环境**：离线 gate；需要 `fastapi`、`httpx`（TestClient 依赖）。参考实现另需真实模型和本地 embedding。

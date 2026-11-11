@@ -66,8 +66,6 @@ v3 路线（大纲、章节总表、就业出口标准 E1–E4 与 16 周排期�
 
 整合实现 [capstone](capstone/README.md)：主问答链路使用原生 openai SDK 与 chromadb，业务行为以它为准。**历史教学快照（已冻结）**：[企业客服 Copilot 项目教程（第 7 篇）](flagship-project/README.md)，基于 LangChain 1.x，2026-10-27 冻结，不再修改。
 
-> 旧的 v2 路线保留在 [docs/curriculum-v2.md](docs/curriculum-v2.md)（已被 v3 取代）与各章 README 的 `v2 路径` 一行；两种标签并存时以 `v3 路径` 为准。
-
 ## 目录说明
 
 ```text

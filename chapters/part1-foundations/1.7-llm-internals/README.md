@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L1.1](../1.1-first-call/README.md) · [下一章 L1.3](../1.2-control-output/README.md)
 
 - **能力**：用纯 Python 代码实现自回归模型的核心算子：带温度的 Softmax 数值稳定计算、Top-p/Top-k 采样截断、KV Cache 显存容量公式、余弦相似度几何度量、Prompt Caching 计费模型与分类评测指标（Precision/Recall/F1 除零保护）。
-- **v2 路径**：L1.1 / 核心阅读（清单验收）
 - **v3 路径**：L1.2 / 核心（Gate；LLM 原理）
 - **岗位任务 / 面试题型**：T1、T5 / F3、F5
 - **前置**：已完成 [L1.1 一次调用与 LLM 边界](../1.1-first-call/README.md)

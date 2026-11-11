@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 9.4](../9.4-intent-workflow/README.md) · [下一章 9.6](../9.6-readonly-sql-explain/README.md)
 
 - **能力**：事务内设置租户；参数化读写；查询带 tenant/user/session；limit 边界；游标关闭/提交。
-- **v2 路径**：L5.4 / 核心阅读（Gate；Postgres RLS/多租户）
 - **v3 路径**：L5.4 / 核心阅读（归入 L5.4）
 - **前置**：5.4（SQLite 持久化）、5.7（权限）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。

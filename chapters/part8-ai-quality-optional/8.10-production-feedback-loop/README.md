@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 8.9](../8.9-ci-layered-gate/README.md) · [下一章 9.1](../../part9-enterprise-infra-optional/9.1-intent-fewshot/README.md)
 
 - **能力**：反馈入队去重；只审核负反馈；人工 approve；只导出已批准样本。
-- **v2 路径**：L3.7 / 核心阅读（Gate；反馈闭环）
 - **v3 路径**：L3.8 / 核心阅读（归入 L3.8）
 - **前置**：5.4（SQLite）、3.4（评测集）。
 - **时间盒**：4 小时。

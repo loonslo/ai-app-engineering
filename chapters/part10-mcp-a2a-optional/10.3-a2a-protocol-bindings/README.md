@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 10.2](../10.2-a2a-agent-card-task/README.md) · [下一章 10.4](../10.4-cross-agent-delegation/README.md)
 
 - **能力**：校验 JSON-RPC 形状；按 method 分发；错误码 -32600/-32601/-32602/-32001；成功返回 result。
-- **v2 路径**：L10 / 选做（Gate；A2A JSON-RPC 绑定）
 - **v3 路径**：选修 / 选修（MCP 鉴权深挖与 A2A）
 - **前置**：10.2（任务状态机）。
 - **时间盒**：5 小时。

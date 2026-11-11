@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L3.6（3.7）](../3.7-eval-regression-curve/README.md) · [下一章 L3.6（3.10）](../3.10-eval-report-failures/README.md)
 
 - **能力**：归一化答案；判拒答；关键词/引用命中率；拒答一致性。
-- **v2 路径**：L3.6 / 核心（Gate；Prompt A/B 指标）
 - **v3 路径**：L3.6 / 核心（Gate；Prompt A/B）
 - **前置**：3.2（指标）。
 - **时间盒**：4 小时。

@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 10.1](../10.1-mcp-auth-approval/README.md) · [下一章 10.3](../10.3-a2a-protocol-bindings/README.md)
 
 - **能力**：按 message_id 幂等提交；按状态表迁移；终态/非法迁移拒绝；未知任务 `TaskNotFound`。
-- **v2 路径**：L10 / 选做（Gate；A2A 任务状态机）
 - **v3 路径**：选修 / 选修（MCP 鉴权深挖与 A2A）
 - **前置**：4.10（检查点/状态）。
 - **时间盒**：5 小时。

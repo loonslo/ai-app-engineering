@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 8.4](../8.4-rag-layered-testing/README.md) · [下一章 8.6](../8.6-agent-trajectory-testing/README.md)
 
 - **能力**：用人工标签校准 Judge 阈值；计算一致率、Cohen's kappa、混淆矩阵。
-- **v2 路径**：L3.4 / 核心阅读（Gate；Judge 校准）
 - **v3 路径**：L3.4 / 核心阅读（归入 L3.4）
 - **前置**：3.3（LLM Judge）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。

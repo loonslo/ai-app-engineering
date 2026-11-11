@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L5.2](../5.3-cost-cache-routing/README.md) · [下一章 L5.4](../5.15-auth-multitenancy/README.md)
 
 - **能力**：建对话/反馈表；trace_id 幂等写入；游标分页；反馈校验。
-- **v2 路径**：L5.3 / 核心（Gate；SQLite 持久化）
 - **v3 路径**：L5.3 / 核心（Gate；持久化）
 - **前置**：4.10（检查点）。
 - **时间盒**：6 小时（1h 读 + 4h 实现 + 1h 故障分析）。

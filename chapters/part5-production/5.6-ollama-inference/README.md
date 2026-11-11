@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 5.5](../5.5-docker-packaging/README.md) · [下一章 5.7](../5.7-security-guardrails/README.md)
 
 - **目标**：给每次模型调用记一条结构化日志，并了解怎样把开源模型跑在本机（Ollama）。
-- **v2 路径**：L5.7 / 选做（清单验收）
 - **v3 路径**：选修 / 选修（私有化部署）
 - **前置**：3.6、5.2。
 - **环境**：日志部分调用真实模型；Ollama 部分需要 `pip install langchain-ollama`，并在本机安装 Ollama、拉取过任一模型，缺任一条件会跳过并提示。

@@ -139,28 +139,6 @@ v3 是当前的学习路线：L0–L5 是技术主线，P（篇 11）是持续�
 | J7 | 投递与漏斗 | [12.7](part12-job-track/12.7-applications-funnel/README.md) | 清单 + 产物 | 5h |
 选修与降级的章节（1.6、4.9、4.13、5.6、6.2、8.x、9.x、10.x 中未列入主线的章节）见 [outline.md 第 5 节](../docs/v3/outline.md#5-选修与降级)；它们保留原有的上一章/下一章链接，不在上表的顺序里。
 
-## v2 路径速查（历史）
-
-v2 路径是 v3 之前的路线，保留作历史参考。各章 README 里 `v2 路径` 与 `v3 路径` 两行并存，**以 `v3 路径` 和上面的“v3 路线速查”为准**；下表的 `v2 路径` 编号与 v3 编号不同。
-
-| v2 阶段 | 对应章节 | 定位 |
-|---|---|---|
-| L0 定位与基线 | 0.1–0.2 | 核心 |
-| L1 模型调用与 Harness | 1.1–1.8、2.5 | 核心；1.1–1.5、1.8、2.5 是 Gate |
-| L2 RAG 与上下文 | 2.1–2.11（全部 Gate；2.5 归 L1） | 核心；2.11 多模态部分选做 |
-| L3 评测与质量 | 3.1–3.10 | 核心；3.1–3.5、3.7、3.10 已 Gate，3.6 清单，3.9 建议放到 4.10 后学 |
-| L4 Agent 与工作流 | 4.1–4.15、3.9 | 核心；4.1–4.12、4.14、3.9 已 Gate，4.13 选做 |
-| L5 服务化与生产 | 5.1–5.8、6.1 | 核心；5.1–5.5、5.7、5.8 已 Gate，5.6 选做 |
-| L6 项目与求职 | 7.8、capstone | 项目与求职 |
-| 选修专项 | 6.2、8.x、9.x、10.x | 选做；8.5/8.6/8.9/9.5 可作核心阅读 |
-
-跨篇顺序以 `v2 路径` 为准，不要只看目录号：
-
-- **2.4 / 2.5**：先学 2.5（L1.6 手写 Harness），再做 2.4（L2.9 评测 Gate）；两者都不依赖对方。
-- **3.9**：合成轨迹可先当预习，真正做轨迹评测放在 4.10/4.11 之后。
-- **5.2**：先通过 5.1 的 Gate，再读 5.2 的 jitter、主备切换和真实成本。
-- **9.1 / 10.1**：`前置` 里的 8.10 / 9.12 是**运行累积代码**的还原顺序，不是学习前置；不想跑整条线时，可直接读概念，不必先做完整条选修线。
-
 ## 怎样运行
 
 从仓库根目录运行。第 0–6 篇的独立脚本统一用：
@@ -177,7 +155,7 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 - 第 11、12 篇（项目主线与就业轨道）的章节多数**没有可运行的脚本**：它们是指南、清单与模板。有脚本的只有两处：12.3 的 `drill/check_drill.py` 与 12.5 的 `checkers/check_a.py`、`check_b.py`、`check_c.py`，按各章 README 里的命令直接用 `python` 运行，不经过 `tools/run_chapter.py`。11.5 的 `example_static/` 是静态页面，由你的 FastAPI 服务提供。
 - 依赖：`python -m pip install -r requirements-course.txt`；先运行 `python tools/run_chapter.py 0.1` 自检，缺哪一篇的依赖会直接列出。
 
-“运行环境”一列说明该章需要什么（该列主要写于 v2 时期；v3 之后许多参考实现默认离线、加 `--live` 才调用真实模型，以各章 README 的运行说明为准；“v2 Lx”前缀表示该章是选修或核心阅读，沿用 v2 编号，与 v3 编号不同）：**离线**不需要密钥或模型；**真实模型**需要 `DEEPSEEK_API_KEY` 并会产生少量费用；**本地 embedding** 需要下载 BGE 模型（见根目录 README“准备本地 embedding 模型”）。
+“运行环境”一列说明该章需要什么（许多参考实现默认离线、加 `--live` 才调用真实模型，以各章 README 的运行说明为准；选修章节的标题不带阶段号）：**离线**不需要密钥或模型；**真实模型**需要 `DEEPSEEK_API_KEY` 并会产生少量费用；**本地 embedding** 需要下载 BGE 模型（见根目录 README“准备本地 embedding 模型”）。
 
 ## 怎样记录
 
@@ -266,11 +244,11 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 | 4.6 | [L4.9 扩展：节点可靠性（Gate）](part4-agents-langgraph/4.6-node-reliability/README.md) | 离线 gate；参考实现一处需真实模型 |
 | 4.7 | [L4.4 结构化路由（Gate）](part4-agents-langgraph/4.7-structured-routing/README.md) | 离线 gate；live 运行方式见 README |
 | 4.8 | [L4.4 扩展：规划与执行（Gate）](part4-agents-langgraph/4.8-plan-and-execute/README.md) | 离线 gate；live 运行方式见 README |
-| 4.9 | [v2 L5.6 可观测性（Gate）](part4-agents-langgraph/4.9-observability/README.md) | 离线 gate |
+| 4.9 | [可观测性（Gate）](part4-agents-langgraph/4.9-observability/README.md) | 离线 gate |
 | 4.10 | [L4.10 检查点与上下文（Gate）](part4-agents-langgraph/4.10-checkpoint-context/README.md) | 离线 gate；live 运行方式见 README |
 | 4.11 | [L4.10 流式与人工介入（Gate）](part4-agents-langgraph/4.11-streaming-hitl/README.md) | 离线 gate |
 | 4.12 | [L4.13 搜索信任边界（Gate）](part4-agents-langgraph/4.12-tool-safety-search/README.md) | 离线 gate；live 运行方式见 README |
-| 4.13 | [v2 L4.12 Text2SQL 安全门（Gate）](part4-agents-langgraph/4.13-text2sql-agent/README.md) | 离线 gate |
+| 4.13 | [Text2SQL 安全门（Gate）](part4-agents-langgraph/4.13-text2sql-agent/README.md) | 离线 gate |
 | 4.14 | [L4.6 Supervisor 与并行（Gate）](part4-agents-langgraph/4.14-supervisor-fanout/README.md) | 离线 gate；live 运行方式见 README |
 | 4.15 | [框架取舍（清单）](part4-agents-langgraph/4.15-framework-landscape/README.md) | 清单验收 |
 | 4.16 | [L4.5 用 Pydantic AI 写 Agent（Gate）](part4-agents-langgraph/4.16-pydantic-ai-agent/README.md) | 离线 gate |
@@ -311,7 +289,7 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 | 章节 | 文字教程 | 运行环境 |
 |---|---|---|
 | 6.1 | [L5.12 方案选型（Gate）](part6-model-tradeoffs/6.1-choose-prompt-rag-finetune/README.md) | 离线 gate |
-| 6.2 | [v2 L6 LoRA 质量门禁（Gate）](part6-model-tradeoffs/6.2-lora-finetune-optional/README.md) | 离线 gate；真实训练需重依赖 |
+| 6.2 | [LoRA 质量门禁（Gate）](part6-model-tradeoffs/6.2-lora-finetune-optional/README.md) | 离线 gate；真实训练需重依赖 |
 
 ## 第 7 篇：企业客服 Copilot（已冻结，历史快照）
 
@@ -323,16 +301,16 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 
 | 章节 | 文字教程 | 运行环境 |
 |---|---|---|
-| 8.1 | [v2 L8 风险建模（Gate）](part8-ai-quality-optional/8.1-risk-modeling/README.md) | 离线 gate |
-| 8.2 | [v2 L8 评测数据工程（Gate）](part8-ai-quality-optional/8.2-eval-data-engineering/README.md) | 离线 gate |
-| 8.3 | [v2 L8 契约与不变量（Gate）](part8-ai-quality-optional/8.3-mock-contract-invariant/README.md) | 离线 gate |
-| 8.4 | [v2 L8 RAG 分层检索评测（Gate）](part8-ai-quality-optional/8.4-rag-layered-testing/README.md) | 离线 gate |
-| 8.5 | [v2 L3.4 扩展：Judge 校准（Gate）](part8-ai-quality-optional/8.5-judge-calibration/README.md) | 离线 gate |
-| 8.6 | [v2 L4.11 扩展：Agent 轨迹测试（Gate）](part8-ai-quality-optional/8.6-agent-trajectory-testing/README.md) | 离线 gate |
-| 8.7 | [v2 L8 API/SSE E2E（Gate）](part8-ai-quality-optional/8.7-api-sse-e2e/README.md) | 离线 gate |
-| 8.8 | [v2 L8 安全/韧性/性能（Gate）](part8-ai-quality-optional/8.8-security-resilience-perf/README.md) | 离线 gate |
-| 8.9 | [v2 L5.7 扩展：CI 分层门禁（Gate）](part8-ai-quality-optional/8.9-ci-layered-gate/README.md) | 离线 gate |
-| 8.10 | [v2 L3.7 反馈闭环（Gate）](part8-ai-quality-optional/8.10-production-feedback-loop/README.md) | 离线 gate |
+| 8.1 | [风险建模（Gate）](part8-ai-quality-optional/8.1-risk-modeling/README.md) | 离线 gate |
+| 8.2 | [评测数据工程（Gate）](part8-ai-quality-optional/8.2-eval-data-engineering/README.md) | 离线 gate |
+| 8.3 | [契约与不变量（Gate）](part8-ai-quality-optional/8.3-mock-contract-invariant/README.md) | 离线 gate |
+| 8.4 | [RAG 分层检索评测（Gate）](part8-ai-quality-optional/8.4-rag-layered-testing/README.md) | 离线 gate |
+| 8.5 | [扩展：Judge 校准（Gate）](part8-ai-quality-optional/8.5-judge-calibration/README.md) | 离线 gate |
+| 8.6 | [扩展：Agent 轨迹测试（Gate）](part8-ai-quality-optional/8.6-agent-trajectory-testing/README.md) | 离线 gate |
+| 8.7 | [API/SSE E2E（Gate）](part8-ai-quality-optional/8.7-api-sse-e2e/README.md) | 离线 gate |
+| 8.8 | [安全/韧性/性能（Gate）](part8-ai-quality-optional/8.8-security-resilience-perf/README.md) | 离线 gate |
+| 8.9 | [扩展：CI 分层门禁（Gate）](part8-ai-quality-optional/8.9-ci-layered-gate/README.md) | 离线 gate |
+| 8.10 | [反馈闭环（Gate）](part8-ai-quality-optional/8.10-production-feedback-loop/README.md) | 离线 gate |
 
 ## 第 9 篇：企业数据与推理设施专项（选修）
 
@@ -340,18 +318,18 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 
 | 章节 | 文字教程 | 运行环境 |
 |---|---|---|
-| 9.1 | [v2 L9 Few-shot 意图识别（Gate）](part9-enterprise-infra-optional/9.1-intent-fewshot/README.md) | 离线 gate |
-| 9.2 | [v2 L9 槽位填充（Gate）](part9-enterprise-infra-optional/9.2-slot-filling/README.md) | 离线 gate |
-| 9.3 | [v2 L9 稳定 JSON 契约（Gate）](part9-enterprise-infra-optional/9.3-stable-json-output/README.md) | 离线 gate |
-| 9.4 | [v2 L9 意图工作流（Gate）](part9-enterprise-infra-optional/9.4-intent-workflow/README.md) | 离线 gate |
-| 9.5 | [v2 L5.4 扩展：Postgres 与 RLS（Gate）](part9-enterprise-infra-optional/9.5-postgres-rls/README.md) | 离线 gate |
-| 9.6 | [v2 L9 只读 SQL 护栏（Gate）](part9-enterprise-infra-optional/9.6-readonly-sql-explain/README.md) | 离线 gate |
-| 9.7 | [v2 L5.2 扩展：Redis 缓存/限流（Gate）](part9-enterprise-infra-optional/9.7-redis-cache-ratelimit/README.md) | 离线 gate |
-| 9.8 | [v2 L9 向量存储选型（Gate）](part9-enterprise-infra-optional/9.8-vectorstore-selection/README.md) | 离线 gate |
-| 9.9 | [v2 L9 Compose 与运维（Gate）](part9-enterprise-infra-optional/9.9-compose-linux-ops/README.md) | 离线 gate |
-| 9.10 | [v2 L5.10 兼容模型配置（Gate）](part9-enterprise-infra-optional/9.10-openai-compatible-provider/README.md) | 离线 gate |
-| 9.11 | [v2 L9 vLLM 启动配置（Gate）](part9-enterprise-infra-optional/9.11-vllm-gpu/README.md) | 离线 gate |
-| 9.12 | [v2 L5.8 扩展：推理基准（Gate）](part9-enterprise-infra-optional/9.12-inference-benchmark/README.md) | 离线 gate |
+| 9.1 | [Few-shot 意图识别（Gate）](part9-enterprise-infra-optional/9.1-intent-fewshot/README.md) | 离线 gate |
+| 9.2 | [槽位填充（Gate）](part9-enterprise-infra-optional/9.2-slot-filling/README.md) | 离线 gate |
+| 9.3 | [稳定 JSON 契约（Gate）](part9-enterprise-infra-optional/9.3-stable-json-output/README.md) | 离线 gate |
+| 9.4 | [意图工作流（Gate）](part9-enterprise-infra-optional/9.4-intent-workflow/README.md) | 离线 gate |
+| 9.5 | [扩展：Postgres 与 RLS（Gate）](part9-enterprise-infra-optional/9.5-postgres-rls/README.md) | 离线 gate |
+| 9.6 | [只读 SQL 护栏（Gate）](part9-enterprise-infra-optional/9.6-readonly-sql-explain/README.md) | 离线 gate |
+| 9.7 | [扩展：Redis 缓存/限流（Gate）](part9-enterprise-infra-optional/9.7-redis-cache-ratelimit/README.md) | 离线 gate |
+| 9.8 | [向量存储选型（Gate）](part9-enterprise-infra-optional/9.8-vectorstore-selection/README.md) | 离线 gate |
+| 9.9 | [Compose 与运维（Gate）](part9-enterprise-infra-optional/9.9-compose-linux-ops/README.md) | 离线 gate |
+| 9.10 | [兼容模型配置（Gate）](part9-enterprise-infra-optional/9.10-openai-compatible-provider/README.md) | 离线 gate |
+| 9.11 | [vLLM 启动配置（Gate）](part9-enterprise-infra-optional/9.11-vllm-gpu/README.md) | 离线 gate |
+| 9.12 | [扩展：推理基准（Gate）](part9-enterprise-infra-optional/9.12-inference-benchmark/README.md) | 离线 gate |
 
 ## 第 10 篇：MCP 鉴权与 A2A（选修）
 
@@ -359,10 +337,10 @@ python tools/run_chapter.py 3.7 --no-upload        # 章节号（和脚本名）
 
 | 章节 | 文字教程 | 运行环境 |
 |---|---|---|
-| 10.1 | [v2 L4.9 MCP 授权与审批（Gate）](part10-mcp-a2a-optional/10.1-mcp-auth-approval/README.md) | 离线 gate |
-| 10.2 | [v2 L10 A2A 任务生命周期（Gate）](part10-mcp-a2a-optional/10.2-a2a-agent-card-task/README.md) | 离线 gate |
-| 10.3 | [v2 L10 A2A JSON-RPC 绑定（Gate）](part10-mcp-a2a-optional/10.3-a2a-protocol-bindings/README.md) | 离线 gate |
-| 10.4 | [v2 L10 跨 Agent 委派（Gate）](part10-mcp-a2a-optional/10.4-cross-agent-delegation/README.md) | 离线 gate |
+| 10.1 | [MCP 授权与审批（Gate）](part10-mcp-a2a-optional/10.1-mcp-auth-approval/README.md) | 离线 gate |
+| 10.2 | [A2A 任务生命周期（Gate）](part10-mcp-a2a-optional/10.2-a2a-agent-card-task/README.md) | 离线 gate |
+| 10.3 | [A2A JSON-RPC 绑定（Gate）](part10-mcp-a2a-optional/10.3-a2a-protocol-bindings/README.md) | 离线 gate |
+| 10.4 | [跨 Agent 委派（Gate）](part10-mcp-a2a-optional/10.4-cross-agent-delegation/README.md) | 离线 gate |
 
 ## 第 11 篇：项目主线（P）
 

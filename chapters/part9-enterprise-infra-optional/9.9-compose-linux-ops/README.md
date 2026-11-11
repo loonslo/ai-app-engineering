@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 9.8](../9.8-vectorstore-selection/README.md) · [下一章 9.10](../9.10-openai-compatible-provider/README.md)
 
 - **能力**：启动前检查数据库/Redis/Qdrant 协议；生产禁止示例密码；一次收集全部错误。
-- **v2 路径**：L9 / 选做（Gate；Compose/运维配置）
 - **v3 路径**：选修 / 选修（企业数据与推理设施）
 - **前置**：5.5（容器）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。

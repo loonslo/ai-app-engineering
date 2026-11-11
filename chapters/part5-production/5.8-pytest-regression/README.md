@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L3.3（3.2）](../../part3-evals/3.2-eval-basics/README.md) · [下一章 L3.4](../../part3-evals/3.3-llm-judge/README.md)
 
 - **能力**：归一化答案；判拒答；按同义词组检查关键词；合并用例；汇总 passed/failed/skipped。
-- **v2 路径**：L3.3 / 核心（Gate；pytest 回归（3.2 后读））
 - **v3 路径**：L3.3 / 核心（Gate；pytest 回归）
 - **前置**：3.2（基础评测）、5.4（失败数据）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。

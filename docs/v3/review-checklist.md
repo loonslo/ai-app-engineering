@@ -83,7 +83,6 @@
 
 - [ ] `python -m pytest tools chapters/test_new_lessons.py chapters/test_v3_lessons.py -q` 通过。
 - [ ] 本批次碰过的旧 gate，用原有的临时参考解重跑仍全部通过。
-- [ ] `python tools/apply_v2_map.py --check` 显示无变化。
 
 ### J. 文风（次要，系统性问题升为主要）
 

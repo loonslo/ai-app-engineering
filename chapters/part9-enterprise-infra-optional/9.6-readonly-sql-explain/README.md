@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 9.5](../9.5-postgres-rls/README.md) · [下一章 9.7](../9.7-redis-cache-ratelimit/README.md)
 
 - **能力**：校验只读单语句、表白名单、显式 LIMIT；按目录+角色取 SQL；拒绝超阈值顺扫。
-- **v2 路径**：L9 / 选做（Gate；只读 SQL/执行计划）
 - **v3 路径**：选修 / 选修（企业数据与推理设施）
 - **前置**：9.5（Postgres/RLS）。
 - **时间盒**：5 小时。

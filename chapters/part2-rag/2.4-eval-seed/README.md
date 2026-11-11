@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L2.10](../2.14-memory-compaction/README.md) · [下一章 L2.12](../2.15-real-corpus-kb-gate/README.md)
 
 - **能力**：把“答得对不对”拆成召回、引用、拒答、关键词四项；用固定样本证明评测器能抓住已知失败。
-- **v2 路径**：L2.9 / 核心（Gate；RAG 评测基线）
 - **v3 路径**：L2.11 / 核心（Gate；RAG 评测基线）
 - **前置**：[1.10 评测体系与嵌入式功能](../../part1-foundations/1.10-embedded-llm-feature/README.md)（掌握 Task/Trial/Grader/Transcript 架构）、[2.3 最小 RAG](../2.3-minimal-rag/README.md)。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 故障分析）。

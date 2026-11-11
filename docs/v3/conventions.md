@@ -191,12 +191,9 @@ python tools/check_course_links.py
 # 6. 静态检查，按 CI 的 Python 版本
 python -m ruff check --target-version py311 <本批次改动的目录与文件>
 # 7. LangChain 边界：第 7 节的 grep 命令应无输出
-# 8. v2 标签未被改动
-python tools/apply_v2_map.py --check
-# 9. v3 映射（V3-0 之后）。V3-10 之前退出码为 1 属正常：只允许出现旧章节的 inserted 与未建目录的“待建”；
-#    本批次新建的章节必须显示 unchanged（README 中已有正确的 v3 路径行）
+# 8. v3 标签未被改动（2026-11-08 起 v2 路线已移除，只保留 v3 路径标签）
 python tools/apply_v3_map.py --check
-# 10. 参考实现能启动；无密钥时给出可读提示
+# 9. 参考实现能启动；无密钥时给出可读提示
 python tools/run_chapter.py <章节号> [脚本名]
 ```
 
@@ -204,7 +201,7 @@ python tools/run_chapter.py <章节号> [脚本名]
 
 ## 12. 验证记录模板
 
-文件名为 `docs/gate-v3-<批次号>-validation.md`，结构沿用 `docs/gate-samples-validation.md`：
+文件名为 `docs/gate-v3-<批次号>-validation.md`，结构见 `docs/gate-v3-10-validation.md`：
 
 ```markdown
 # V3-x <批次名> 验证 · YYYY-MM-DD

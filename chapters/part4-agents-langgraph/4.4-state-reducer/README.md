@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L4.9（4.3）](../4.3-branch-loop/README.md) · [下一章 L4.9（4.6）](../4.6-node-reliability/README.md)
 
 - **能力**：理解节点返回值如何合并进 state；用 reducer 处理累加、fan-out 和滑动窗口。
-- **v2 路径**：L4.3 / 核心（Gate；状态与 Reducer）
 - **v3 路径**：L4.9 / 核心（Gate；状态 Reducer）
 - **前置**：4.3（分支与循环）。
 - **时间盒**：5 小时（1h 读 + 3h 实现 + 1h 分析）。

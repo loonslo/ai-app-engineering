@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 8.6](../8.6-agent-trajectory-testing/README.md) · [下一章 8.8](../8.8-security-resilience-perf/README.md)
 
 - **能力**：解析 SSE 事件；拼接 token/message 文本；校验 E2E 响应契约。
-- **v2 路径**：L8 / 选做（Gate；API/SSE E2E）
 - **v3 路径**：选修 / 选修（AI 质量工程专项，评测岗加分）
 - **前置**：5.1（API）、8.3（契约）。
 - **时间盒**：4 小时。

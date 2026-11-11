@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L4.6](../../part4-agents-langgraph/4.14-supervisor-fanout/README.md) · [下一章 L4.8](../../part4-agents-langgraph/4.17-native-vs-sdk-gate/README.md)
 
 - **能力**：从轨迹提取工具调用；判定期望/禁用工具、完成、步数、最少调用；汇总通过率。
-- **v2 路径**：L4.11 / 核心（Gate；Agent 轨迹评测（建议 4.10 后学））
 - **v3 路径**：L4.7 / 核心（Gate；Agent 评测）
 - **岗位任务 / 面试题型**：T3、T4 / F4、F5
 - **前置**：3.2–3.5（RAG 评测）；建议 4.10/4.11 后学。

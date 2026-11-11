@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 L5.11](../../part5-production/5.14-llm-system-design/README.md) · [下一章 P1](../../part11-project-sprint/11.1-requirements-metrics/README.md)
 
 - **能力**：按知识/引用/行为/样本/训练条件，选择 Prompt、RAG、微调或组合，并给出上线检查项。
-- **v2 路径**：L5.10 / 核心（Gate；方案选型）
 - **v3 路径**：L5.12 / 核心（Gate；方案决策）
 - **前置**：2.3（RAG）、1.3（结构化输出）。
 - **时间盒**：4 小时（1h 读 + 2h 实现 + 1h 分析）。

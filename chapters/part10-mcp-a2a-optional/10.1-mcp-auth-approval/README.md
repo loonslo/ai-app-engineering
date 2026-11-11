@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 9.12](../../part9-enterprise-infra-optional/9.12-inference-benchmark/README.md) · [下一章 10.2](../10.2-a2a-agent-card-task/README.md)
 
 - **能力**：校验 token audience、工具 scope、高风险审批；失败统一 `McpAuthorizationError`。
-- **v2 路径**：L4.9 / 选做（Gate；MCP 授权/审批）
 - **v3 路径**：选修 / 选修（MCP 鉴权深挖与 A2A）
 - **前置**：4.11（HITL）、5.7（权限）。
 - **时间盒**：5 小时。

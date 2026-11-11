@@ -9,9 +9,8 @@
 `- **v3 路径**：<stage> / <role>（<note>）`。
 插入规则：
 - 已有 v3 路径行时原地替换；
-- 否则若有 v2 路径行，插在它的下一行；
-- 两者都没有时，插在第一个头部字段行（- **能力** 或 - **目标**）之后。
-永远保留 v2 路径行；不处理 flagship-project/（已冻结）；
+- 否则插在第一个头部字段行（- **能力** 或 - **目标**）之后。
+不处理 flagship-project/（已冻结）；
 映射中存在但尚未创建目录的章节输出为“待建”，不视为错误。
 """
 
@@ -65,55 +64,40 @@ def upsert(path: Path, line: str, apply: bool) -> str:
         updated[v3_idx] = line
         status = "updated"
     else:
-        v2_idx = next(
-            (i for i, line_text in enumerate(lines) if "**v2 路径**" in line_text),
+        header_idx = next(
+            (
+                i
+                for i, line_text in enumerate(lines)
+                if line_text.startswith(("- **能力**", "- **目标**"))
+            ),
             None,
         )
-        if v2_idx is not None:
-            updated = lines[: v2_idx + 1] + [line] + lines[v2_idx + 1 :]
+        if header_idx is not None:
+            updated = lines[: header_idx + 1] + [line] + lines[header_idx + 1 :]
         else:
-            header_idx = next(
+            bullet_at = next(
                 (
                     i
                     for i, line_text in enumerate(lines)
-                    if line_text.startswith(("- **能力**", "- **目标**"))
+                    if line_text.startswith("- **")
                 ),
                 None,
             )
-            if header_idx is not None:
-                updated = (
-                    lines[: header_idx + 1] + [line] + lines[header_idx + 1 :]
-                )
+            if bullet_at is not None:
+                updated = lines[: bullet_at + 1] + [line] + lines[bullet_at + 1 :]
             else:
-                bullet_at = next(
+                nav_at = next(
                     (
                         i
                         for i, line_text in enumerate(lines)
-                        if line_text.startswith("- **")
+                        if line_text.startswith(("[全书目录]", "[项目目录]", "[返回"))
                     ),
                     None,
                 )
-                if bullet_at is not None:
-                    updated = (
-                        lines[: bullet_at + 1] + [line] + lines[bullet_at + 1 :]
-                    )
+                if nav_at is not None:
+                    updated = lines[: nav_at + 1] + ["", line] + lines[nav_at + 1 :]
                 else:
-                    nav_at = next(
-                        (
-                            i
-                            for i, line_text in enumerate(lines)
-                            if line_text.startswith(
-                                ("[全书目录]", "[项目目录]", "[返回")
-                            )
-                        ),
-                        None,
-                    )
-                    if nav_at is not None:
-                        updated = (
-                            lines[: nav_at + 1] + ["", line] + lines[nav_at + 1 :]
-                        )
-                    else:
-                        updated = lines[:2] + ["", line] + lines[2:]
+                    updated = lines[:2] + ["", line] + lines[2:]
         status = "inserted"
 
     new_text = "\n".join(updated) + "\n"

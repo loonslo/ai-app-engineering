@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 6.1](../6.1-choose-prompt-rag-finetune/README.md) · [下一章 项目实战](../../../flagship-project/README.md)
 
 - **能力**：比较基座/适配器 held-out 得分；校验 LoRA 学习率/epoch/rank/alpha。
-- **v2 路径**：L6 / 选做（Gate；LoRA 质量门禁）
 - **v3 路径**：选修 / 选修（概念并入 L5.12）
 - **前置**：6.1（选型）。
 - **时间盒**：4 小时（不含真实训练）。

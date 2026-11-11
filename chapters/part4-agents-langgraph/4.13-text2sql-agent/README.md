@@ -3,7 +3,6 @@
 [全书目录](../../README.md) · [上一章 4.12](../4.12-tool-safety-search/README.md) · [下一章 4.14](../4.14-supervisor-fanout/README.md)
 
 - **能力**：SELECT-only；危险关键字；表白名单；强制 LIMIT；结构化/非结构化分流。
-- **v2 路径**：L4.12 / 选做（Gate；Text2SQL 安全门）
 - **v3 路径**：选修 / 选修（数据类岗位再学）
 - **前置**：9.6（只读 SQL）。
 - **时间盒**：4 小时。

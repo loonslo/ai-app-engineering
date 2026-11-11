@@ -1,11 +1,11 @@
-# tests/test_0_1.py
+# course/lesson_01/test_0_1.py
 import asyncio
 import time
 from decimal import Decimal
 import httpx
 import pytest
-from invoice_models import RawInvoiceInput
-from invoice_batch import (
+from course.lesson_01.invoice_models import RawInvoiceInput
+from course.lesson_01.invoice_batch import (
     process_invoices_broken_async,
     process_invoices_async,
 )

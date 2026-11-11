@@ -1,6 +1,6 @@
 # Tasks
 
-状态核对：2026-11-09。V3-0–V3-10 的实施批次均有对应验证记录；V3-4 与 V3-5 审核结论均为通过，V3-4 复核见 `docs/v3/reviews/V3-4.md`。capstone 依赖、默认语料边界、评测拒答口径与 CI 检查的本轮修复/复测见 `docs/capstone-repair-validation.md`。2026-11-04 完成旧版书籍排版工具链（pdf-course/）与临时缓存/配置清理（释放 70MB+）。2026-11-09 完成 v2 路线移除收尾，验证见 `docs/project-v2-removal-validation.md`。尚未关闭：L2.12 拒答率未达 90% 门槛、capstone 失败样本待重新生成、真实学习与试教、外部生产验收、第三方内容版权确认。统一入口见 `chapters/README.md`；课件实现与 gate 通过不代表本人已学完。
+状态核对：2026-11-09。V3-0–V3-10 的实施批次均有对应验证记录；V3-4 与 V3-5 审核结论均为通过，V3-4 复核见 `docs/v3/reviews/V3-4.md`。capstone 依赖、默认语料边界、评测拒答口径与 CI 检查的本轮修复/复测见 `docs/capstone-repair-validation.md`。2026-11-04 完成旧版书籍排版工具链（pdf-course/）与临时缓存/配置清理（释放 70MB+）。2026-11-09 完成 v2 路线移除收尾，验证见 `docs/project-v2-removal-validation.md`。尚未关闭：L2.12 拒答率未达 90% 门槛、capstone 失败样本待重新生成、真实学习与试教、外部生产验收、第三方内容版权确认。报销课入口见 `course/README.md`，配套练习见 `chapters/README.md`；课件实现与 gate 通过不代表本人已学完。
 
 ## Active
 
@@ -20,6 +20,8 @@
 - [ ] **求职准备** - 只从 `capstone/docs/portfolio/` 和真实报告提取可证明结论
 
 ## Done
+
+- [x] **整理学习入口（2026-11-11）** - 首页指向报销课，首篇文章、示例和测试集中到 `course/lesson_01/`，删除与本文件重复的根目录待办索引。验证见 [学习目录整理记录](docs/course-layout-validation.md)。
 
 - [x] **v2 路线移除收尾（2026-11-09）** - 2026-11-08 的清理改动落盘后上一会话中断，本次补完：删除 30 个 v2 文档与 `tools/apply_v2_map.py`，112 个 README 去掉 `v2 路径` 行（chapters 83、flagship 29），CI 与 `docs/v3/` 去掉 v2 检查；删掉上一会话被 ACL 拒绝的 `.pytest-tmp`、`.acl-recovery`，以及 14 个空 `pytest-cache-files-*`、`chapters/.wtest_backend`、根目录 `.cleanup_v2.py`；恢复 `pytest.ini` 的 `--basetemp=.tmp/pytest` 并重建 `.tmp/`；1.1 README 头部改为标题、空行、标签、空行、正文，29 个旗舰 README 收敛删行后多出的空行。验证：`apply_v3_map --check` 119 unchanged、462 个 Markdown 0 断链、ruff py311 通过、106 项工具与章节测试通过、capstone baseline 通过；`milestones --strict-evidence` 因 `capstone/data/failures.json` 被删缺一项。未调用真实模型、未在 CI 的 3.11 复跑、未提交；证据见 `docs/project-v2-removal-validation.md`。
 

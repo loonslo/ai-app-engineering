@@ -4,7 +4,7 @@ import time
 from typing import Any
 import httpx
 from pydantic import ValidationError
-from invoice_models import RawInvoiceInput
+from course.lesson_01.invoice_models import RawInvoiceInput
 
 
 def mock_sync_ocr_verify(invoice_id: str, delay_seconds: float = 0.1) -> dict[str, Any]:

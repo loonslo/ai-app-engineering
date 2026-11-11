@@ -131,7 +131,7 @@
 
 | 篇号 | 可独立发布的文章标题 | 主要能力 |
 |---|---|---|
-| **0.1** | 为什么 `async def` 里的阻塞调用会拖慢全部请求？——从脏发票校验到异步限流 | 软件工程准入 |
+| **[0.1](../course/lesson_01/README.md)** | 为什么 `async def` 里的阻塞调用会拖慢全部请求？——从脏发票校验到异步限流 | 软件工程准入 |
 | **0.2** | 并发报销为什么会把预算扣成负数？——FastAPI 事务与数据库锁 | 软件工程准入 |
 | **0.3** | 没有真实外部接口，怎么证明代码可靠？——pytest、Mock、Git 与 Docker | 软件工程准入 |
 | **1.1** | 浏览器点击“停止”，为什么模型还在继续生成？——原生 LLM API 与 SSE | LLM 与 Workflow |
@@ -161,7 +161,7 @@
 ## 阶段 0：工程准入（3 篇）
 - **0.1** 为什么 `async def` 里的阻塞调用会拖慢全部请求？——从脏发票校验到异步限流
   - 核心：Pydantic V2 校验、`httpx.AsyncClient` 复用、`asyncio.Semaphore` 限流、逐请求超时与错误分类。
-  - 产出：`invoice_models.py`、`invoice_batch.py`、`tests/test_0_1.py`。
+  - 产出：`invoice_models.py`、`invoice_batch.py`、`course/lesson_01/test_0_1.py`。
 - **0.2** 并发报销为什么会把预算扣成负数？——FastAPI 事务与数据库锁
   - 核心：FastAPI 路由与依赖注入、SQLAlchemy 2.x `AsyncSession`、行锁/乐观锁、事务整体回滚。
   - 产出：`expense_api.py`、Alembic 迁移、并发回归测试。

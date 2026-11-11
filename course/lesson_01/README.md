@@ -2,8 +2,9 @@
 
 > 系列：生产级 AI 应用开发 · 第 0.1 篇（可独立阅读）  
 > 运行环境：Python 3.10+，无需外部 API 密钥或付费模型  
-> 核心代码与测试：`invoice_models.py`、`invoice_batch.py`、`tests/test_0_1.py`  
-> 验收命令：`python -m pytest tests/test_0_1.py -v`
+> 核心代码与测试：`invoice_models.py`、`invoice_batch.py`、`course/lesson_01/test_0_1.py`
+>
+> 验收命令：`python -m pytest course/lesson_01/test_0_1.py -v`
 
 平时处理发票或者调用外部第三方接口，如果只是写个单机脚本，拿列表循环一张张处理，一般不会觉得有什么问题。
 
@@ -72,7 +73,7 @@ class RawInvoiceInput(BaseModel):
 import time
 from typing import Any
 from pydantic import ValidationError
-from invoice_models import RawInvoiceInput
+from course.lesson_01.invoice_models import RawInvoiceInput
 
 
 def mock_sync_ocr_verify(invoice_id: str, delay_seconds: float = 0.1) -> dict[str, Any]:
@@ -298,17 +299,17 @@ async def process_invoices_async(
 1. 脏数据是否在本地就被完全拦截？（确定性规则测试）
 2. 异步限流是否真的在保护下游的同时缩短了耗时？（性能与行为边界测试）
 
-测试文件位于 `tests/test_0_1.py`：
+测试文件位于 `course/lesson_01/test_0_1.py`：
 
 ```python
-# tests/test_0_1.py
+# course/lesson_01/test_0_1.py
 import asyncio
 import time
 from decimal import Decimal
 import httpx
 import pytest
-from invoice_models import RawInvoiceInput
-from invoice_batch import (
+from course.lesson_01.invoice_models import RawInvoiceInput
+from course.lesson_01.invoice_batch import (
     process_invoices_broken_async,
     process_invoices_async,
 )
@@ -410,7 +411,7 @@ def test_timeout_is_classified_correctly():
 
 运行测试：
 ```bash
-python -m pytest tests/test_0_1.py -v
+python -m pytest course/lesson_01/test_0_1.py -v
 ```
 
 所有测试用例都会稳定通过。测试不仅锁定了脏数据拦截的确定性，也通过精确的延迟对比证实了：阻塞消除之后，任务成功按信号量窗口交替完成了重叠。

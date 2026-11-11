@@ -1,19 +1,21 @@
 ---
 project_id: ai-app-engineering
-updated: 2026-11-09
+updated: 2026-11-11
 status: active
 overview: 测试工程师转 AI 应用开发的章节课程、capstone 整合项目与岗位选修专项；企业客服旗舰项目已冻结为历史快照。
-progress: 2026-11-09：完成 v2 路线移除收尾——删除 30 个 v2 文档与 `tools/apply_v2_map.py`、112 个 README 去掉 `v2 路径` 行、CI 与 `docs/v3/` 去掉 v2 检查，并清掉上一会话被 ACL 拒绝的 `.pytest-tmp`、`.acl-recovery` 与残留缓存；离线复跑结果为 `apply_v3_map --check` 119 unchanged、462 个 Markdown 0 断链、ruff 通过、106 项工具与章节测试通过、capstone baseline 通过，`capstone.milestones --strict-evidence` 因运行产物 `capstone/data/failures.json` 被清理而缺一项，需一次真实评测重新生成。
+progress: 2026-11-11：整理报销课入口，首课示例与测试集中到同一目录，离线复跑 5 项通过，尚未试教。
+  2026-11-09：完成 v2 路线移除收尾——删除 30 个 v2 文档与 `tools/apply_v2_map.py`、112 个 README 去掉 `v2 路径` 行、CI 与 `docs/v3/` 去掉 v2 检查，并清掉上一会话被 ACL 拒绝的 `.pytest-tmp`、`.acl-recovery` 与残留缓存；离线复跑结果为 `apply_v3_map --check` 119 unchanged、462 个 Markdown 0 断链、ruff 通过、106 项工具与章节测试通过、capstone baseline 通过，`capstone.milestones --strict-evidence` 因运行产物 `capstone/data/failures.json` 被清理而缺一项，需一次真实评测重新生成。
   此前 2026-11-05：确立《从零到就业：生产级 AI 应用与 Agent 全栈工程实战 课程总纲、22 篇独立文章选题、撰稿规范与工程验收手册（最终编辑版 v3.0）》（docs/course-outline-22-articles-v3.0.md）为唯一最新大纲；完成阶段
-  0 第 0.1 篇《为什么 async def 里的阻塞调用会拖慢全部请求？——从脏发票校验到异步限流》随笔范文（docs/articles/0.1-async-blocking-invoice.md），配套发票模型、批处理限流与 5 项确定性/并发测试（tests/test_0_1.py）全部通过；清理历史中间过渡大纲草案（v6/v6.1/v7
+  0 第 0.1 篇《为什么 async def 里的阻塞调用会拖慢全部请求？——从脏发票校验到异步限流》随笔范文（course/lesson_01/README.md），配套发票模型、批处理限流与 5 项确定性/并发测试（course/lesson_01/test_0_1.py）全部通过；清理历史中间过渡大纲草案（v6/v6.1/v7
   共 6 个文档）与孤立样稿，消除干扰。此前记录：历史修复和离线测试结果见 docs/capstone-repair-validation.md。历史 L2.12 Hybrid 拒答率 71.88% 未达 90%；真实学习、真实生产验收和第三方内容权利仍未完成，第三方材料按用户决定暂时保留且不得公开分发。
 next: 跑一次真实评测重新生成 capstone/data/failures.json，让 milestones 的严格证据检查恢复；真实学习与试教；为 L2.12 拒答门槛提供代表性评测和真实 reranker/model 证据；补齐真实模型、远端 CI、staging、容量、OTLP、恢复与事故演练；面试题/ 暂保留，公开前确认复用权利或移除复制内容。
 evidence:
+- docs/course-layout-validation.md
 - docs/course-outline-22-articles-v3.0.md
-- docs/articles/0.1-async-blocking-invoice.md
-- invoice_models.py
-- invoice_batch.py
-- tests/test_0_1.py
+- course/lesson_01/README.md
+- course/lesson_01/invoice_models.py
+- course/lesson_01/invoice_batch.py
+- course/lesson_01/test_0_1.py
 - README.md
 - TASKS.md
 - chapters/README.md
